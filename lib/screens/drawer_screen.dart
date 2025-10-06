@@ -5,8 +5,13 @@ import 'package:learning_english/screens/note_screen.dart';
 import 'package:learning_english/screens/course_screen.dart';
 import 'package:learning_english/screens/grammar_screen.dart';
 import 'package:learning_english/screens/home_screen.dart';
+import 'package:learning_english/service/google_auth_service.dart';
 import 'package:learning_english/service/auth_service.dart';
 import 'package:learning_english/service/user_service.dart';
+
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../service/user_prefs.dart';
 
 class DrawerScreen extends StatefulWidget {
   const DrawerScreen({super.key});
@@ -18,9 +23,11 @@ class DrawerScreen extends StatefulWidget {
 class _DrawerScreenState extends State<DrawerScreen> {
   final _authService = AuthService();
   final _userService = UserService();
+  final _googleAuthService = GoogleAuthService();
   int _selectedItem = 0;
 
   // Biến lưu thông tin user
+  bool isLoggedIn = false;
   String? _fullName;
   String? _email;
   String? _avatarUrl;
@@ -38,6 +45,7 @@ class _DrawerScreenState extends State<DrawerScreen> {
   void initState() {
     super.initState();
     _loadUserData();
+    _checkLoginStatus();
   }
 
   // Hàm load dữ liệu user
@@ -119,7 +127,14 @@ class _DrawerScreenState extends State<DrawerScreen> {
 
   Future<void> _logout() async {
     try {
-      await _authService.signOut();
+      final isGoogleUser = _googleAuthService.isSignedIn && _googleAuthService.googleAccount != null;
+
+      if(isGoogleUser){
+        await _googleAuthService.signOut();
+      }else{
+        await _authService.signOut();
+        await UserPrefs.clearUser();
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -161,6 +176,19 @@ class _DrawerScreenState extends State<DrawerScreen> {
       }
     }
   }
+
+  //Check login status
+  Future<void> _checkLoginStatus() async {
+    final user = await UserPrefs.getUser();
+    setState(() {
+      isLoggedIn = user['isLoggedIn'] == true; // đảm bảo boolean đúng
+      _fullName = user['full_name'] ?? 'User';
+      _email = user['email'] ?? 'No email';
+      _avatarUrl = user['avatar_url'];
+      _isLoading = false;
+    });
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -243,10 +271,22 @@ class _DrawerScreenState extends State<DrawerScreen> {
               onTap: () => _onItemTapped(4),
             ),
             Divider(),
-            ListTile(
+            //Swtich signIn and signOut
+            isLoggedIn
+                ? ListTile(
               leading: const Icon(Icons.logout, color: Colors.red),
               title: const Text('Đăng xuất', style: TextStyle(color: Colors.red)),
               onTap: _showLogoutDialog,
+            )
+                : ListTile(
+              leading: const Icon(Icons.login, color: Colors.green),
+              title: const Text('Đăng nhập', style: TextStyle(color: Colors.green)),
+              onTap: () {
+                Navigator.of(context).pushNamedAndRemoveUntil(
+                  '/signIn',
+                      (route) => false,
+                );
+              },
             ),
           ],
         ),

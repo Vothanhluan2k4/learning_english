@@ -1,33 +1,46 @@
+import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:learning_english/core/supabase_config.dart';
 import 'package:learning_english/core/uni_links.dart';
 import 'package:learning_english/screens/drawer_screen.dart';
+import 'package:learning_english/screens/forgot_password_screen.dart';
 import 'package:learning_english/screens/home_screen.dart';
 import 'package:learning_english/screens/setting_screen.dart';
 import 'package:learning_english/screens/note_screen.dart';
 import 'package:learning_english/screens/course_screen.dart';
 import 'package:learning_english/screens/grammar_screen.dart';
-import 'package:learning_english/screens/login_screen.dart';
 import 'package:learning_english/screens/signIn_screen.dart';
 import 'package:learning_english/screens/signUp_screen.dart';
+import 'package:learning_english/screens/verify_otp_screen.dart' hide ForgotPasswordScreen;
 import 'package:learning_english/service/auth_service.dart'; // Import AuthService
 import 'dart:async';
+
+import 'package:learning_english/service/google_auth_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 
 void main() async{
   WidgetsFlutterBinding.ensureInitialized();
+  final prefs = await SharedPreferences.getInstance();
+  final bool isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
 
   //initialize Supabase
   await SupabaseConfig.initialize();
   final deepLinkService = DeepLinkService();
   await deepLinkService.initDeepLinks();
 
-  runApp(const MyApp());
+  // Initialize Google Sign In
+  final googleAuth = GoogleAuthService();
+  await googleAuth.initialize();
+
+
+  runApp( MyApp(isLoggedIn: isLoggedIn));
 }
 
 class MyApp extends StatefulWidget {
-  const MyApp({super.key});
+  final bool isLoggedIn;
+  const MyApp({super.key, required this.isLoggedIn});
 
   @override
   State<MyApp> createState() => _MyAppState();
@@ -36,25 +49,27 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   Timer? _expiryCheckTimer;
   final AuthService _authService = AuthService();
-  final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+  final _appLinks =  AppLinks();
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
 
-    // Kiểm tra ngay khi app khởi động
     Future.delayed(Duration(seconds: 1), () {
       _checkLoginExpiry();
     });
 
-    // Kiểm tra định kỳ mỗi giờ
     _expiryCheckTimer = Timer.periodic(
       Duration(hours: 1),
           (timer) => _checkLoginExpiry(),
     );
+
   }
 
+
+  //Auth Check Login
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // Kiểm tra khi app trở lại foreground
@@ -69,13 +84,13 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
       if (isExpired) {
         // Chuyển về màn hình login
-        navigatorKey.currentState?.pushNamedAndRemoveUntil(
+        _navigatorKey.currentState?.pushNamedAndRemoveUntil(
           '/signIn',
               (route) => false,
         );
 
         // Hiển thị thông báo
-        final context = navigatorKey.currentContext;
+        final context = _navigatorKey.currentContext;
         if (context != null && mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -101,15 +116,15 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      navigatorKey: navigatorKey,
+      navigatorKey: _navigatorKey,
       title: 'Lun English',
       theme: ThemeData(primaryColor: Colors.blue),
-      initialRoute: '/signIn',
+      initialRoute: widget.isLoggedIn ? '/homedrawer' : '/signIn',
       routes: {
         '/signUp': (context) => SignUpScreen(),
         '/signIn': (context) => SignInScreen(),
+        '/forgotPassword': (context) => ForgotPasswordScreen(),
         '/homedrawer': (context) => DrawerScreen(),
-        '/login': (context) => const LoginScreen(),
         '/home': (context) => const HomeScreen(),
       },
     );

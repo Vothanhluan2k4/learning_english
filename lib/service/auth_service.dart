@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AuthService{
@@ -122,6 +124,19 @@ class AuthService{
     }
   }
 
+  //Get user
+  Future<Map<String, dynamic>> getUserData(String authId) async {
+    final response = await _supabase
+        .from('users')
+        .select()
+        .eq('auth_id', authId)
+        .maybeSingle();
+
+    if (response == null) throw Exception('Không tìm thấy thông tin người dùng');
+    return Map<String, dynamic>.from(response);
+  }
+
+
   //signIn
   Future<AuthResponse> signIn({
     required String email,
@@ -147,17 +162,8 @@ class AuthService{
     await _supabase.auth.signOut();
   }
 
-  //Reset password
-  Future<void> resetPassword(String email) async{
-    await _supabase.auth.resetPasswordForEmail(email);
-  }
 
-  //Update password
-  Future<UserResponse> updatePassword(String newPassword) async{
-    return await _supabase.auth.updateUser(
-        UserAttributes(password: newPassword)
-    );
-  }
+
 
   //Check Login Expiry
   Future<bool> checkLoginExpiry() async {
