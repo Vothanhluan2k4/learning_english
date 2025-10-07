@@ -13,6 +13,7 @@ import 'package:learning_english/screens/grammar_screen.dart';
 import 'package:learning_english/screens/signIn_screen.dart';
 import 'package:learning_english/screens/signUp_screen.dart';
 import 'package:learning_english/screens/verify_otp_screen.dart' hide ForgotPasswordScreen;
+import 'package:learning_english/screens/welcome_screen.dart';
 import 'package:learning_english/service/auth_service.dart'; // Import AuthService
 import 'dart:async';
 
@@ -119,13 +120,15 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       navigatorKey: _navigatorKey,
       title: 'Lun English',
       theme: ThemeData(primaryColor: Colors.blue),
-      initialRoute: widget.isLoggedIn ? '/homedrawer' : '/signIn',
+      initialRoute: widget.isLoggedIn ? '/welcome' : '/signIn',
       routes: {
         '/signUp': (context) => SignUpScreen(),
         '/signIn': (context) => SignInScreen(),
+        '/welcome': (context) => WelcomeScreen(),
         '/forgotPassword': (context) => ForgotPasswordScreen(),
         '/homedrawer': (context) => DrawerScreen(),
         '/home': (context) => const HomeScreen(),
+
       },
     );
   }
