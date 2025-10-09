@@ -30,13 +30,13 @@ class _GrammarScreenState extends State<GrammarScreen> {
   // Map màu sắc và icon cho từng topic
   final Map<int, Map<String, dynamic>> topicStyles = {
     0: {'color': Colors.red, 'icon': Icons.swap_horiz},
-    1: {'color': Colors.teal, 'icon': Icons.psychology},
-    2: {'color': Colors.green, 'icon': Icons.link},
-    3: {'color': Colors.purple, 'icon': Icons.alt_route},
-    4: {'color': Colors.blue, 'icon': Icons.access_time},
+    1: {'color': Colors.brown, 'icon': Icons.place},
+    2: {'color': Colors.blue, 'icon': Icons.access_time},
+    3: {'color': Colors.green, 'icon': Icons.link},
+    4: {'color': Colors.purple, 'icon': Icons.alt_route},
     5: {'color': Colors.orange, 'icon': Icons.record_voice_over},
     6: {'color': Colors.indigo, 'icon': Icons.text_fields},
-    7: {'color': Colors.brown, 'icon': Icons.place},
+    7: {'color': Colors.teal, 'icon': Icons.psychology},
   };
 
   // Map screens cho từng topic (theo topic_name_en hoặc id)

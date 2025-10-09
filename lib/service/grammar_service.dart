@@ -75,44 +75,7 @@ class GrammarService {
     }
   }
 
-  // 2️ Lấy danh sách bài học theo TÊN CHỦ ĐỀ (VD: "Tenses")
-
-  Future<List<Lesson>> getLessonsByTopicName(String topicName) async {
-    // Lấy ID của topic theo topic_name_en
-    final topicResponse = await _supabase
-        .from('topics')
-        .select('id')
-        .eq('topic_name_en', topicName)
-        .maybeSingle();
-
-    if (topicResponse == null) {
-      throw Exception('Không tìm thấy chủ đề: $topicName');
-    }
-
-    final topicId = topicResponse['id'];
-
-    final lessonsResponse = await _supabase
-        .from('lessons')
-        .select()
-        .eq('topic_id', topicId)
-        .order('order_in_topic', ascending: true);
-
-    return lessonsResponse.map<Lesson>((json) => Lesson.fromJson(json)).toList();
-  }
-
-  // 3️ Lấy nội dung bài học (Lesson Content)
-
-  Future<List<LessonContent>> getLessonContents(String lessonId) async {
-    final response = await _supabase
-        .from('lesson_contents')
-        .select()
-        .eq('lesson_id', lessonId)
-        .order('order_in_lesson', ascending: true);
-
-    return response.map<LessonContent>((json) => LessonContent.fromJson(json)).toList();
-  }
-
-  // 4️ Lấy danh sách bài tập của một bài học
+  //  Lấy danh sách bài tập của một bài học
 
   Future<List<Exercise>> getExercises(String lessonId) async {
     final response = await _supabase
@@ -122,14 +85,6 @@ class GrammarService {
 
     return response.map<Exercise>((json) => Exercise.fromJson(json)).toList();
   }
-  //  Lấy chi tiết một bài học theo ID
-  Future<Map<String, dynamic>?> getLessonById(String lessonId) async {
-    final response = await _supabase
-        .from('lessons')
-        .select()
-        .eq('id', lessonId)
-        .maybeSingle();
-    return response;
-  }
+
 
 }
