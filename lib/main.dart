@@ -7,7 +7,7 @@ import 'package:learning_english/screens/drawer_screen.dart';
 import 'package:learning_english/screens/forgot_password_screen.dart';
 import 'package:learning_english/screens/home_screen.dart';
 import 'package:learning_english/screens/setting_screen.dart';
-import 'package:learning_english/screens/note_screen.dart';
+import 'package:learning_english/screens/flashcards_screen.dart';
 import 'package:learning_english/screens/course_screen.dart';
 import 'package:learning_english/screens/grammar_screen.dart';
 import 'package:learning_english/screens/signIn_screen.dart';
@@ -119,7 +119,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     return MaterialApp(
       navigatorKey: _navigatorKey,
       title: 'Lun English',
-      theme: ThemeData(primaryColor: Colors.blue),
+      theme: ThemeData(primaryColor: Colors.blue[450]),
       initialRoute: widget.isLoggedIn ? '/welcome' : '/signIn',
       routes: {
         '/signUp': (context) => SignUpScreen(),

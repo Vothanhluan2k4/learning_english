@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:learning_english/screens/setting_screen.dart';
-import 'package:learning_english/screens/note_screen.dart';
+import 'package:learning_english/screens/flashcards_screen.dart';
 import 'package:learning_english/screens/course_screen.dart';
 import 'package:learning_english/screens/grammar_screen.dart';
 import 'package:learning_english/screens/home_screen.dart';
@@ -37,7 +37,7 @@ class _DrawerScreenState extends State<DrawerScreen> {
     HomeScreen(),
     CourseScreen(),
     GrammarScreen(),
-    NoteScreen(),
+    FlashcardsScreen(),
     SettingScreen(),
   ];
 
@@ -262,7 +262,7 @@ class _DrawerScreenState extends State<DrawerScreen> {
             ),
             ListTile(
               leading: const Icon(Icons.note),
-              title: const Text('Ghi chú'),
+              title: const Text('FlashCards'),
               onTap: () => _onItemTapped(3),
             ),
             ListTile(
