@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:learning_english/models/lesson.dart';
-import 'package:learning_english/service/prepositons_service.dart';
+import 'package:learning_english/service/grammar_service.dart';
 import '../prepositions/prepositions_detail_screen.dart';
 
 class PrepositionsScreen extends StatefulWidget {
@@ -11,7 +11,7 @@ class PrepositionsScreen extends StatefulWidget {
 }
 
 class _PrepositionsScreenState extends State<PrepositionsScreen> {
-  final PrepositonsService _prepositionsService = PrepositonsService();
+  final GrammarService _grammarService = GrammarService();
   List<Lesson> lessons = [];
   bool isLoading = true;
   String? errorMessage;
@@ -29,7 +29,7 @@ class _PrepositionsScreenState extends State<PrepositionsScreen> {
         errorMessage = null;
       });
 
-      final result = await _prepositionsService.getLessonsByTopicName('Prepositions');
+      final result = await _grammarService.getLessonsByTopicName('Prepositions');
       setState(() {
         lessons = result;
         isLoading = false;

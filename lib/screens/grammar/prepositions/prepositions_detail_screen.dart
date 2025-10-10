@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:learning_english/service/prepositons_service.dart';
+import 'package:learning_english/service/grammar_service.dart';
 import 'package:learning_english/models/lesson_content.dart';
 import 'prepositions_exercise.dart';
 
@@ -12,7 +12,7 @@ class PrepositionsDetailScreen extends StatefulWidget {
 }
 
 class _PrepositionsDetailScreenState extends State<PrepositionsDetailScreen> {
-  final PrepositonsService _prepositonsService = PrepositonsService();
+  final GrammarService _grammarService = GrammarService();
   Map<String, dynamic>? _lesson;
   List<LessonContent> _contents = [];
   bool _loading = true;
@@ -24,8 +24,8 @@ class _PrepositionsDetailScreenState extends State<PrepositionsDetailScreen> {
   }
 
   Future<void> _loadLesson() async {
-    final lesson = await _prepositonsService.getLessonById(widget.lessonId);
-    final contents = await _prepositonsService.getLessonContents(widget.lessonId);
+    final lesson = await _grammarService.getLessonById(widget.lessonId);
+    final contents = await _grammarService.getLessonContents(widget.lessonId);
 
     setState(() {
       _lesson = lesson;

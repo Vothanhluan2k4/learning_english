@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:learning_english/service/modalverbs_service.dart';
+import 'package:learning_english/service/grammar_service.dart';
 import 'package:learning_english/models/lesson_content.dart';
 import 'modalverbs_exercise.dart';
 
@@ -12,7 +12,7 @@ class ModalverbsDetailScreen extends StatefulWidget {
 }
 
 class _ModalverbsDetailScreenState extends State<ModalverbsDetailScreen> {
-  final ModalverbsService _modalverbsService = ModalverbsService();
+  final GrammarService _grammarService = GrammarService();
   Map<String, dynamic>? _lesson;
   List<LessonContent> _contents = [];
   bool _loading = true;
@@ -24,8 +24,8 @@ class _ModalverbsDetailScreenState extends State<ModalverbsDetailScreen> {
   }
 
   Future<void> _loadLesson() async {
-    final lesson = await _modalverbsService.getLessonById(widget.lessonId);
-    final contents = await _modalverbsService.getLessonContents(widget.lessonId);
+    final lesson = await _grammarService.getLessonById(widget.lessonId);
+    final contents = await _grammarService.getLessonContents(widget.lessonId);
 
     setState(() {
       _lesson = lesson;

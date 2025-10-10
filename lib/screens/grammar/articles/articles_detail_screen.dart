@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:learning_english/service/articles_service.dart';
+import 'package:learning_english/service/grammar_service.dart';
 import 'package:learning_english/models/lesson_content.dart';
 import 'articles_exercise.dart';
 
@@ -12,7 +12,7 @@ class ArticlesDetailScreen extends StatefulWidget {
 }
 
 class _ArticlesDetailScreenState extends State<ArticlesDetailScreen> {
-  final ArticlesService _articlesService = ArticlesService();
+  final GrammarService _grammarService = GrammarService();
   Map<String, dynamic>? _lesson;
   List<LessonContent> _contents = [];
   bool _loading = true;
@@ -24,8 +24,8 @@ class _ArticlesDetailScreenState extends State<ArticlesDetailScreen> {
   }
 
   Future<void> _loadLesson() async {
-    final lesson = await _articlesService.getLessonById(widget.lessonId);
-    final contents = await _articlesService.getLessonContents(widget.lessonId);
+    final lesson = await _grammarService.getLessonById(widget.lessonId);
+    final contents = await _grammarService.getLessonContents(widget.lessonId);
 
     setState(() {
       _lesson = lesson;

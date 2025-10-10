@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:learning_english/models/lesson.dart';
-import '../../../service/articles_service.dart';
+import '../../../service/grammar_service.dart';
 import '../articles/articles_detail_screen.dart';
 
 class ArticlesScreen extends StatefulWidget {
@@ -11,7 +11,7 @@ class ArticlesScreen extends StatefulWidget {
 }
 
 class _ArticlesScreenState extends State<ArticlesScreen> {
-  final ArticlesService _articlesService = ArticlesService();
+  final GrammarService _grammarService = GrammarService();
   List<Lesson> lessons = [];
   bool isLoading = true;
   String? errorMessage;
@@ -29,7 +29,7 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
         errorMessage = null;
       });
 
-      final result = await _articlesService.getLessonsByTopicName('Articles');
+      final result = await _grammarService.getLessonsByTopicName('Articles');
       setState(() {
         lessons = result;
         isLoading = false;
