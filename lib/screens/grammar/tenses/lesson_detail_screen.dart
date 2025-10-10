@@ -37,50 +37,399 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(color: Colors.blue),
+              SizedBox(height: 20),
+              Text('Đang tải bài học...', style: TextStyle(color: Colors.grey)),
+            ],
+          ),
+        ),
       );
     }
 
     if (_lesson == null) {
-      return const Scaffold(
-        body: Center(child: Text('Không tìm thấy bài học.')),
+      return Scaffold(
+        appBar: AppBar(title: Text('Lỗi')),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error_outline, size: 80, color: Colors.red[300]),
+              SizedBox(height: 16),
+              Text('Không tìm thấy bài học.'),
+              SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('Quay lại'),
+              ),
+            ],
+          ),
+        ),
       );
     }
 
     return DefaultTabController(
       length: 2,
       child: Scaffold(
+        backgroundColor: Colors.grey[50],
         appBar: AppBar(
           title: Text(_lesson!['title'] ?? 'Chi tiết bài học'),
-          bottom: const TabBar(
+          backgroundColor: Colors.blue[600],
+          foregroundColor: Colors.white,
+          elevation: 0,
+          bottom: TabBar(
+            indicatorColor: Colors.white,
+            indicatorWeight: 3,
+            labelStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.bold,color: Colors.white),
+            unselectedLabelStyle: TextStyle(fontSize: 16),
             tabs: [
-              Tab(text: 'Nội dung'),
-              Tab(text: 'Bài tập'),
+              Tab(icon: Icon(Icons.book), text: 'Nội dung',),
+              Tab(icon: Icon(Icons.edit_note), text: 'Bài tập'),
             ],
           ),
         ),
         body: TabBarView(
           children: [
-            ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _contents.length,
-              itemBuilder: (context, index) {
-                final content = _contents[index];
-                return Column(
+            _buildContentTab(),
+            ExerciseScreen(lessonId: widget.lessonId),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContentTab() {
+    if (_contents.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.description_outlined, size: 80, color: Colors.grey[400]),
+            SizedBox(height: 16),
+            Text('Chưa có nội dung cho bài học này'),
+          ],
+        ),
+      );
+    }
+
+
+    // Phân loại nội dung
+    final structures = _contents.where((c) => c.type == 'structure').toList();
+    final explanations = _contents.where((c) => c.type == 'explanation').toList();
+    final examples = _contents.where((c) => c.type == 'example').toList();
+
+    return SingleChildScrollView(
+      physics: BouncingScrollPhysics(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header với màu nền đơn giản
+          Container(
+            width: double.infinity,
+            color: Colors.white, // Thay bằng màu nền mong muốn
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _lesson!['title'] ?? '',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
+                  ),
+                ),
+                if (_lesson!['description'] != null) ...[
+                  SizedBox(height: 8),
+                  Text(
+                    _lesson!['description'],
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+
+          // 📋 Công thức
+          if (structures.isNotEmpty) ...[
+            _buildSectionHeader(Icons.architecture, 'Công thức', Colors.orange),
+            ...structures.map((content) => _buildStructureCard(content)),
+          ],
+
+          // 💡 Giải thích
+          if (explanations.isNotEmpty) ...[
+            _buildSectionHeader(Icons.lightbulb_outline, 'Giải thích', Colors.purple),
+            ...explanations.map((content) => _buildExplanationCard(content)),
+          ],
+
+          // 📝 Ví dụ
+          if (examples.isNotEmpty) ...[
+            _buildSectionHeader(Icons.format_quote, 'Ví dụ minh họa', Colors.green),
+            ...examples.map((content) => _buildExampleCard(content)),
+          ],
+
+          SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(IconData icon, String title, Color color) {
+    return Container(
+      margin: EdgeInsets.fromLTRB(16, 24, 16, 12),
+      child: Row(
+        children: [
+          Container(
+            padding: EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: color, size: 24),
+          ),
+          SizedBox(width: 12),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStructureCard(LessonContent content) {
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (content.dataTitle != null)
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.orange[50],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  content.dataTitle!,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.orange[800],
+                  ),
+                ),
+              ),
+            if (content.dataBody != null) ...[
+              SizedBox(height: 12),
+              Container(
+                padding: EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.orange[200]!, width: 2),
+                ),
+                child: Text(
+                  content.dataBody!,
+                  style: TextStyle(
+                    fontSize: 17,
+                    color: Colors.black,
+                    height: 1.5,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildExplanationCard(LessonContent content) {
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (content.dataTitle != null)
+              Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.purple[400], size: 20),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      content.dataTitle!,
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.purple[700],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            if (content.dataBody != null) ...[
+              SizedBox(height: 12),
+              Text(
+                content.dataBody!,
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.black87,
+                  height: 1.6,
+                ),
+              ),
+            ],
+            if (content.exampleSentence != null) ...[
+              SizedBox(height: 16),
+              Container(
+                padding: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.purple[50],
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border(
+                    left: BorderSide(color: Colors.purple[400]!, width: 4),
+                  ),
+                ),
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(content.dataTitle ?? '',
-                        style: const TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 8),
-                    Text(content.dataBody ?? ''),
-                    const Divider(height: 24),
+                    Text(
+                      'Ví dụ:',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.purple[600],
+                      ),
+                    ),
+                    SizedBox(height: 6),
+                    Text(
+                      content.exampleSentence!,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontStyle: FontStyle.italic,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    if (content.exampleTranslation != null) ...[
+                      SizedBox(height: 6),
+                      Text(
+                        '→ ${content.exampleTranslation!}',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
                   ],
-                );
-              },
-            ),
-            ExerciseScreen(lessonId: widget.lessonId),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildExampleCard(LessonContent content) {
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Colors.green[50]!, Colors.green[100]!],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.green[300]!, width: 1),
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (content.dataTitle != null)
+              Row(
+                children: [
+                  Icon(Icons.chat_bubble_outline, color: Colors.green[700], size: 20),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      content.dataTitle!,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green[800],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            if (content.exampleSentence != null) ...[
+              SizedBox(height: 12),
+              Text(
+                content.exampleSentence!,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontStyle: FontStyle.italic,
+                  color: Colors.black87,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+            if (content.exampleTranslation != null) ...[
+              SizedBox(height: 8),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.arrow_forward, size: 16, color: Colors.green[600]),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      content.exampleTranslation!,
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: Colors.black54,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),

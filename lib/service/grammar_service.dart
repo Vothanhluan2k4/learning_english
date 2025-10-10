@@ -120,7 +120,6 @@ class GrammarService {
   }
 
   //  Lấy nội dung bài học (Lesson Content)
-
   Future<List<LessonContent>> getLessonContents(String lessonId) async {
     final response = await _supabase
         .from('lesson_contents')
@@ -131,6 +130,7 @@ class GrammarService {
     return response.map<LessonContent>((json) => LessonContent.fromJson(json)).toList();
   }
 
+  // Lấy exrercise theo từng lesson
   Future<List<Map<String, dynamic>>> getExercisesByLesson(String lessonId) async {
     final response = await _supabase
         .from('exercises')
