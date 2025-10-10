@@ -5,12 +5,12 @@ import '../service/grammar_service.dart';
 import '../models/topic.dart';
 
 // Screen
-import 'grammar/articles_screen.dart';
+import 'grammar/articles/articles_screen.dart';
 import 'grammar/conditionals_screen.dart';
 import 'grammar/linkingVerbs_screen.dart';
-import 'grammar/modalVerbs_screen.dart';
+import 'grammar/modalverbs/modalVerbs_screen.dart';
 import 'grammar/passiveVoice_screen.dart';
-import 'grammar/prepositions_screen.dart';
+import 'grammar/prepositions/prepositions_screen.dart';
 import 'grammar/pronunciation_screen.dart';
 import 'grammar/tenses/tenses_screen.dart';
 
@@ -46,7 +46,7 @@ class _GrammarScreenState extends State<GrammarScreen> {
     'Linking Verbs': () => const LinkingVerbsScreen(),
     'Conditionals': () => const ConditionalsScreen(),
     'Passive Voice': () => const PassiveVoiceScreen(),
-    'Modal Verbs': () => const ModalVerbsScreen(),
+    'Modal Verbs': () => const ModalverbsScreen(),
     'Articles': () => const ArticlesScreen(),
     'Prepositions': () => const PrepositionsScreen(),
   };
