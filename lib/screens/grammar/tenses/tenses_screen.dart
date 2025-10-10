@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:learning_english/models/lesson.dart';
-import 'package:learning_english/service/tenses_service.dart';
+import 'package:learning_english/service/grammar_service.dart';
 import '../tenses/lesson_detail_screen.dart';
 
 class TensesScreen extends StatefulWidget {
@@ -11,7 +11,7 @@ class TensesScreen extends StatefulWidget {
 }
 
 class _TensesScreenState extends State<TensesScreen> {
-  final TensesService _tensesService = TensesService();
+  final GrammarService _grammarService = GrammarService();
   List<Lesson> lessons = [];
   bool isLoading = true;
   String? errorMessage;
@@ -29,7 +29,7 @@ class _TensesScreenState extends State<TensesScreen> {
         errorMessage = null;
       });
 
-      final result = await _tensesService.getLessonsByTopicName('Tenses');
+      final result = await _grammarService.getLessonsByTopicName('Tenses');
       setState(() {
         lessons = result;
         isLoading = false;
