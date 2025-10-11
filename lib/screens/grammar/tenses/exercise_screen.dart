@@ -20,9 +20,8 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
   List<Map<String, dynamic>> _exercises = [];
   Map<String, bool> _progressResults = {}; // Kết quả từ DB
   Map<String, String?> _answers = {};
+  Set<String> _submittedExercises = {}; // Track câu đã nộp
   bool _loading = true;
-  bool _submitted = false;
-  bool _hasProgress = false;
   int _correctCount = 0;
 
   @override
@@ -31,15 +30,11 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
     _loadExercisesAndProgress();
   }
 
-  // Load exercises và progress
   Future<void> _loadExercisesAndProgress() async {
     setState(() => _loading = true);
 
     try {
-      // Load exercises
       final exercises = await _grammarService.getExercisesByLesson(widget.lessonId);
-
-      // Load progress từ DB
       final progress = await _exerciseProgressService.getProgressByLesson(
         userId!,
         widget.lessonId,
@@ -47,12 +42,14 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
 
       Map<String, String?> loadedAnswers = {};
       Map<String, bool> results = {};
+      Set<String> submitted = {};
       int correct = 0;
 
       if (progress.isNotEmpty) {
         for (var p in progress) {
           loadedAnswers[p.exerciseId] = p.userAnswer;
           results[p.exerciseId] = p.isCorrect;
+          submitted.add(p.exerciseId);
           if (p.isCorrect) correct++;
         }
       }
@@ -61,8 +58,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
         _exercises = exercises;
         _answers = loadedAnswers;
         _progressResults = results;
-        _hasProgress = progress.isNotEmpty;
-        _submitted = progress.isNotEmpty;
+        _submittedExercises = submitted;
         _correctCount = correct;
         _loading = false;
       });
@@ -72,157 +68,123 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
     }
   }
 
-  // Submit exercises
-  void _submitExercises() async {
+  // Nộp từng câu
+  Future<void> _submitSingleExercise(Map<String, dynamic> exercise) async {
     if (userId == null) return;
 
-    int correct = 0;
-    Map<String, bool> results = {};
+    final exerciseId = exercise['id'];
+    final userAnswer = _answers[exerciseId]?.trim().toLowerCase() ?? '';
+    final correctAnswer = exercise['correct_answer']?.trim().toLowerCase() ?? '';
+    final isCorrect = userAnswer == correctAnswer;
 
-    // Tính điểm và save từng câu
-    for (var exercise in _exercises) {
-      final userAnswer = _answers[exercise['id']]?.trim().toLowerCase() ?? '';
-      final correctAnswer = exercise['correct_answer']?.trim().toLowerCase() ?? '';
-      final isCorrect = userAnswer == correctAnswer;
-
-      if (isCorrect) correct++;
-      results[exercise['id']] = isCorrect;
-
-      // Save vào DB
-      await _exerciseProgressService.saveProgress(
-        ExerciseProgress(
-          userId: userId!,
-          lessonId: widget.lessonId,
-          exerciseId: exercise['id'],
-          userAnswer: userAnswer,
-          isCorrect: isCorrect,
-          explanation: exercise['explanation'] ?? '',
-          completedAt: DateTime.now(),
-        ),
-      );
-    }
+    // Save vào DB
+    await _exerciseProgressService.saveProgress(
+      ExerciseProgress(
+        userId: userId!,
+        lessonId: widget.lessonId,
+        exerciseId: exerciseId,
+        userAnswer: userAnswer,
+        isCorrect: isCorrect,
+        explanation: exercise['explanation'] ?? '',
+        completedAt: DateTime.now(),
+      ),
+    );
 
     setState(() {
-      _submitted = true;
-      _correctCount = correct;
-      _progressResults = results;
-      _hasProgress = true;
+      _progressResults[exerciseId] = isCorrect;
+      _submittedExercises.add(exerciseId);
+      if (isCorrect) {
+        _correctCount++;
+      } else {
+        // Nếu submit lại câu đã đúng trước đó mà bây giờ sai
+        if (_progressResults[exerciseId] == true && !isCorrect) {
+          _correctCount--;
+        }
+      }
     });
 
-    _showResultDialog();
-  }
-
-  void _showResultDialog() {
-    final total = _exercises.length;
-    final percentage = ((_correctCount / total) * 100).toInt();
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
+    // Show snackbar feedback
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
           children: [
             Icon(
-              percentage >= 80 ? Icons.emoji_events : Icons.mood,
-              color: percentage >= 80 ? Colors.amber : Colors.blue,
-              size: 32,
+              isCorrect ? Icons.check_circle : Icons.cancel,
+              color: Colors.white,
             ),
             SizedBox(width: 12),
-            Text('Kết quả'),
+            Text(isCorrect ? 'Chính xác! 🎉' : 'Sai rồi, xem giải thích nhé!'),
           ],
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: percentage >= 80 ? Colors.green[50] : Colors.blue[50],
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Column(
-                children: [
-                  Text(
-                    '$_correctCount/$total',
-                    style: TextStyle(
-                      fontSize: 48,
-                      fontWeight: FontWeight.bold,
-                      color: percentage >= 80 ? Colors.green : Colors.blue,
-                    ),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    'Đúng $_correctCount câu / $total câu',
-                    style: TextStyle(fontSize: 16, color: Colors.grey[700]),
-                  ),
-                  SizedBox(height: 12),
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: percentage >= 80 ? Colors.green : Colors.blue,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      '$percentage%',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(height: 16),
-            Text(
-              percentage >= 80
-                  ? '🎉 Xuất sắc! Bạn đã nắm vững kiến thức!'
-                  : percentage >= 60
-                  ? '👍 Khá tốt! Hãy xem lại các câu sai nhé!'
-                  : '💪 Đừng nản! Xem lại lý thuyết và thử lại nhé!',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Xem giải thích', style: TextStyle(fontSize: 16)),
-          ),
-        ],
+        backgroundColor: isCorrect ? Colors.green : Colors.red,
+        behavior: SnackBarBehavior.floating,
+        duration: Duration(seconds: 2),
       ),
     );
   }
 
-  // Reset exercises - XÓA PROGRESS TRONG DB
-  void _resetExercises() async {
+  // Reset 1 câu
+  Future<void> _resetSingleExercise(String exerciseId) async {
     if (userId == null) return;
 
-    // Xóa trong DB
+    await _exerciseProgressService.deleteSingleProgress(userId!, exerciseId);
+
+    setState(() {
+      final wasCorrect = _progressResults[exerciseId] ?? false;
+      if (wasCorrect) _correctCount--;
+
+      _answers.remove(exerciseId);
+      _progressResults.remove(exerciseId);
+      _submittedExercises.remove(exerciseId);
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Đã reset câu này. Hãy làm lại!'),
+        backgroundColor: Colors.blue[600],
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  // Reset toàn bộ
+  Future<void> _resetAll() async {
+    if (userId == null) return;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Reset tất cả?'),
+        content: Text('Bạn có chắc muốn reset toàn bộ bài tập?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Hủy', style: TextStyle(color: Colors.black),),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: Text('Reset', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
     await _exerciseProgressService.resetProgress(userId!, widget.lessonId);
 
     setState(() {
       _answers.clear();
       _progressResults.clear();
-      _submitted = false;
-      _hasProgress = false;
+      _submittedExercises.clear();
       _correctCount = 0;
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Row(
-          children: [
-            Icon(Icons.refresh, color: Colors.white),
-            SizedBox(width: 12),
-            Text('Đã reset bài tập. Hãy làm lại từ đầu!'),
-          ],
-        ),
+        content: Text('Đã reset toàn bộ bài tập!'),
         backgroundColor: Colors.blue[600],
-        behavior: SnackBarBehavior.floating,
       ),
     );
   }
@@ -255,83 +217,12 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
       );
     }
 
+    final completedCount = _submittedExercises.length;
+    final totalCount = _exercises.length;
+
     return Column(
       children: [
-        // Progress bar - CẬP NHẬT
-        Container(
-          padding: EdgeInsets.all(16),
-          color: Colors.white,
-          child: Column(
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        _hasProgress ? Icons.check_circle : Icons.pending,
-                        color: _hasProgress ? Colors.green : Colors.orange,
-                        size: 20,
-                      ),
-                      SizedBox(width: 8),
-                      Text(
-                        _hasProgress
-                            ? 'Đã hoàn thành'
-                            : 'Tiến độ: ${_answers.length}/${_exercises.length}',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ],
-                  ),
-                  if (_submitted)
-                    Container(
-                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.green[100],
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        'Điểm: $_correctCount/${_exercises.length}',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.green[800],
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              SizedBox(height: 8),
-              LinearProgressIndicator(
-                value: _hasProgress ? 1.0 : (_answers.length / _exercises.length),
-                backgroundColor: Colors.grey[200],
-                valueColor: AlwaysStoppedAnimation(
-                  _hasProgress ? Colors.green : Colors.blue,
-                ),
-                minHeight: 8,
-                borderRadius: BorderRadius.circular(4),
-              ),
-            ],
-          ),
-        ),
-
-        // Exercise list - CẬP NHẬT
-        Expanded(
-          child: ListView.builder(
-            padding: EdgeInsets.all(16),
-            itemCount: _exercises.length,
-            itemBuilder: (context, index) {
-              final exercise = _exercises[index];
-              final exerciseId = exercise['id'];
-
-              // Lấy kết quả từ _progressResults (đã load từ DB)
-              final isCorrect = _progressResults[exerciseId] ?? false;
-              final isWrong = _submitted && !isCorrect;
-
-              return _buildExerciseCard(exercise, index, isCorrect, isWrong);
-            },
-          ),
-        ),
-
-        // Submit button
+        // Progress bar
         Container(
           padding: EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -340,52 +231,145 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
               BoxShadow(
                 color: Colors.black.withOpacity(0.05),
                 blurRadius: 10,
-                offset: Offset(0, -4),
+                offset: Offset(0, 2),
               ),
             ],
           ),
-          child: Row(
+          child: Column(
             children: [
-              if (_submitted)
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: _resetExercises,
-                    style: OutlinedButton.styleFrom(
-                      padding: EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        completedCount == totalCount
+                            ? Icons.check_circle
+                            : Icons.pending,
+                        color: completedCount == totalCount
+                            ? Colors.green
+                            : Colors.orange,
+                        size: 20,
                       ),
-                    ),
-                    child: Text('Làm lại', style: TextStyle(fontSize: 16)),
+                      SizedBox(width: 8),
+                      Text(
+                        'Tiến độ: $completedCount/$totalCount',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ],
                   ),
+                  Row(
+                    children: [
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.green[100],
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '✓ $_correctCount',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green[800],
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.red[100],
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '✗ ${completedCount - _correctCount}',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.red[800],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              SizedBox(height: 8),
+              LinearProgressIndicator(
+                value: completedCount / totalCount,
+                backgroundColor: Colors.grey[200],
+                valueColor: AlwaysStoppedAnimation(
+                  completedCount == totalCount ? Colors.green : Colors.blue,
                 ),
-              if (_submitted) SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: _submitted
-                      ? null
-                      : (_answers.length == _exercises.length ? _submitExercises : null),
-                  style: ElevatedButton.styleFrom(
-                    padding: EdgeInsets.symmetric(vertical: 16),
-                    backgroundColor: Colors.blue[600],
-                    disabledBackgroundColor: Colors.grey[300],
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: Text(
-                    _submitted ? 'Đã nộp bài' : 'Nộp bài',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
+                minHeight: 8,
+                borderRadius: BorderRadius.circular(4),
               ),
             ],
           ),
         ),
+
+        // Exercise list
+        Expanded(
+          child: ListView.builder(
+            padding: EdgeInsets.all(16),
+            itemCount: _exercises.length,
+            itemBuilder: (context, index) {
+              final exercise = _exercises[index];
+              final exerciseId = exercise['id'];
+              final isSubmitted = _submittedExercises.contains(exerciseId);
+              final isCorrect = _progressResults[exerciseId] ?? false;
+              final isWrong = isSubmitted && !isCorrect;
+
+              return _buildExerciseCard(
+                exercise,
+                index,
+                isSubmitted,
+                isCorrect,
+                isWrong,
+              );
+            },
+          ),
+        ),
+
+        // Reset all button
+        if (completedCount > 0)
+          Container(
+            padding: EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: Offset(0, -4),
+                ),
+              ],
+            ),
+            child: OutlinedButton(
+              onPressed: _resetAll,
+              style: OutlinedButton.styleFrom(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                side: BorderSide(color: Colors.red),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.refresh, color: Colors.red),
+                  SizedBox(width: 8),
+                  Text(
+                    'Reset tất cả',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.red,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -393,13 +377,17 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
   Widget _buildExerciseCard(
       Map<String, dynamic> exercise,
       int index,
+      bool isSubmitted,
       bool isCorrect,
       bool isWrong,
       ) {
+    final exerciseId = exercise['id'];
     final type = exercise['question_type'];
     final options = exercise['options'] != null
         ? List<String>.from(exercise['options'])
         : [];
+    final canSubmit = _answers[exerciseId] != null &&
+        _answers[exerciseId]!.trim().isNotEmpty;
 
     return Container(
       margin: EdgeInsets.only(bottom: 16),
@@ -412,7 +400,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
               : isWrong
               ? Colors.red
               : Colors.grey[300]!,
-          width: isCorrect || isWrong ? 2 : 1,
+          width: isSubmitted ? 2 : 1,
         ),
         boxShadow: [
           BoxShadow(
@@ -427,7 +415,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Question number
+            // Header
             Row(
               children: [
                 Container(
@@ -445,14 +433,37 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
                   ),
                 ),
                 Spacer(),
-                if (isCorrect)
-                  Icon(Icons.check_circle, color: Colors.green, size: 24),
-                if (isWrong) Icon(Icons.cancel, color: Colors.red, size: 24),
+                if (isSubmitted)
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: isCorrect ? Colors.green[100] : Colors.red[100],
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          isCorrect ? Icons.check_circle : Icons.cancel,
+                          color: isCorrect ? Colors.green : Colors.red,
+                          size: 18,
+                        ),
+                        SizedBox(width: 4),
+                        Text(
+                          isCorrect ? 'Đúng' : 'Sai',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: isCorrect ? Colors.green[800] : Colors.red[800],
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
               ],
             ),
             SizedBox(height: 12),
 
-            // Question text
+            // Question
             Text(
               exercise['question_text'],
               style: TextStyle(
@@ -466,9 +477,9 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
             // Answer options
             if (type == 'multiple_choice')
               ...options.map((opt) {
-                final isSelected = _answers[exercise['id']] == opt;
+                final isSelected = _answers[exerciseId] == opt;
                 final isCorrectOption =
-                    _submitted && opt == exercise['correct_answer'];
+                    isSubmitted && opt == exercise['correct_answer'];
 
                 return Container(
                   margin: EdgeInsets.only(bottom: 8),
@@ -494,18 +505,21 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
                     title: Text(
                       opt,
                       style: TextStyle(
-                        color: isCorrectOption ? Colors.green[800] : Colors.black87,
-                        fontWeight:
-                        isCorrectOption ? FontWeight.bold : FontWeight.normal,
+                        color: isCorrectOption
+                            ? Colors.green[800]
+                            : Colors.black87,
+                        fontWeight: isCorrectOption
+                            ? FontWeight.bold
+                            : FontWeight.normal,
                       ),
                     ),
                     value: opt,
-                    groupValue: _answers[exercise['id']],
-                    onChanged: _submitted
+                    groupValue: _answers[exerciseId],
+                    onChanged: isSubmitted
                         ? null
                         : (value) {
                       setState(() {
-                        _answers[exercise['id']] = value;
+                        _answers[exerciseId] = value;
                       });
                     },
                     activeColor: isCorrectOption ? Colors.green : Colors.blue,
@@ -515,8 +529,8 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
 
             if (type == 'fill_in_the_blank')
               TextField(
-                enabled: !_submitted,
-                controller: TextEditingController(text: _answers[exercise['id']]),
+                enabled: !isSubmitted,
+                controller: TextEditingController(text: _answers[exerciseId]),
                 decoration: InputDecoration(
                   labelText: 'Nhập câu trả lời',
                   border: OutlineInputBorder(
@@ -527,25 +541,74 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
                     borderSide: BorderSide(color: Colors.blue, width: 2),
                   ),
                   filled: true,
-                  fillColor: _submitted ? Colors.grey[100] : Colors.white,
+                  fillColor: isSubmitted ? Colors.grey[100] : Colors.white,
                 ),
                 onChanged: (value) {
                   setState(() {
-                    _answers[exercise['id']] = value;
+                    _answers[exerciseId] = value;
                   });
                 },
               ),
 
-            // Explanation after submit
-            if (_submitted && exercise['explanation'] != null) ...[
+            SizedBox(height: 16),
+
+            // Submit/Reset button
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: isSubmitted
+                        ? null
+                        : (canSubmit
+                        ? () => _submitSingleExercise(exercise)
+                        : null),
+                    style: ElevatedButton.styleFrom(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      backgroundColor: Colors.blue[600],
+                      disabledBackgroundColor: Colors.grey[300],
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Text(
+                      isSubmitted ? 'Đã nộp' : 'Nộp câu này',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+                if (isSubmitted) ...[
+                  SizedBox(width: 12),
+                  OutlinedButton(
+                    onPressed: () => _resetSingleExercise(exerciseId),
+                    style: OutlinedButton.styleFrom(
+                      padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                      side: BorderSide(color: Colors.orange),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Icon(Icons.refresh, color: Colors.orange),
+                  ),
+                ],
+              ],
+            ),
+
+            // Explanation
+            if (isSubmitted && exercise['explanation'] != null) ...[
               SizedBox(height: 16),
               Container(
                 padding: EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.blue[50],
+                  color: isCorrect ? Colors.green[50] : Colors.blue[50],
                   borderRadius: BorderRadius.circular(12),
                   border: Border(
-                    left: BorderSide(color: Colors.blue, width: 4),
+                    left: BorderSide(
+                      color: isCorrect ? Colors.green : Colors.blue,
+                      width: 4,
+                    ),
                   ),
                 ),
                 child: Column(
@@ -553,14 +616,17 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.lightbulb_outline,
-                            color: Colors.blue[700], size: 20),
+                        Icon(
+                          Icons.lightbulb_outline,
+                          color: isCorrect ? Colors.green[700] : Colors.blue[700],
+                          size: 20,
+                        ),
                         SizedBox(width: 8),
                         Text(
                           'Giải thích:',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
-                            color: Colors.blue[700],
+                            color: isCorrect ? Colors.green[700] : Colors.blue[700],
                           ),
                         ),
                       ],
@@ -571,11 +637,24 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
                       style: TextStyle(fontSize: 14, color: Colors.black87),
                     ),
                     SizedBox(height: 8),
-                    Text(
-                      'Đáp án đúng: ${exercise['correct_answer']}',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.green[700],
+                    Container(
+                      padding: EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.green[100],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.check, color: Colors.green[700], size: 18),
+                          SizedBox(width: 8),
+                          Text(
+                            'Đáp án đúng: ${exercise['correct_answer']}',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green[700],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],

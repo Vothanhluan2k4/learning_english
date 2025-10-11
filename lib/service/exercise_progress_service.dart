@@ -10,6 +10,23 @@ class ExerciseProgressService {
     );
   }
 
+  // Submit 1 câu
+  Future<void> deleteSingleProgress(String userId, String exerciseId) async {
+    try {
+      await _supabase
+          .from('user_exercise_progress')
+          .delete()
+          .eq('user_id', userId)
+          .eq('exercise_id', exerciseId);
+
+      print(' Progress deleted for exercise: $exerciseId');
+    } catch (e) {
+      print(' Error deleting progress: $e');
+      rethrow;
+    }
+  }
+
+
   Future<List<ExerciseProgress>> getProgressByLesson(
       String userId, String lessonId) async {
     final response = await _supabase
