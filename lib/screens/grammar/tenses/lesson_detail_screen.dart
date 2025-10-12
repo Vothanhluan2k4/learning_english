@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:learning_english/service/grammar_service.dart';
 import 'package:learning_english/models/lesson_content.dart';
-import 'exercise_screen.dart';
+import '../exercise_screen.dart';
 
 class LessonDetailScreen extends StatefulWidget {
   final String lessonId;
@@ -15,6 +15,7 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> {
   final GrammarService _grammarService = GrammarService();
   Map<String, dynamic>? _lesson;
   List<LessonContent> _contents = [];
+  int _exerciseCount = 0;
   bool _loading = true;
 
   @override
@@ -26,10 +27,12 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> {
   Future<void> _loadLesson() async {
     final lesson = await _grammarService.getLessonById(widget.lessonId);
     final contents = await _grammarService.getLessonContents(widget.lessonId);
+    final exercises = await _grammarService.getExercisesByLesson(widget.lessonId);
 
     setState(() {
       _lesson = lesson;
       _contents = contents;
+      _exerciseCount = exercises.length;
       _loading = false;
     });
   }
@@ -77,21 +80,60 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> {
       child: Scaffold(
         backgroundColor: Colors.grey[50],
         appBar: AppBar(
-          title: Text(_lesson!['title'] ?? 'Chi tiết bài học'),
-          backgroundColor: Colors.blue[600],
+          backgroundColor: Colors.blue,
           foregroundColor: Colors.white,
-          elevation: 0,
+          title: Text(_lesson!['title'] ?? 'Bài học'),
           bottom: TabBar(
+            labelColor: Colors.white,
+            unselectedLabelColor: Colors.black87,
             indicatorColor: Colors.white,
             indicatorWeight: 3,
-            labelStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.bold,color: Colors.white),
-            unselectedLabelStyle: TextStyle(fontSize: 16),
             tabs: [
-              Tab(icon: Icon(Icons.book), text: 'Nội dung',),
-              Tab(icon: Icon(Icons.edit_note), text: 'Bài tập'),
+              const Tab(
+                icon: Icon(Icons.book),
+                text: 'Nội dung',
+              ),
+              Tab(
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Icon(Icons.assignment),
+                        SizedBox(width: 6),
+                        Text('Bài tập'),
+                      ],
+                    ),
+                    if (_exerciseCount > 0)
+                      Positioned(
+                        right: -25,
+                        top: -5,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.blue, width: 1),
+                          ),
+                          child: Text(
+                            '$_exerciseCount',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blue,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
+
         body: TabBarView(
           children: [
             _buildContentTab(),

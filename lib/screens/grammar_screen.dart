@@ -7,7 +7,7 @@ import '../models/topic.dart';
 // Screen
 import 'grammar/articles_screen.dart';
 import 'grammar/conditionals_screen.dart';
-import 'grammar/linkingVerbs_screen.dart';
+import 'grammar/linking_verb/linkingVerbs_screen.dart';
 import 'grammar/modalVerbs_screen.dart';
 import 'grammar/passiveVoice_screen.dart';
 import 'grammar/prepositions_screen.dart';
