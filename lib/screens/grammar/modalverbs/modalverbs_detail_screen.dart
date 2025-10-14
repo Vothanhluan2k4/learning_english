@@ -368,14 +368,7 @@ class _ModalverbsDetailScreenState extends State<ModalverbsDetailScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  content.dataBody ?? '',
-                  style: TextStyle(
-                    fontSize: 15,
-                    color: Colors.grey[800],
-                    height: 1.6,
-                  ),
-                ),
+                _buildContentBody(content),
                 const SizedBox(height: 16),
                 Container(
                   height: 4,
@@ -393,5 +386,85 @@ class _ModalverbsDetailScreenState extends State<ModalverbsDetailScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildContentBody(LessonContent content) {
+    final title = content.dataTitle ?? '';
+    final body = content.dataBody ?? '';
+    if (title.toLowerCase().contains('công thức')) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.orange[100],
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(
+          body,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
+          ),
+        ),
+      );
+    } else if (title.toLowerCase().contains('giải thích')) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(
+            radius: 12,
+            backgroundColor: Colors.purple[100],
+            child: Icon(Icons.info, size: 16, color: Colors.purple[700]),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              body,
+              style: TextStyle(
+                fontSize: 15,
+                color: Colors.grey[800],
+                height: 1.6,
+              ),
+            ),
+          ),
+        ],
+      );
+    } else if (title.toLowerCase().contains('ví dụ')) {
+      final parts = body.split('-');
+      final english = parts[0].trim();
+      final vietnamese = parts.length > 1 ? parts[1].trim() : '';
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: title.toLowerCase().contains('minh họa') ? Colors.green[100] : Colors.purple[100],
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              english,
+              style: const TextStyle(fontSize: 15, color: Colors.black87),
+            ),
+            if (vietnamese.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                '- $vietnamese',
+                style: TextStyle(color: Colors.grey[700], fontSize: 14),
+              ),
+            ],
+          ],
+        ),
+      );
+    } else {
+      return Text(
+        body,
+        style: TextStyle(
+          fontSize: 15,
+          color: Colors.grey[800],
+          height: 1.6,
+        ),
+      );
+    }
   }
 }
