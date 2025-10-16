@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:learning_english/screens/profile/profile_screen.dart';
 import 'package:learning_english/screens/setting_screen.dart';
 import 'package:learning_english/screens/flashcards_screen.dart';
 import 'package:learning_english/screens/course_screen.dart';
@@ -38,6 +39,7 @@ class _DrawerScreenState extends State<DrawerScreen> {
     CourseScreen(),
     GrammarScreen(),
     FlashcardsScreen(),
+    ProfileScreen(),
     SettingScreen(),
   ];
 
@@ -188,13 +190,32 @@ class _DrawerScreenState extends State<DrawerScreen> {
       _isLoading = false;
     });
   }
+  //Change title
+  String _getTitleForScreen(int index){
+    switch(index){
+      case 0 :
+        return 'Trang chủ';
+      case 1 :
+        return 'Luyện đề';
+      case 2 :
+        return 'Ngữ pháp';
+      case 3:
+        return 'FashCard';
+      case 4 :
+        return 'Hồ sơ cá nhân';
+      case 5:
+        return 'Setting';
+      default:
+        return 'Learning English';
+    }
+  }
 
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Learning English", style: TextStyle(color: Colors.white)),
+        title: Text(_getTitleForScreen(_selectedItem), style: TextStyle(color: Colors.white)),
         backgroundColor: Colors.blue[600],
         iconTheme: IconThemeData(color: Colors.white),
       ),
@@ -266,9 +287,14 @@ class _DrawerScreenState extends State<DrawerScreen> {
               onTap: () => _onItemTapped(3),
             ),
             ListTile(
+              leading: const Icon(FontAwesomeIcons.userCircle),
+              title: const Text('Hồ sơ cá nhân'),
+              onTap: () => _onItemTapped(4),
+            ),
+            ListTile(
               leading: const Icon(Icons.settings),
               title: const Text('Cài đặt'),
-              onTap: () => _onItemTapped(4),
+              onTap: () => _onItemTapped(5),
             ),
             Divider(),
             //Swtich signIn and signOut
