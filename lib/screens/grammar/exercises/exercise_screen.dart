@@ -4,15 +4,15 @@ import 'package:learning_english/service/exercise_progress_service.dart';
 import 'package:learning_english/service/grammar_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-class PrepositionsExercise extends StatefulWidget {
+class ExerciseScreen extends StatefulWidget {
   final String lessonId;
-  const PrepositionsExercise({super.key, required this.lessonId});
+  const ExerciseScreen({super.key, required this.lessonId});
 
   @override
-  State<PrepositionsExercise> createState() => _PrepositionsExerciseState();
+  State<ExerciseScreen> createState() => _ExerciseScreenState();
 }
 
-class _PrepositionsExerciseState extends State<PrepositionsExercise> {
+class _ExerciseScreenState extends State<ExerciseScreen> {
   final userId = Supabase.instance.client.auth.currentUser?.id;
   final _exerciseProgressService = ExerciseProgressService();
   final GrammarService _grammarService = GrammarService();
@@ -192,7 +192,7 @@ class _PrepositionsExerciseState extends State<PrepositionsExercise> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CircularProgressIndicator(color: Colors.brown[700]),
+            CircularProgressIndicator(color: Colors.red[700]),
             const SizedBox(height: 16),
             Text(
               'Đang tải bài tập...',
@@ -300,7 +300,7 @@ class _PrepositionsExerciseState extends State<PrepositionsExercise> {
                 value: completedCount / totalCount,
                 backgroundColor: Colors.grey[200],
                 valueColor: AlwaysStoppedAnimation(
-                  completedCount == totalCount ? Colors.green : Colors.brown[700]!,
+                  completedCount == totalCount ? Colors.green : Colors.red[700]!,
                 ),
                 minHeight: 8,
                 borderRadius: BorderRadius.circular(4),
@@ -312,7 +312,7 @@ class _PrepositionsExerciseState extends State<PrepositionsExercise> {
         Expanded(
           child: RefreshIndicator(
             onRefresh: _loadExercisesAndProgress,
-            color: Colors.brown[700],
+            color: Colors.red[700],
             child: ListView.builder(
               padding: const EdgeInsets.all(16),
               itemCount: _exercises.length + 1,
@@ -366,12 +366,12 @@ class _PrepositionsExerciseState extends State<PrepositionsExercise> {
                               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
-                                  colors: [Colors.brown[400]!, Colors.brown[600]!],
+                                  colors: [Colors.red[400]!, Colors.red[600]!],
                                 ),
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Text(
-                                '${index}',
+                                '$index',
                                 style: const TextStyle(
                                   fontSize: 16,
                                   color: Colors.white,
@@ -388,7 +388,7 @@ class _PrepositionsExerciseState extends State<PrepositionsExercise> {
                                     padding: const EdgeInsets.symmetric(
                                         horizontal: 10, vertical: 4),
                                     decoration: BoxDecoration(
-                                      color: Colors.amber[50],
+                                      color: Colors.orange[50],
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Text(
@@ -397,7 +397,7 @@ class _PrepositionsExerciseState extends State<PrepositionsExercise> {
                                           : '✍️ Điền từ',
                                       style: TextStyle(
                                         fontSize: 12,
-                                        color: Colors.amber[900],
+                                        color: Colors.orange[800],
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
@@ -475,7 +475,7 @@ class _PrepositionsExerciseState extends State<PrepositionsExercise> {
                                         : isSelected && isWrong
                                         ? Colors.red
                                         : isSelected
-                                        ? Colors.brown[700]!
+                                        ? Colors.red[700]!
                                         : Colors.grey[200]!,
                                     width: isCorrectOption || (isSelected && isWrong)
                                         ? 2
@@ -497,7 +497,7 @@ class _PrepositionsExerciseState extends State<PrepositionsExercise> {
                                   ),
                                   value: opt,
                                   groupValue: _answers[exerciseId],
-                                  activeColor: Colors.brown[700],
+                                  activeColor: Colors.red[700],
                                   contentPadding:
                                   const EdgeInsets.symmetric(horizontal: 8),
                                   shape: RoundedRectangleBorder(
@@ -542,9 +542,9 @@ class _PrepositionsExerciseState extends State<PrepositionsExercise> {
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide:
-                                BorderSide(color: Colors.brown[700]!, width: 2),
+                                BorderSide(color: Colors.red[700]!, width: 2),
                               ),
-                              prefixIcon: Icon(Icons.edit, color: Colors.brown[700]),
+                              prefixIcon: Icon(Icons.edit, color: Colors.red[700]),
                             ),
                             style: const TextStyle(fontSize: 15),
                             onChanged: isSubmitted
@@ -569,7 +569,7 @@ class _PrepositionsExerciseState extends State<PrepositionsExercise> {
                                     : null),
                                 style: ElevatedButton.styleFrom(
                                   padding: EdgeInsets.symmetric(vertical: 12),
-                                  backgroundColor: Colors.brown[700],
+                                  backgroundColor: Colors.red[700],
                                   disabledBackgroundColor: Colors.grey[300],
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(12),
@@ -727,12 +727,12 @@ class _PrepositionsExerciseState extends State<PrepositionsExercise> {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Colors.amber[400]!, Colors.brown[600]!],
+          colors: [Colors.orange[400]!, Colors.red[600]!],
         ),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.amber.withOpacity(0.3),
+            color: Colors.orange.withOpacity(0.3),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -778,7 +778,7 @@ class _PrepositionsExerciseState extends State<PrepositionsExercise> {
             child: Text(
               '${_exercises.length}',
               style: TextStyle(
-                color: Colors.amber[800],
+                color: Colors.orange[700],
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
               ),

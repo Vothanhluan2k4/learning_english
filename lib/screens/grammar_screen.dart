@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:learning_english/screens/grammar/conditionals/conditionals_screen.dart';
 import 'package:learning_english/widgets/grammar_category.dart';
 import '../widgets/grammar_card.dart';
 import '../service/grammar_service.dart';
@@ -6,10 +7,10 @@ import '../models/topic.dart';
 
 // Screen
 import 'grammar/articles/articles_screen.dart';
-import 'grammar/conditionals_screen.dart';
+import 'grammar/conditionals/conditionals_screen.dart';
 import 'grammar/linkingVerbs_screen.dart';
 import 'grammar/modalverbs/modalVerbs_screen.dart';
-import 'grammar/passiveVoice_screen.dart';
+import 'grammar/passivevoice/passiveVoice_screen.dart';
 import 'grammar/prepositions/prepositions_screen.dart';
 import 'grammar/pronunciation_screen.dart';
 import 'grammar/tenses/tenses_screen.dart';
@@ -45,7 +46,7 @@ class _GrammarScreenState extends State<GrammarScreen> {
     'Pronunciation': () => const PronunciationScreen(),
     'Linking Verbs': () => const LinkingVerbsScreen(),
     'Conditionals': () => const ConditionalsScreen(),
-    'Passive Voice': () => const PassiveVoiceScreen(),
+    'Passive Voice': () => const PassiveVoicesScreen(),
     'Modal Verbs': () => const ModalverbsScreen(),
     'Articles': () => const ArticlesScreen(),
     'Prepositions': () => const PrepositionsScreen(),

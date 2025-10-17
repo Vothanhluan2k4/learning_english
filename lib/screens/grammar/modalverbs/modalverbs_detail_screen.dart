@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:learning_english/service/grammar_service.dart';
 import 'package:learning_english/models/lesson_content.dart';
-import 'modalverbs_exercise.dart';
+import 'package:learning_english/screens/grammar/exercises/exercise_screen.dart';
 
 class ModalverbsDetailScreen extends StatefulWidget {
   final String lessonId;
@@ -186,7 +186,7 @@ class _ModalverbsDetailScreenState extends State<ModalverbsDetailScreen> {
           body: TabBarView(
             children: [
               _buildContentTab(),
-              ModalverbsExercise(lessonId: widget.lessonId),
+              ExerciseScreen(lessonId: widget.lessonId),
             ],
           ),
         ),

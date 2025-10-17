@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:learning_english/service/grammar_service.dart';
 import 'package:learning_english/models/lesson_content.dart';
-import 'prepositions_exercise.dart';
+import 'package:learning_english/screens/grammar/exercises/exercise_screen.dart';
 
 class PrepositionsDetailScreen extends StatefulWidget {
   final String lessonId;
@@ -186,7 +186,7 @@ class _PrepositionsDetailScreenState extends State<PrepositionsDetailScreen> {
           body: TabBarView(
             children: [
               _buildContentTab(),
-              PrepositionsExercise(lessonId: widget.lessonId),
+              ExerciseScreen(lessonId: widget.lessonId),
             ],
           ),
         ),

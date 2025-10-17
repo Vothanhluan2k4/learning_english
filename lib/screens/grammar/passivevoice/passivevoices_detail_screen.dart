@@ -3,15 +3,15 @@ import 'package:learning_english/service/grammar_service.dart';
 import 'package:learning_english/models/lesson_content.dart';
 import 'package:learning_english/screens/grammar/exercises/exercise_screen.dart';
 
-class ArticlesDetailScreen extends StatefulWidget {
+class PassiveVoicesDetailScreen extends StatefulWidget {
   final String lessonId;
-  const ArticlesDetailScreen({super.key, required this.lessonId});
+  const PassiveVoicesDetailScreen({super.key, required this.lessonId});
 
   @override
-  State<ArticlesDetailScreen> createState() => _ArticlesDetailScreenState();
+  State<PassiveVoicesDetailScreen> createState() => _PassiveVoicesDetailScreenState();
 }
 
-class _ArticlesDetailScreenState extends State<ArticlesDetailScreen> {
+class _PassiveVoicesDetailScreenState extends State<PassiveVoicesDetailScreen> {
   final GrammarService _grammarService = GrammarService();
   Map<String, dynamic>? _lesson;
   List<LessonContent> _contents = [];
@@ -43,7 +43,7 @@ class _ArticlesDetailScreenState extends State<ArticlesDetailScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              CircularProgressIndicator(color: Colors.red[700]),
+              CircularProgressIndicator(color: Colors.purple[700]),
               const SizedBox(height: 16),
               Text(
                 'Đang tải bài học...',
@@ -59,7 +59,7 @@ class _ArticlesDetailScreenState extends State<ArticlesDetailScreen> {
       return Scaffold(
         backgroundColor: Colors.grey[50],
         appBar: AppBar(
-          backgroundColor: Colors.red[700],
+          backgroundColor: Colors.purple[700],
           foregroundColor: Colors.white,
           elevation: 0,
         ),
@@ -90,7 +90,7 @@ class _ArticlesDetailScreenState extends State<ArticlesDetailScreen> {
                 expandedHeight: 180,
                 floating: false,
                 pinned: true,
-                backgroundColor: Colors.red[700],
+                backgroundColor: Colors.purple[700],
                 foregroundColor: Colors.white,
                 elevation: 0,
                 flexibleSpace: FlexibleSpaceBar(
@@ -99,7 +99,7 @@ class _ArticlesDetailScreenState extends State<ArticlesDetailScreen> {
                       gradient: LinearGradient(
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
-                        colors: [Colors.red[600]!, Colors.red[900]!],
+                        colors: [Colors.purple[600]!, Colors.purple[900]!],
                       ),
                     ),
                     child: SafeArea(
@@ -145,7 +145,7 @@ class _ArticlesDetailScreenState extends State<ArticlesDetailScreen> {
                 bottom: PreferredSize(
                   preferredSize: const Size.fromHeight(48),
                   child: Container(
-                    color: Colors.red[700],
+                    color: Colors.purple[700],
                     child: TabBar(
                       labelColor: Colors.white,
                       unselectedLabelColor: Colors.white70,
@@ -218,7 +218,7 @@ class _ArticlesDetailScreenState extends State<ArticlesDetailScreen> {
 
     return RefreshIndicator(
       onRefresh: _loadLesson,
-      color: Colors.red[700],
+      color: Colors.purple[700],
       child: SingleChildScrollView(
         physics: BouncingScrollPhysics(),
         child: Column(

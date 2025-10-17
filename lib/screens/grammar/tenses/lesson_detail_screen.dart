@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:learning_english/service/tenses_service.dart';
 import 'package:learning_english/models/lesson_content.dart';
-import 'exercise_screen.dart';
+import '../exercises/exercise_screen.dart';
 
 class LessonDetailScreen extends StatefulWidget {
   final String lessonId;
