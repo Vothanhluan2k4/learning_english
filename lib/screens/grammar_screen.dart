@@ -8,12 +8,10 @@ import '../models/topic.dart';
 // Screen
 import 'grammar/articles/articles_screen.dart';
 import 'grammar/conditionals/conditionals_screen.dart';
-import 'grammar/linkingVerbs/linkingVerbs_screen.dart';
 import 'grammar/modalverbs/modalVerbs_screen.dart';
 import 'grammar/passivevoice/passiveVoice_screen.dart';
 import 'grammar/prepositions/prepositions_screen.dart';
-import 'grammar/pronunciation/pronunciation_screen.dart';
-import 'grammar/tenses/tenses_screen.dart';
+
 
 class GrammarScreen extends StatefulWidget {
   const GrammarScreen({super.key});
