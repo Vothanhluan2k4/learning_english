@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:learning_english/service/grammar_service.dart';
 import 'package:learning_english/models/lesson_content.dart';
-import 'package:learning_english/screens/grammar/exercises/exercise_screen.dart';
+import 'package:learning_english/screens/grammar/exercise_screen.dart';
 
 class PrepositionsDetailScreen extends StatefulWidget {
   final String lessonId;
@@ -11,16 +11,38 @@ class PrepositionsDetailScreen extends StatefulWidget {
   State<PrepositionsDetailScreen> createState() => _PrepositionsDetailScreenState();
 }
 
-class _PrepositionsDetailScreenState extends State<PrepositionsDetailScreen> {
+class _PrepositionsDetailScreenState extends State<PrepositionsDetailScreen> with TickerProviderStateMixin {
   final GrammarService _grammarService = GrammarService();
   Map<String, dynamic>? _lesson;
   List<LessonContent> _contents = [];
   bool _loading = true;
 
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
+
   @override
   void initState() {
     super.initState();
     _loadLesson();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
+
+    _slideAnimation = Tween<Offset>(begin: const Offset(0, 0.2), end: Offset.zero).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadLesson() async {
@@ -32,6 +54,10 @@ class _PrepositionsDetailScreenState extends State<PrepositionsDetailScreen> {
       _contents = contents;
       _loading = false;
     });
+
+    if (_contents.isNotEmpty) {
+      _animationController.forward();
+    }
   }
 
   @override
@@ -211,34 +237,41 @@ class _PrepositionsDetailScreenState extends State<PrepositionsDetailScreen> {
       );
     }
 
-    return RefreshIndicator(
-      onRefresh: _loadLesson,
-      color: Colors.brown[700],
-      child: SingleChildScrollView(
-        physics: BouncingScrollPhysics(),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 📋 Công thức
-            if (_contents.any((c) => c.dataTitle?.toLowerCase().contains('công thức') ?? false)) ...[
-              _buildSectionHeader(Icons.architecture, 'Công thức', Colors.orange),
-              ..._contents.where((c) => c.dataTitle?.toLowerCase().contains('công thức') ?? false).map((content) => _buildStructureCard(content)),
-            ],
+    final structures = _contents.where((c) => c.type == 'structure').toList();
+    final explanations = _contents.where((c) => c.type == 'explanation').toList();
+    final examples = _contents.where((c) => c.type == 'example').toList();
 
-            // 💡 Giải thích
-            if (_contents.any((c) => c.dataTitle?.toLowerCase().contains('giải thích') ?? false)) ...[
-              _buildSectionHeader(Icons.lightbulb_outline, 'Giải thích', Colors.purple),
-              ..._contents.where((c) => c.dataTitle?.toLowerCase().contains('giải thích') ?? false).map((content) => _buildExplanationCard(content)),
-            ],
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: SlideTransition(
+        position: _slideAnimation,
+        child: RefreshIndicator(
+          onRefresh: _loadLesson,
+          color: Colors.brown[700],
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (structures.isNotEmpty) ...[
+                  _buildSectionHeader(Icons.architecture, 'Công thức', Colors.orange),
+                  ...structures.map((content) => _buildStructureCard(content)),
+                ],
 
-            // 📝 Ví dụ
-            if (_contents.any((c) => c.dataTitle?.toLowerCase().contains('ví dụ') ?? false)) ...[
-              _buildSectionHeader(Icons.format_quote, 'Ví dụ minh họa', Colors.green),
-              ..._contents.where((c) => c.dataTitle?.toLowerCase().contains('ví dụ') ?? false).map((content) => _buildExampleCard(content)),
-            ],
+                if (explanations.isNotEmpty) ...[
+                  _buildSectionHeader(Icons.lightbulb_outline, 'Giải thích', Colors.purple),
+                  ...explanations.map((content) => _buildExplanationCard(content)),
+                ],
 
-            SizedBox(height: 20),
-          ],
+                if (examples.isNotEmpty) ...[
+                  _buildSectionHeader(Icons.format_quote, 'Ví dụ minh họa', Colors.green),
+                  ...examples.map((content) => _buildExampleCard(content)),
+                ],
+
+                const SizedBox(height: 20),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -246,18 +279,18 @@ class _PrepositionsDetailScreenState extends State<PrepositionsDetailScreen> {
 
   Widget _buildSectionHeader(IconData icon, String title, Color color) {
     return Container(
-      margin: EdgeInsets.fromLTRB(16, 24, 16, 12),
+      margin: const EdgeInsets.fromLTRB(16, 24, 16, 12),
       child: Row(
         children: [
           Container(
-            padding: EdgeInsets.all(8),
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: color.withOpacity(0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(icon, color: color, size: 24),
           ),
-          SizedBox(width: 12),
+          const SizedBox(width: 12),
           Text(
             title,
             style: TextStyle(
@@ -273,7 +306,7 @@ class _PrepositionsDetailScreenState extends State<PrepositionsDetailScreen> {
 
   Widget _buildStructureCard(LessonContent content) {
     return Container(
-      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -281,18 +314,18 @@ class _PrepositionsDetailScreenState extends State<PrepositionsDetailScreen> {
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
             blurRadius: 10,
-            offset: Offset(0, 4),
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Padding(
-        padding: EdgeInsets.all(20),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (content.dataTitle != null)
               Container(
-                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: Colors.orange[50],
                   borderRadius: BorderRadius.circular(8),
@@ -307,9 +340,9 @@ class _PrepositionsDetailScreenState extends State<PrepositionsDetailScreen> {
                 ),
               ),
             if (content.dataBody != null) ...[
-              SizedBox(height: 12),
+              const SizedBox(height: 12),
               Container(
-                padding: EdgeInsets.all(16),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Colors.grey[100],
                   borderRadius: BorderRadius.circular(12),
@@ -317,7 +350,7 @@ class _PrepositionsDetailScreenState extends State<PrepositionsDetailScreen> {
                 ),
                 child: Text(
                   content.dataBody!,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 17,
                     color: Colors.black,
                     height: 1.5,
@@ -333,7 +366,7 @@ class _PrepositionsDetailScreenState extends State<PrepositionsDetailScreen> {
 
   Widget _buildExplanationCard(LessonContent content) {
     return Container(
-      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -341,12 +374,12 @@ class _PrepositionsDetailScreenState extends State<PrepositionsDetailScreen> {
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
             blurRadius: 10,
-            offset: Offset(0, 4),
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Padding(
-        padding: EdgeInsets.all(20),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -354,7 +387,7 @@ class _PrepositionsDetailScreenState extends State<PrepositionsDetailScreen> {
               Row(
                 children: [
                   Icon(Icons.info_outline, color: Colors.purple[400], size: 20),
-                  SizedBox(width: 8),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       content.dataTitle!,
@@ -368,13 +401,58 @@ class _PrepositionsDetailScreenState extends State<PrepositionsDetailScreen> {
                 ],
               ),
             if (content.dataBody != null) ...[
-              SizedBox(height: 12),
+              const SizedBox(height: 12),
               Text(
                 content.dataBody!,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 16,
                   color: Colors.black87,
                   height: 1.6,
+                ),
+              ),
+            ],
+            if (content.exampleSentence != null) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.purple[50],
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border(
+                    left: BorderSide(color: Colors.purple[400]!, width: 4),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Ví dụ:',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.purple[600],
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      content.exampleSentence!,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontStyle: FontStyle.italic,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    if (content.exampleTranslation != null) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        '→ ${content.exampleTranslation!}',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
             ],
@@ -386,7 +464,7 @@ class _PrepositionsDetailScreenState extends State<PrepositionsDetailScreen> {
 
   Widget _buildExampleCard(LessonContent content) {
     return Container(
-      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [Colors.green[50]!, Colors.green[100]!],
@@ -397,7 +475,7 @@ class _PrepositionsDetailScreenState extends State<PrepositionsDetailScreen> {
         border: Border.all(color: Colors.green[300]!, width: 1),
       ),
       child: Padding(
-        padding: EdgeInsets.all(20),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -405,7 +483,7 @@ class _PrepositionsDetailScreenState extends State<PrepositionsDetailScreen> {
               Row(
                 children: [
                   Icon(Icons.chat_bubble_outline, color: Colors.green[700], size: 20),
-                  SizedBox(width: 8),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       content.dataTitle!,
@@ -418,16 +496,35 @@ class _PrepositionsDetailScreenState extends State<PrepositionsDetailScreen> {
                   ),
                 ],
               ),
-            if (content.dataBody != null) ...[
-              SizedBox(height: 12),
+            if (content.exampleSentence != null) ...[
+              const SizedBox(height: 12),
               Text(
-                content.dataBody!,
-                style: TextStyle(
+                content.exampleSentence!,
+                style: const TextStyle(
                   fontSize: 16,
                   fontStyle: FontStyle.italic,
                   color: Colors.black87,
                   fontWeight: FontWeight.w500,
                 ),
+              ),
+            ],
+            if (content.exampleTranslation != null) ...[
+              const SizedBox(height: 8),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.arrow_forward, size: 16, color: Colors.green[600]),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      content.exampleTranslation!,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        color: Colors.black54,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ],

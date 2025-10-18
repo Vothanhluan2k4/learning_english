@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:learning_english/service/grammar_service.dart';
 import 'package:learning_english/models/lesson_content.dart';
-import 'package:learning_english/screens/grammar/exercises/exercise_screen.dart';
+import 'package:learning_english/screens/grammar/exercise_screen.dart';
 
 class ModalverbsDetailScreen extends StatefulWidget {
   final String lessonId;
@@ -11,16 +11,38 @@ class ModalverbsDetailScreen extends StatefulWidget {
   State<ModalverbsDetailScreen> createState() => _ModalverbsDetailScreenState();
 }
 
-class _ModalverbsDetailScreenState extends State<ModalverbsDetailScreen> {
+class _ModalverbsDetailScreenState extends State<ModalverbsDetailScreen> with TickerProviderStateMixin {
   final GrammarService _grammarService = GrammarService();
   Map<String, dynamic>? _lesson;
   List<LessonContent> _contents = [];
   bool _loading = true;
 
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
+
   @override
   void initState() {
     super.initState();
     _loadLesson();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
+
+    _slideAnimation = Tween<Offset>(begin: const Offset(0, 0.2), end: Offset.zero).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadLesson() async {
@@ -32,6 +54,10 @@ class _ModalverbsDetailScreenState extends State<ModalverbsDetailScreen> {
       _contents = contents;
       _loading = false;
     });
+
+    if (_contents.isNotEmpty) {
+      _animationController.forward();
+    }
   }
 
   @override
@@ -211,90 +237,22 @@ class _ModalverbsDetailScreenState extends State<ModalverbsDetailScreen> {
       );
     }
 
-    return RefreshIndicator(
-      onRefresh: _loadLesson,
-      color: Colors.teal[700],
-      child: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: _contents.length + 1,
-        itemBuilder: (context, index) {
-          if (index == 0) {
-            return _buildProgressCard();
-          }
-
-          final content = _contents[index - 1];
-          return _buildContentCard(content, index - 1);
-        },
-      ),
-    );
-  }
-
-  Widget _buildProgressCard() {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Colors.teal[400]!, Colors.teal[600]!],
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: SlideTransition(
+        position: _slideAnimation,
+        child: RefreshIndicator(
+          onRefresh: _loadLesson,
+          color: Colors.teal[700],
+          child: ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: _contents.length,
+            itemBuilder: (context, index) {
+              final content = _contents[index];
+              return _buildContentCard(content, index);
+            },
+          ),
         ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.teal.withOpacity(0.3),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(Icons.library_books, color: Colors.white, size: 28),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Tổng quan bài học',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${_contents.length} phần nội dung',
-                  style: const TextStyle(color: Colors.white70, fontSize: 14),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              '${_contents.length}',
-              style: TextStyle(
-                color: Colors.teal[700],
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -324,6 +282,7 @@ class _ModalverbsDetailScreenState extends State<ModalverbsDetailScreen> {
                 topLeft: Radius.circular(16),
                 topRight: Radius.circular(16),
               ),
+              border: Border(bottom: BorderSide(color: Colors.teal[100]!)),
             ),
             child: Row(
               children: [
@@ -365,23 +324,7 @@ class _ModalverbsDetailScreenState extends State<ModalverbsDetailScreen> {
           ),
           Padding(
             padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildContentBody(content),
-                const SizedBox(height: 16),
-                Container(
-                  height: 4,
-                  width: 60,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.teal[400]!, Colors.teal[200]!],
-                    ),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ],
-            ),
+            child: _buildContentBody(content),
           ),
         ],
       ),
@@ -389,82 +332,66 @@ class _ModalverbsDetailScreenState extends State<ModalverbsDetailScreen> {
   }
 
   Widget _buildContentBody(LessonContent content) {
-    final title = content.dataTitle ?? '';
     final body = content.dataBody ?? '';
-    if (title.toLowerCase().contains('công thức')) {
-      return Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.orange[100],
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Text(
-          body,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
+    final example = content.exampleSentence ?? '';
+    final translation = content.exampleTranslation ?? '';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (body.isNotEmpty)
+          Text(
+            body,
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.grey[800],
+              height: 1.6,
+            ),
           ),
-        ),
-      );
-    } else if (title.toLowerCase().contains('giải thích')) {
-      return Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          CircleAvatar(
-            radius: 12,
-            backgroundColor: Colors.purple[100],
-            child: Icon(Icons.info, size: 16, color: Colors.purple[700]),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              body,
-              style: TextStyle(
-                fontSize: 15,
-                color: Colors.grey[800],
-                height: 1.6,
-              ),
+        if (example.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.teal[50],
+              borderRadius: BorderRadius.circular(10),
+              border: Border(left: BorderSide(color: Colors.teal[400]!, width: 4)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Ví dụ:',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.teal[600],
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  example,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontStyle: FontStyle.italic,
+                    color: Colors.black87,
+                  ),
+                ),
+                if (translation.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    '→ $translation',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
         ],
-      );
-    } else if (title.toLowerCase().contains('ví dụ')) {
-      final parts = body.split('-');
-      final english = parts[0].trim();
-      final vietnamese = parts.length > 1 ? parts[1].trim() : '';
-      return Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: title.toLowerCase().contains('minh họa') ? Colors.green[100] : Colors.purple[100],
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              english,
-              style: const TextStyle(fontSize: 15, color: Colors.black87),
-            ),
-            if (vietnamese.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(
-                '- $vietnamese',
-                style: TextStyle(color: Colors.grey[700], fontSize: 14),
-              ),
-            ],
-          ],
-        ),
-      );
-    } else {
-      return Text(
-        body,
-        style: TextStyle(
-          fontSize: 15,
-          color: Colors.grey[800],
-          height: 1.6,
-        ),
-      );
-    }
+      ],
+    );
   }
 }

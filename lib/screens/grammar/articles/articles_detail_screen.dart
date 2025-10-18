@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:learning_english/service/grammar_service.dart';
 import 'package:learning_english/models/lesson_content.dart';
-import 'package:learning_english/screens/grammar/exercises/exercise_screen.dart';
+import 'package:learning_english/screens/grammar/exercise_screen.dart';
 
 class ArticlesDetailScreen extends StatefulWidget {
   final String lessonId;
@@ -11,16 +11,38 @@ class ArticlesDetailScreen extends StatefulWidget {
   State<ArticlesDetailScreen> createState() => _ArticlesDetailScreenState();
 }
 
-class _ArticlesDetailScreenState extends State<ArticlesDetailScreen> {
+class _ArticlesDetailScreenState extends State<ArticlesDetailScreen> with TickerProviderStateMixin {
   final GrammarService _grammarService = GrammarService();
   Map<String, dynamic>? _lesson;
   List<LessonContent> _contents = [];
   bool _loading = true;
 
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
+
   @override
   void initState() {
     super.initState();
     _loadLesson();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
+
+    _slideAnimation = Tween<Offset>(begin: const Offset(0, 0.2), end: Offset.zero).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadLesson() async {
@@ -32,6 +54,10 @@ class _ArticlesDetailScreenState extends State<ArticlesDetailScreen> {
       _contents = contents;
       _loading = false;
     });
+
+    if (_contents.isNotEmpty) {
+      _animationController.forward();
+    }
   }
 
   @override
@@ -211,39 +237,41 @@ class _ArticlesDetailScreenState extends State<ArticlesDetailScreen> {
       );
     }
 
-    // Phân loại nội dung
     final structures = _contents.where((c) => c.type == 'structure').toList();
     final explanations = _contents.where((c) => c.type == 'explanation').toList();
     final examples = _contents.where((c) => c.type == 'example').toList();
 
-    return RefreshIndicator(
-      onRefresh: _loadLesson,
-      color: Colors.red[700],
-      child: SingleChildScrollView(
-        physics: BouncingScrollPhysics(),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 📋 Công thức
-            if (structures.isNotEmpty) ...[
-              _buildSectionHeader(Icons.architecture, 'Công thức', Colors.orange),
-              ...structures.map((content) => _buildStructureCard(content)),
-            ],
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: SlideTransition(
+        position: _slideAnimation,
+        child: RefreshIndicator(
+          onRefresh: _loadLesson,
+          color: Colors.red[700],
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (structures.isNotEmpty) ...[
+                  _buildSectionHeader(Icons.architecture, 'Công thức', Colors.red),
+                  ...structures.map((content) => _buildStructureCard(content)),
+                ],
 
-            // 💡 Giải thích
-            if (explanations.isNotEmpty) ...[
-              _buildSectionHeader(Icons.lightbulb_outline, 'Giải thích', Colors.purple),
-              ...explanations.map((content) => _buildExplanationCard(content)),
-            ],
+                if (explanations.isNotEmpty) ...[
+                  _buildSectionHeader(Icons.lightbulb_outline, 'Giải thích', Colors.orange),
+                  ...explanations.map((content) => _buildExplanationCard(content)),
+                ],
 
-            // 📝 Ví dụ
-            if (examples.isNotEmpty) ...[
-              _buildSectionHeader(Icons.format_quote, 'Ví dụ minh họa', Colors.green),
-              ...examples.map((content) => _buildExampleCard(content)),
-            ],
+                if (examples.isNotEmpty) ...[
+                  _buildSectionHeader(Icons.format_quote, 'Ví dụ minh họa', Colors.green),
+                  ...examples.map((content) => _buildExampleCard(content)),
+                ],
 
-            SizedBox(height: 20),
-          ],
+                const SizedBox(height: 20),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -251,18 +279,18 @@ class _ArticlesDetailScreenState extends State<ArticlesDetailScreen> {
 
   Widget _buildSectionHeader(IconData icon, String title, Color color) {
     return Container(
-      margin: EdgeInsets.fromLTRB(16, 24, 16, 12),
+      margin: const EdgeInsets.fromLTRB(16, 24, 16, 12),
       child: Row(
         children: [
           Container(
-            padding: EdgeInsets.all(8),
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: color.withOpacity(0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(icon, color: color, size: 24),
           ),
-          SizedBox(width: 12),
+          const SizedBox(width: 12),
           Text(
             title,
             style: TextStyle(
@@ -278,7 +306,7 @@ class _ArticlesDetailScreenState extends State<ArticlesDetailScreen> {
 
   Widget _buildStructureCard(LessonContent content) {
     return Container(
-      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -286,20 +314,20 @@ class _ArticlesDetailScreenState extends State<ArticlesDetailScreen> {
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
             blurRadius: 10,
-            offset: Offset(0, 4),
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Padding(
-        padding: EdgeInsets.all(20),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (content.dataTitle != null)
               Container(
-                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Colors.orange[50],
+                  color: Colors.red[50],
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -307,22 +335,22 @@ class _ArticlesDetailScreenState extends State<ArticlesDetailScreen> {
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: Colors.orange[800],
+                    color: Colors.red[800],
                   ),
                 ),
               ),
             if (content.dataBody != null) ...[
-              SizedBox(height: 12),
+              const SizedBox(height: 12),
               Container(
-                padding: EdgeInsets.all(16),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Colors.grey[100],
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.orange[200]!, width: 2),
+                  border: Border.all(color: Colors.red[200]!, width: 2),
                 ),
                 child: Text(
                   content.dataBody!,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 17,
                     color: Colors.black,
                     height: 1.5,
@@ -338,7 +366,7 @@ class _ArticlesDetailScreenState extends State<ArticlesDetailScreen> {
 
   Widget _buildExplanationCard(LessonContent content) {
     return Container(
-      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -346,37 +374,37 @@ class _ArticlesDetailScreenState extends State<ArticlesDetailScreen> {
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
             blurRadius: 10,
-            offset: Offset(0, 4),
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Padding(
-        padding: EdgeInsets.all(20),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (content.dataTitle != null)
               Row(
                 children: [
-                  Icon(Icons.info_outline, color: Colors.purple[400], size: 20),
-                  SizedBox(width: 8),
+                  Icon(Icons.info_outline, color: Colors.orange[400], size: 20),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       content.dataTitle!,
                       style: TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.bold,
-                        color: Colors.purple[700],
+                        color: Colors.orange[700],
                       ),
                     ),
                   ),
                 ],
               ),
             if (content.dataBody != null) ...[
-              SizedBox(height: 12),
+              const SizedBox(height: 12),
               Text(
                 content.dataBody!,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 16,
                   color: Colors.black87,
                   height: 1.6,
@@ -384,14 +412,14 @@ class _ArticlesDetailScreenState extends State<ArticlesDetailScreen> {
               ),
             ],
             if (content.exampleSentence != null) ...[
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
               Container(
-                padding: EdgeInsets.all(12),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.purple[50],
+                  color: Colors.orange[50],
                   borderRadius: BorderRadius.circular(10),
                   border: Border(
-                    left: BorderSide(color: Colors.purple[400]!, width: 4),
+                    left: BorderSide(color: Colors.orange[400]!, width: 4),
                   ),
                 ),
                 child: Column(
@@ -402,20 +430,20 @@ class _ArticlesDetailScreenState extends State<ArticlesDetailScreen> {
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
-                        color: Colors.purple[600],
+                        color: Colors.orange[600],
                       ),
                     ),
-                    SizedBox(height: 6),
+                    const SizedBox(height: 6),
                     Text(
                       content.exampleSentence!,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 15,
                         fontStyle: FontStyle.italic,
                         color: Colors.black87,
                       ),
                     ),
                     if (content.exampleTranslation != null) ...[
-                      SizedBox(height: 6),
+                      const SizedBox(height: 6),
                       Text(
                         '→ ${content.exampleTranslation!}',
                         style: TextStyle(
@@ -436,7 +464,7 @@ class _ArticlesDetailScreenState extends State<ArticlesDetailScreen> {
 
   Widget _buildExampleCard(LessonContent content) {
     return Container(
-      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [Colors.green[50]!, Colors.green[100]!],
@@ -447,7 +475,7 @@ class _ArticlesDetailScreenState extends State<ArticlesDetailScreen> {
         border: Border.all(color: Colors.green[300]!, width: 1),
       ),
       child: Padding(
-        padding: EdgeInsets.all(20),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -455,7 +483,7 @@ class _ArticlesDetailScreenState extends State<ArticlesDetailScreen> {
               Row(
                 children: [
                   Icon(Icons.chat_bubble_outline, color: Colors.green[700], size: 20),
-                  SizedBox(width: 8),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       content.dataTitle!,
@@ -469,10 +497,10 @@ class _ArticlesDetailScreenState extends State<ArticlesDetailScreen> {
                 ],
               ),
             if (content.exampleSentence != null) ...[
-              SizedBox(height: 12),
+              const SizedBox(height: 12),
               Text(
                 content.exampleSentence!,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 16,
                   fontStyle: FontStyle.italic,
                   color: Colors.black87,
@@ -481,16 +509,16 @@ class _ArticlesDetailScreenState extends State<ArticlesDetailScreen> {
               ),
             ],
             if (content.exampleTranslation != null) ...[
-              SizedBox(height: 8),
+              const SizedBox(height: 8),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Icon(Icons.arrow_forward, size: 16, color: Colors.green[600]),
-                  SizedBox(width: 8),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       content.exampleTranslation!,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 15,
                         color: Colors.black54,
                       ),
