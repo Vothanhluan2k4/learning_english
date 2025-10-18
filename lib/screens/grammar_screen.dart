@@ -173,7 +173,9 @@ class _GrammarScreenState extends State<GrammarScreen> {
       return const Center(
         child: Padding(
           padding: EdgeInsets.all(40),
-          child: CircularProgressIndicator(),
+          child: CircularProgressIndicator(
+            color: Colors.blue, // Tùy chỉnh màu thành indigo[700]
+          ),
         ),
       );
     }

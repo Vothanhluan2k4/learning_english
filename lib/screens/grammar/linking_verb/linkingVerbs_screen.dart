@@ -50,7 +50,7 @@ class _LinkingVerbsScreenState extends State<LinkingVerbsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Linking Verbs', style: TextStyle(color: Colors.white),),
-        backgroundColor: Colors.green,
+        backgroundColor: Colors.indigo,
         leading: IconButton(
             onPressed: (){
               Navigator.pop(context);
@@ -93,7 +93,7 @@ class _LinkingVerbsScreenState extends State<LinkingVerbsScreen> {
               onPressed: _loadLessons,
               icon: const Icon(Icons.refresh),
               label: const Text('Thử lại'),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo),
             ),
           ],
         ),
@@ -131,7 +131,6 @@ class _LinkingVerbsScreenState extends State<LinkingVerbsScreen> {
   Widget _buildLessonList() {
     return Column(
       children: [
-        _buildHeader(),
         Expanded(
           child: ListView.builder(
             padding: const EdgeInsets.all(16),
@@ -145,22 +144,6 @@ class _LinkingVerbsScreenState extends State<LinkingVerbsScreen> {
     );
   }
 
-  Widget _buildHeader() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.green,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildLessonCard(Lesson lesson, int index) {
     return Card(
@@ -174,7 +157,7 @@ class _LinkingVerbsScreenState extends State<LinkingVerbsScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => LessonDetailScreen(lesson: lesson),
+              builder: (context) => LessonDetailScreen(lessonId: lesson.id),
             ),
           );
         },
@@ -187,7 +170,7 @@ class _LinkingVerbsScreenState extends State<LinkingVerbsScreen> {
                 width: 50,
                 height: 50,
                 decoration: BoxDecoration(
-                  color: Colors.green.shade50,
+                  color: Colors.indigo.shade50,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Center(
@@ -196,7 +179,7 @@ class _LinkingVerbsScreenState extends State<LinkingVerbsScreen> {
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
-                      color: Colors.green.shade700,
+                      color: Colors.indigo.shade700,
                     ),
                   ),
                 ),
