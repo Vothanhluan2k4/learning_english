@@ -2,18 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:learning_english/screens/grammar/conditionals/conditionals_screen.dart';
 import 'package:learning_english/screens/grammar/linking_verb/linkingVerbs_screen.dart';
 import 'package:learning_english/screens/grammar/pronunciation_screen.dart';
+import 'package:learning_english/screens/grammar/tenses/tenses_screen.dart';
 import 'package:learning_english/widgets/grammar_category.dart';
 import '../widgets/grammar_card.dart';
 import '../service/grammar_service.dart';
 import '../models/topic.dart';
-
-// Screen
 import 'grammar/articles/articles_screen.dart';
-import 'grammar/conditionals/conditionals_screen.dart';
 import 'grammar/modalverbs/modalVerbs_screen.dart';
 import 'grammar/passivevoice/passiveVoice_screen.dart';
 import 'grammar/prepositions/prepositions_screen.dart';
-
 
 class GrammarScreen extends StatefulWidget {
   const GrammarScreen({super.key});
@@ -257,7 +254,7 @@ class _GrammarScreenState extends State<GrammarScreen> {
         crossAxisCount: 2,
         crossAxisSpacing: 16,
         mainAxisSpacing: 16,
-        childAspectRatio: 0.75, // Giảm giá trị để tăng chiều cao
+        childAspectRatio: 0.7, // Giảm giá trị để tăng chiều cao
       ),
       itemCount: grammarCategories.length,
       itemBuilder: (context, index) {
