@@ -16,6 +16,7 @@ class _PrepositionsDetailScreenState extends State<PrepositionsDetailScreen> wit
   Map<String, dynamic>? _lesson;
   List<LessonContent> _contents = [];
   bool _loading = true;
+  int _exerciseCount = 0;
 
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
@@ -48,10 +49,12 @@ class _PrepositionsDetailScreenState extends State<PrepositionsDetailScreen> wit
   Future<void> _loadLesson() async {
     final lesson = await _grammarService.getLessonById(widget.lessonId);
     final contents = await _grammarService.getLessonContents(widget.lessonId);
+    final exercises = await _grammarService.getExercisesByLesson(widget.lessonId);
 
     setState(() {
       _lesson = lesson;
       _contents = contents;
+      _exerciseCount = exercises.length;
       _loading = false;
     });
 
@@ -59,6 +62,7 @@ class _PrepositionsDetailScreenState extends State<PrepositionsDetailScreen> wit
       _animationController.forward();
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -193,14 +197,41 @@ class _PrepositionsDetailScreenState extends State<PrepositionsDetailScreen> wit
                           ),
                         ),
                         Tab(
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: const [
-                              Icon(Icons.quiz, size: 18),
-                              SizedBox(width: 8),
-                              Text('Bài tập'),
-                            ],
-                          ),
+                          child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              mainAxisSize: MainAxisSize.min,
+                              children: const [
+                                Icon(Icons.assignment),
+                                SizedBox(width: 6),
+                                Text('Bài tập'),
+                              ],
+                            ),
+                            if (_exerciseCount > 0)
+                              Positioned(
+                                right: -25,
+                                top: -5,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(color: Colors.grey, width: 1),
+                                  ),
+                                  child: Text(
+                                    '$_exerciseCount',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
                         ),
                       ],
                     ),

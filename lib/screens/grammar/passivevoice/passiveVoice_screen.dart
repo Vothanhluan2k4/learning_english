@@ -15,6 +15,7 @@ class _PassiveVoicesScreenState extends State<PassiveVoicesScreen> with TickerPr
   List<Lesson> lessons = [];
   bool isLoading = true;
   String? errorMessage;
+  
 
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;

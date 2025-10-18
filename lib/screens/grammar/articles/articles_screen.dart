@@ -76,7 +76,7 @@ class _ArticlesScreenState extends State<ArticlesScreen> with TickerProviderStat
 
   Map<String, List<Lesson>> _groupLessons(List<Lesson> lessons) {
     Map<String, List<Lesson>> grouped = {
-      'Mạo từ không xác định (A/An)': [],
+      'Mạo từ (A/An)': [],
       'Mạo từ xác định (The)': [],
       'Không dùng mạo từ': [],
       'Khác': [],
@@ -85,7 +85,7 @@ class _ArticlesScreenState extends State<ArticlesScreen> with TickerProviderStat
     for (var lesson in lessons) {
       final title = lesson.lessonTitleVi.toLowerCase();
       if (title.contains('a/an')) {
-        grouped['Mạo từ không xác định (A/An)']!.add(lesson);
+        grouped['Mạo từ (A/An)']!.add(lesson);
       } else if (title.contains('the')) {
         grouped['Mạo từ xác định (The)']!.add(lesson);
       } else if (title.contains('zero article') || title.contains('không dùng mạo từ')) {
@@ -101,7 +101,7 @@ class _ArticlesScreenState extends State<ArticlesScreen> with TickerProviderStat
 
   IconData _getGroupIcon(String groupName) {
     switch (groupName) {
-      case 'Mạo từ không xác định (A/An)':
+      case 'Mạo từ (A/An)':
         return Icons.abc;
       case 'Mạo từ xác định (The)':
         return Icons.article_outlined;
@@ -114,7 +114,7 @@ class _ArticlesScreenState extends State<ArticlesScreen> with TickerProviderStat
 
   Color _getGroupColor(String groupName) {
     switch (groupName) {
-      case 'Mạo từ không xác định (A/An)':
+      case 'Mạo từ (A/An)':
         return Colors.red[400]!;
       case 'Mạo từ xác định (The)':
         return Colors.red[600]!;
