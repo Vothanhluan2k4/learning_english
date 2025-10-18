@@ -162,7 +162,45 @@ class AuthService{
     await _supabase.auth.signOut();
   }
 
+  //Check test course
+  Future<bool> hasPlacementTestResult() async {
+    final supabase = Supabase.instance.client;
+    final user = supabase.auth.currentUser;
+    if (user == null) return false;
 
+    try {
+      // 1. Lấy bản ghi user_placement_summary
+      final result = await supabase
+          .from('user_placement_summary')
+      // Lấy cả 2 cột score và is_skipped
+          .select('score, is_skipped')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+      if (result == null) {
+        // 2. Không có bản ghi nào -> Chưa làm và chưa bỏ qua
+        return false;
+      }
+
+      // 3. Kiểm tra các điều kiện để chuyển sang Home Screen
+      final score = result['score'];
+      // Nếu score tồn tại (khác null), có nghĩa là test đã được làm.
+      final hasScore = score != null;
+
+      // Kiểm tra trạng thái is_skipped
+      // Mặc định là FALSE nếu null (dù is_skipped đã được đặt NOT NULL DEFAULT FALSE trong SQL)
+      final isSkipped = result['is_skipped'] as bool? ?? false;
+
+      // Trả về TRUE nếu: (Đã có điểm) HOẶC (Đã bỏ qua)
+      // Nếu hasPlacementTestResult trả về TRUE, ứng dụng sẽ chuyển đến /welcome (hoặc /homedrawer).
+      return hasScore || isSkipped;
+
+    } catch (e) {
+      print('Error fetching placement summary: $e');
+      // Nếu có lỗi, tốt nhất là chuyển đến màn hình chọn lộ trình để người dùng thử lại.
+      return false;
+    }
+  }
 
 
   //Check Login Expiry

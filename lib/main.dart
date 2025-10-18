@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:learning_english/core/supabase_config.dart';
 import 'package:learning_english/core/uni_links.dart';
+import 'package:learning_english/screens/course/chosse_course_screen.dart';
 import 'package:learning_english/screens/drawer_screen.dart';
 import 'package:learning_english/screens/forgot_password_screen.dart';
 import 'package:learning_english/screens/home_screen.dart';
@@ -108,6 +109,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     }
   }
 
+
+
   @override
   void dispose() {
     _expiryCheckTimer?.cancel();
@@ -128,7 +131,6 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         '/forgotPassword': (context) => ForgotPasswordScreen(),
         '/homedrawer': (context) => DrawerScreen(),
         '/home': (context) => const HomeScreen(),
-
       },
     );
   }
