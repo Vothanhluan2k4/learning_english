@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:learning_english/widgets/pronunciation_lesson.dart';
@@ -140,16 +142,43 @@ class _PronunciationScreenState extends State<PronunciationScreen> {
       isPlaying = true;
     });
 
-    for (String word in words) {
-      if (!isPlaying) break; // Dừng nếu đã dừng thủ công
-      await speakWord(word);
+    for (int i = 0; i < words.length; i++) {
       if (!isPlaying) break;
-      await Future.delayed(const Duration(milliseconds: 800));
+
+      String word = words[i];
+      setState(() {
+        currentSpeakingWord = word;
+      });
+
+      String cleanWord = word.contains(' → ') ? word.split(' → ')[1].trim() : word;
+
+      // Tạo Completer để đợi TTS hoàn thành
+      final completer = Completer<void>();
+
+      flutterTts.setCompletionHandler(() {
+        if (!completer.isCompleted) {
+          completer.complete();
+        }
+      });
+
+      await flutterTts.speak(cleanWord);
+      await completer.future; // Đợi TTS hoàn thành
+
+      // Delay giữa các từ
+      await Future.delayed(const Duration(milliseconds: 500));
     }
 
     setState(() {
       isPlaying = false;
       currentSpeakingWord = null;
+    });
+
+    // Reset completion handler
+    flutterTts.setCompletionHandler(() {
+      setState(() {
+        isPlaying = false;
+        currentSpeakingWord = null;
+      });
     });
   }
 

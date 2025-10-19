@@ -20,6 +20,7 @@ class _InforUserScreenState extends State<InforUserScreen> {
 
   Map<String, dynamic>? _userData;
   bool _isLoading = true;
+  bool _hasChanges = false;
 
   @override
   void initState() {
@@ -71,9 +72,11 @@ class _InforUserScreenState extends State<InforUserScreen> {
 
     // Reload data if changes were saved
     if (result == true) {
-      _loadUserData();
+      await _loadUserData();
+      _hasChanges = true; //  Đánh dấu có thay đổi
     }
   }
+
 
   //Change date
   String _formatDate(String? date) {
@@ -109,15 +112,24 @@ class _InforUserScreenState extends State<InforUserScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[100],
-      appBar: AppBar(
-        backgroundColor: Colors.blue,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
+    return  WillPopScope(
+        onWillPop: () async {
+          // Trả về true để báo hiệu có thay đổi
+          Navigator.pop(context, true);
+          return false;
+        },
+        child: Scaffold(
+          backgroundColor: Colors.grey[100],
+          appBar: AppBar(
+            backgroundColor: Colors.blue,
+            elevation: 0,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.white),
+              onPressed: () {
+                // Trả về true khi nhấn nút back
+                Navigator.pop(context, true);
+              },
+            ),
         title: const Text(
           'Thông tin cá nhân',
           style: TextStyle(color: Colors.white, fontSize: 18,fontWeight: FontWeight.w600,),
@@ -253,8 +265,10 @@ class _InforUserScreenState extends State<InforUserScreen> {
           ],
         ),
       ),
+        ),
     );
   }
+
 
   Widget _buildInfoCard({
     required String label,
@@ -321,4 +335,6 @@ class _InforUserScreenState extends State<InforUserScreen> {
       ),
     );
   }
+
 }
+
