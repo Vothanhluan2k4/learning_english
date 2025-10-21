@@ -1,18 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:learning_english/screens/grammar/conditionals/conditionals_screen.dart';
+import 'package:learning_english/screens/grammar/linking_verb/linkingVerbs_screen.dart';
+import 'package:learning_english/screens/grammar/pronunciation_screen.dart';
+import 'package:learning_english/screens/grammar/tenses/tenses_screen.dart';
 import 'package:learning_english/widgets/grammar_category.dart';
 import '../widgets/grammar_card.dart';
 import '../service/grammar_service.dart';
 import '../models/topic.dart';
-
-// Screen
-import 'grammar/articles_screen.dart';
-import 'grammar/conditionals_screen.dart';
-import 'grammar/linking_verb/linkingVerbs_screen.dart';
-import 'grammar/modalVerbs_screen.dart';
-import 'grammar/passiveVoice_screen.dart';
-import 'grammar/prepositions_screen.dart';
-import 'grammar/pronunciation_screen.dart';
-import 'grammar/tenses/tenses_screen.dart';
+import 'grammar/articles/articles_screen.dart';
+import 'grammar/modalverbs/modalVerbs_screen.dart';
+import 'grammar/passivevoice/passiveVoice_screen.dart';
+import 'grammar/prepositions/prepositions_screen.dart';
 
 class GrammarScreen extends StatefulWidget {
   const GrammarScreen({super.key});
@@ -45,8 +43,8 @@ class _GrammarScreenState extends State<GrammarScreen> {
     'Pronunciation': () => const PronunciationScreen(),
     'Linking Verbs': () => const LinkingVerbsScreen(),
     'Conditionals': () => const ConditionalsScreen(),
-    'Passive Voice': () => const PassiveVoiceScreen(),
-    'Modal Verbs': () => const ModalVerbsScreen(),
+    'Passive Voice': () => const PassiveVoicesScreen(),
+    'Modal Verbs': () => const ModalverbsScreen(),
     'Articles': () => const ArticlesScreen(),
     'Prepositions': () => const PrepositionsScreen(),
   };
@@ -175,7 +173,9 @@ class _GrammarScreenState extends State<GrammarScreen> {
       return const Center(
         child: Padding(
           padding: EdgeInsets.all(40),
-          child: CircularProgressIndicator(),
+          child: CircularProgressIndicator(
+            color: Colors.blue, // Tùy chỉnh màu thành indigo[700]
+          ),
         ),
       );
     }
@@ -256,7 +256,7 @@ class _GrammarScreenState extends State<GrammarScreen> {
         crossAxisCount: 2,
         crossAxisSpacing: 16,
         mainAxisSpacing: 16,
-        childAspectRatio: 0.75, // Giảm giá trị để tăng chiều cao
+        childAspectRatio: 0.7, // Giảm giá trị để tăng chiều cao
       ),
       itemCount: grammarCategories.length,
       itemBuilder: (context, index) {

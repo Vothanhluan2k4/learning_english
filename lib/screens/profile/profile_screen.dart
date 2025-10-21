@@ -178,7 +178,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withOpacity(0.1),
-                              blurRadius: 10,
+                              blurRadius: 15,
                               offset: Offset(0, 5),
                             ),
                           ],
@@ -208,13 +208,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 userData?['avatar_url'] = newUrl;
                               });
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content:
-                                Text('Cập nhật ảnh đại diện thành công!',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    backgroundColor: Colors.green,
+                                SnackBar(
+                                  content: const Text(
+                                    'Cập nhật ảnh đại diện thành công!',
+                                    style: TextStyle(
+                                      color: Colors.white, // ✅ Chỉ set màu chữ
+                                    ),
                                   ),
-                                ),
+                                  backgroundColor: Colors.green,
+                                  behavior: SnackBarBehavior.floating,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  margin: const EdgeInsets.all(16),
                                 ),
                               );
                             }
@@ -301,8 +307,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                         ),
                         TextButton.icon(
-                          onPressed: () {
-                            Navigator.pushNamed(context, '/inforUser');
+                          onPressed: () async {
+                            // Chờ kết quả từ InforUserScreen
+                            final result = await Navigator.pushNamed(context, '/inforUser');
+
+                            // Nếu có thay đổi, reload lại data
+                            if (result == true) {
+                              await _loadUserData();
+                            }
                           },
                           icon: const Icon(Icons.edit, size: 18),
                           label: const Text("Chỉnh sửa"),

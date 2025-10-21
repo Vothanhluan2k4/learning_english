@@ -6,7 +6,7 @@ class ExerciseProgressService {
 
   Future<void> saveProgress(ExerciseProgress progress) async {
     await _supabase.from('user_exercise_progress').upsert(progress.toJson(),
-    onConflict: 'user_id,exercise_id',
+      onConflict: 'user_id,exercise_id',
     );
   }
 
@@ -141,3 +141,4 @@ class ExerciseProgressService {
   }
 
 }
+

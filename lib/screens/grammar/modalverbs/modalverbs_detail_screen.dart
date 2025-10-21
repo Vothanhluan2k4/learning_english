@@ -3,15 +3,15 @@ import 'package:learning_english/service/grammar_service.dart';
 import 'package:learning_english/models/lesson_content.dart';
 import 'package:learning_english/screens/grammar/exercise_screen.dart';
 
-class LessonDetailScreen extends StatefulWidget {
+class ModalverbsDetailScreen extends StatefulWidget {
   final String lessonId;
-  const LessonDetailScreen({super.key, required this.lessonId});
+  const ModalverbsDetailScreen({super.key, required this.lessonId});
 
   @override
-  State<LessonDetailScreen> createState() => _LessonDetailScreenState();
+  State<ModalverbsDetailScreen> createState() => _ModalverbsDetailScreenState();
 }
 
-class _LessonDetailScreenState extends State<LessonDetailScreen> with TickerProviderStateMixin {
+class _ModalverbsDetailScreenState extends State<ModalverbsDetailScreen> with TickerProviderStateMixin {
   final GrammarService _grammarService = GrammarService();
   Map<String, dynamic>? _lesson;
   List<LessonContent> _contents = [];
@@ -46,7 +46,7 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> with TickerProv
     super.dispose();
   }
 
-  Future<void> _loadLesson() async {
+   Future<void> _loadLesson() async {
     final lesson = await _grammarService.getLessonById(widget.lessonId);
     final contents = await _grammarService.getLessonContents(widget.lessonId);
     final exercises = await _grammarService.getExercisesByLesson(widget.lessonId);
@@ -72,7 +72,7 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> with TickerProv
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              CircularProgressIndicator(color: Colors.indigo[700]),
+              CircularProgressIndicator(color: Colors.teal[700]),
               const SizedBox(height: 16),
               Text(
                 'Đang tải bài học...',
@@ -88,7 +88,7 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> with TickerProv
       return Scaffold(
         backgroundColor: Colors.grey[50],
         appBar: AppBar(
-          backgroundColor: Colors.indigo[700],
+          backgroundColor: Colors.teal[700],
           foregroundColor: Colors.white,
           elevation: 0,
         ),
@@ -119,7 +119,7 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> with TickerProv
                 expandedHeight: 180,
                 floating: false,
                 pinned: true,
-                backgroundColor: Colors.indigo[700],
+                backgroundColor: Colors.teal[700],
                 foregroundColor: Colors.white,
                 elevation: 0,
                 flexibleSpace: FlexibleSpaceBar(
@@ -128,7 +128,7 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> with TickerProv
                       gradient: LinearGradient(
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
-                        colors: [Colors.indigo[600]!, Colors.indigo[900]!],
+                        colors: [Colors.teal[600]!, Colors.teal[900]!],
                       ),
                     ),
                     child: SafeArea(
@@ -174,7 +174,7 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> with TickerProv
                 bottom: PreferredSize(
                   preferredSize: const Size.fromHeight(48),
                   child: Container(
-                    color: Colors.indigo[700],
+                    color: Colors.teal[700],
                     child: TabBar(
                       labelColor: Colors.white,
                       unselectedLabelColor: Colors.white70,
@@ -217,14 +217,14 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> with TickerProv
                                     decoration: BoxDecoration(
                                       color: Colors.white,
                                       borderRadius: BorderRadius.circular(10),
-                                      border: Border.all(color: Colors.indigo[400]!, width: 1),
+                                      border: Border.all(color: Color.fromARGB(255, 7, 187, 172), width: 1),
                                     ),
                                     child: Text(
                                       '$_exerciseCount',
                                       style: const TextStyle(
                                         fontSize: 12,
                                         fontWeight: FontWeight.bold,
-                                        color: Colors.indigo,
+                                        color: Color.fromARGB(255, 7, 187, 172),
                                       ),
                                     ),
                                   ),
@@ -273,7 +273,7 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> with TickerProv
         position: _slideAnimation,
         child: RefreshIndicator(
           onRefresh: _loadLesson,
-          color: Colors.indigo[700],
+          color: Colors.teal[700],
           child: ListView.builder(
             padding: const EdgeInsets.all(16),
             itemCount: _contents.length,
@@ -307,12 +307,12 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> with TickerProv
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.indigo[50],
+              color: Colors.teal[50],
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(16),
                 topRight: Radius.circular(16),
               ),
-              border: Border(bottom: BorderSide(color: Colors.indigo[100]!)),
+              border: Border(bottom: BorderSide(color: Colors.teal[100]!)),
             ),
             child: Row(
               children: [
@@ -323,7 +323,7 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> with TickerProv
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [Colors.indigo[400]!, Colors.indigo[700]!],
+                      colors: [Colors.teal[400]!, Colors.teal[700]!],
                     ),
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -383,9 +383,9 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> with TickerProv
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.indigo[50],
+              color: Colors.teal[50],
               borderRadius: BorderRadius.circular(10),
-              border: Border(left: BorderSide(color: Colors.indigo[400]!, width: 4)),
+              border: Border(left: BorderSide(color: Colors.teal[400]!, width: 4)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -395,7 +395,7 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> with TickerProv
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
-                    color: Colors.indigo[600],
+                    color: Colors.teal[600],
                   ),
                 ),
                 const SizedBox(height: 6),
