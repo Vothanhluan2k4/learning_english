@@ -180,6 +180,14 @@ class GoogleAuthService {
   //Save user in SharedPreferences
   Future<void> _saveUserToPref(GoogleSignInAccount account) async{
     final prefs = await SharedPreferences.getInstance();
+    final user = _supabase.auth.currentUser;
+
+    if (user != null) {
+      await prefs.setString('auth_id', user.id);
+    } else {
+      print('Khong tìm thấy user Supabase sau khi đăng nhập');
+    }
+
     await prefs.setBool('isLoggedIn', true);
     await prefs.setString('email', account.email);
     await prefs.setString('name', account.displayName ?? '');
@@ -189,8 +197,10 @@ class GoogleAuthService {
   //Clear user in SharedPreferences
   Future<void> _clearPref() async{
     final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('auth_id');
     await prefs.setBool('isLoggedIn', false);
     await prefs.remove('email');
+    await prefs.remove('auth_id');
     await prefs.remove('name');
     await prefs.remove('avatar');
   }
