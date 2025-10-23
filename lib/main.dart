@@ -10,7 +10,7 @@ import 'package:learning_english/screens/home_screen.dart';
 import 'package:learning_english/screens/profile/infor_user_screen.dart';
 import 'package:learning_english/screens/setting_screen.dart';
 import 'package:learning_english/screens/flashcards_screen.dart';
-import 'package:learning_english/screens/course_screen.dart';
+import 'package:learning_english/screens/course/course_screen.dart';
 import 'package:learning_english/screens/grammar_screen.dart';
 import 'package:learning_english/screens/signIn_screen.dart';
 import 'package:learning_english/screens/signUp_screen.dart';
@@ -53,12 +53,12 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   Timer? _expiryCheckTimer;
   final AuthService _authService = AuthService();
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
-  final _appLinks =  AppLinks();
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+
 
     Future.delayed(Duration(seconds: 1), () {
       _checkLoginExpiry();
@@ -131,6 +131,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         '/forgotPassword': (context) => ForgotPasswordScreen(),
         '/homedrawer': (context) => DrawerScreen(),
         '/home': (context) => const HomeScreen(),
+        '/chooseCourse': (context) => const ChooseCourseScreen(),
       },
     );
   }

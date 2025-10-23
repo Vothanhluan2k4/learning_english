@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../service/auth_service.dart';
 import '../service/google_auth_service.dart';
 import '../service/user_prefs.dart';
+import '../service/placement_test_service.dart';
+
 
 class SignInScreen extends StatefulWidget {
   @override
@@ -11,6 +14,7 @@ class SignInScreen extends StatefulWidget {
 
 class _SignInScreenState extends State<SignInScreen> with SingleTickerProviderStateMixin {
   final _authService = AuthService();
+  final SupabaseClient _supabase = Supabase.instance.client;
   final _googleAuthService = GoogleAuthService();
   final _formKey = GlobalKey<FormState>();
 
@@ -54,6 +58,7 @@ class _SignInScreenState extends State<SignInScreen> with SingleTickerProviderSt
   }
 
   Future<void> _signIn() async {
+
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -73,6 +78,16 @@ class _SignInScreenState extends State<SignInScreen> with SingleTickerProviderSt
         //Save SharedPreferences
         await UserPrefs.saveUser(userData);
 
+        final placementService = PlacementTestService();
+        final shouldShowTest = await placementService.shouldShowPlacementTest(response.user!.id);
+
+        if (shouldShowTest) {
+          Navigator.pushReplacementNamed(context, '/chooseCourse');
+        } else {
+          Navigator.pushReplacementNamed(context, '/homedrawer');
+        }
+
+        //Notification
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(
@@ -87,7 +102,6 @@ class _SignInScreenState extends State<SignInScreen> with SingleTickerProviderSt
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
         );
-        Navigator.pushReplacementNamed(context, '/homedrawer');
       }
     } catch (e) {
       String errorMsg = 'Lỗi đăng nhập: ${e.toString()}';
@@ -125,22 +139,40 @@ class _SignInScreenState extends State<SignInScreen> with SingleTickerProviderSt
       if (!mounted) return;
 
       if (success && _googleAuthService.isSignedIn) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.white),
-                SizedBox(width: 12),
-                Text('Đăng nhập Google thành công!'),
-              ],
-            ),
-            backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-        );
+        // Lấy thông tin người dùng
+        final supabase = Supabase.instance.client;
+        final user = supabase.auth.currentUser;
 
-        Navigator.pushReplacementNamed(context, '/homedrawer');
+        if (user != null) {
+          // Gọi service kiểm tra Placement Test
+          final placementService = PlacementTestService();
+          final shouldShowTest = await placementService.shouldShowPlacementTest(user.id);
+
+          // Hiển thị thông báo đăng nhập thành công
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.check_circle, color: Colors.white),
+                  SizedBox(width: 12),
+                  Text('Đăng nhập Google thành công!'),
+                ],
+              ),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          );
+
+          // Điều hướng dựa theo kết quả kiểm tra
+          if (shouldShowTest) {
+            Navigator.pushReplacementNamed(context, '/chooseCourse');
+          } else {
+            Navigator.pushReplacementNamed(context, '/homedrawer');
+          }
+        } else {
+          throw Exception("Không thể lấy thông tin người dùng Google.");
+        }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -156,15 +188,6 @@ class _SignInScreenState extends State<SignInScreen> with SingleTickerProviderSt
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Lỗi: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }catch (e) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Lỗi đăng nhập: $e'),
           backgroundColor: Colors.red,
         ),
       );
