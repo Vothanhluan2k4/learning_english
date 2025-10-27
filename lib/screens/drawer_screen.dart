@@ -2,16 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:learning_english/screens/profile/profile_screen.dart';
 import 'package:learning_english/screens/setting_screen.dart';
-import 'package:learning_english/screens/flashcards_screen.dart';
+import 'package:learning_english/screens/flashcard/flashcards_screen.dart';
 import 'package:learning_english/screens/course/course_screen.dart';
 import 'package:learning_english/screens/grammar_screen.dart';
 import 'package:learning_english/screens/home_screen.dart';
 import 'package:learning_english/service/google_auth_service.dart';
 import 'package:learning_english/service/auth_service.dart';
 import 'package:learning_english/service/user_service.dart';
-
 import 'package:shared_preferences/shared_preferences.dart';
-
 import '../service/user_prefs.dart';
 
 class DrawerScreen extends StatefulWidget {
@@ -34,13 +32,14 @@ class _DrawerScreenState extends State<DrawerScreen> {
   String? _avatarUrl;
   bool _isLoading = true;
 
-  static const List<Widget> _widgetOptions = <Widget>[
-    HomeScreen(),
-    CourseScreen(),
-    GrammarScreen(),
-    FlashcardsScreen(),
-    ProfileScreen(),
-    SettingScreen(),
+  // Danh sách widget, bỏ const vì các widget không có constructor const
+  static final List<Widget> _widgetOptions = [
+    const HomeScreen(),
+    const CourseScreen(),
+    const GrammarScreen(),
+    const FlashcardsScreen(), // Thay FlashcardService bằng FlashcardsScreen
+    const ProfileScreen(),
+    const SettingScreen(),
   ];
 
   @override
@@ -129,11 +128,12 @@ class _DrawerScreenState extends State<DrawerScreen> {
 
   Future<void> _logout() async {
     try {
-      final isGoogleUser = _googleAuthService.isSignedIn && _googleAuthService.googleAccount != null;
+      final isGoogleUser = _googleAuthService.isSignedIn &&
+          _googleAuthService.googleAccount != null;
 
-      if(isGoogleUser){
+      if (isGoogleUser) {
         await _googleAuthService.signOut();
-      }else{
+      } else {
         await _authService.signOut();
         await UserPrefs.clearUser();
       }
@@ -179,43 +179,46 @@ class _DrawerScreenState extends State<DrawerScreen> {
     }
   }
 
-  //Check login status
+  // Check login status
   Future<void> _checkLoginStatus() async {
     final user = await UserPrefs.getUser();
     setState(() {
-      isLoggedIn = user['isLoggedIn'] == true; // đảm bảo boolean đúng
+      isLoggedIn = user['isLoggedIn'] == true; // Đảm bảo boolean đúng
       _fullName = user['full_name'] ?? 'User';
       _email = user['email'] ?? 'No email';
       _avatarUrl = user['avatar_url'];
       _isLoading = false;
     });
   }
-  //Change title
-  String _getTitleForScreen(int index){
-    switch(index){
-      case 0 :
+
+  // Change title
+  String _getTitleForScreen(int index) {
+    switch (index) {
+      case 0:
         return 'Trang chủ';
-      case 1 :
+      case 1:
         return 'Luyện đề';
-      case 2 :
+      case 2:
         return 'Ngữ pháp';
       case 3:
-        return 'FashCard';
-      case 4 :
+        return 'FlashCard';
+      case 4:
         return 'Hồ sơ cá nhân';
       case 5:
-        return 'Setting';
+        return 'Cài đặt';
       default:
         return 'Learning English';
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_getTitleForScreen(_selectedItem), style: TextStyle(color: Colors.white)),
+        title: Text(
+          _getTitleForScreen(_selectedItem),
+          style: TextStyle(color: Colors.white),
+        ),
         backgroundColor: Colors.blue[600],
         iconTheme: IconThemeData(color: Colors.white),
       ),
@@ -229,7 +232,8 @@ class _DrawerScreenState extends State<DrawerScreen> {
             // Hiển thị loading hoặc user info
             _isLoading
                 ? UserAccountsDrawerHeader(
-              accountName: Text('Loading...', style: TextStyle(fontSize: 18, color: Colors.white)),
+              accountName:
+              Text('Loading...', style: TextStyle(fontSize: 18, color: Colors.white)),
               accountEmail: null,
               currentAccountPicture: CircleAvatar(
                 child: CircularProgressIndicator(color: Colors.white),
@@ -240,7 +244,8 @@ class _DrawerScreenState extends State<DrawerScreen> {
                 : UserAccountsDrawerHeader(
               accountName: Text(
                 _fullName ?? 'User',
-                style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                    fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold),
               ),
               accountEmail: Text(
                 _email ?? '',
@@ -254,7 +259,10 @@ class _DrawerScreenState extends State<DrawerScreen> {
                   : CircleAvatar(
                 child: Text(
                   _fullName?.substring(0, 1).toUpperCase() ?? 'U',
-                  style: TextStyle(fontSize: 32, color: Colors.blue[600], fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                      fontSize: 32,
+                      color: Colors.blue[600],
+                      fontWeight: FontWeight.bold),
                 ),
                 backgroundColor: Colors.white,
               ),
@@ -297,7 +305,7 @@ class _DrawerScreenState extends State<DrawerScreen> {
               onTap: () => _onItemTapped(5),
             ),
             Divider(),
-            //Swtich signIn and signOut
+            // Switch signIn and signOut
             isLoggedIn
                 ? ListTile(
               leading: const Icon(Icons.logout, color: Colors.red),
