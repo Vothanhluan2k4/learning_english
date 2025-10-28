@@ -9,13 +9,12 @@ import 'package:learning_english/screens/home_screen.dart';
 import 'package:learning_english/service/google_auth_service.dart';
 import 'package:learning_english/service/auth_service.dart';
 import 'package:learning_english/service/user_service.dart';
-
-import 'package:shared_preferences/shared_preferences.dart';
-
+import 'package:learning_english/widgets/notification_bell.dart';
 import '../service/user_prefs.dart';
 
 class DrawerScreen extends StatefulWidget {
-  const DrawerScreen({super.key});
+  final int? initialIndex;
+  const DrawerScreen({super.key, this.initialIndex});
 
   @override
   State<DrawerScreen> createState() => _DrawerScreenState();
@@ -27,12 +26,12 @@ class _DrawerScreenState extends State<DrawerScreen> {
   final _googleAuthService = GoogleAuthService();
   int _selectedItem = 0;
 
-  // Biến lưu thông tin user
   bool isLoggedIn = false;
   String? _fullName;
   String? _email;
   String? _avatarUrl;
   bool _isLoading = true;
+  String? _userId;
 
   static const List<Widget> _widgetOptions = <Widget>[
     HomeScreen(),
@@ -46,17 +45,17 @@ class _DrawerScreenState extends State<DrawerScreen> {
   @override
   void initState() {
     super.initState();
+    _selectedItem = widget.initialIndex ?? 0;
     _loadUserData();
     _checkLoginStatus();
   }
 
-  // Hàm load dữ liệu user
   Future<void> _loadUserData() async {
     try {
       final currentUser = _authService.currentUser;
 
       if (currentUser != null) {
-        // Lấy thông tin từ bảng users
+        _userId = currentUser.id;
         final userProfile = await _userService.getUserProfile(currentUser.id);
 
         setState(() {
@@ -66,11 +65,10 @@ class _DrawerScreenState extends State<DrawerScreen> {
           _isLoading = false;
         });
       } else {
-        // Nếu không có user, chuyển về login
         Navigator.of(context).pushReplacementNamed('/signIn');
       }
     } catch (e) {
-      print('Error loading user data: $e');
+      debugPrint('Error loading user data: $e');
       setState(() {
         _fullName = 'User';
         _email = 'No email';
@@ -129,11 +127,12 @@ class _DrawerScreenState extends State<DrawerScreen> {
 
   Future<void> _logout() async {
     try {
-      final isGoogleUser = _googleAuthService.isSignedIn && _googleAuthService.googleAccount != null;
+      final isGoogleUser = _googleAuthService.isSignedIn && 
+          _googleAuthService.googleAccount != null;
 
-      if(isGoogleUser){
+      if (isGoogleUser) {
         await _googleAuthService.signOut();
-      }else{
+      } else {
         await _authService.signOut();
         await UserPrefs.clearUser();
       }
@@ -156,7 +155,7 @@ class _DrawerScreenState extends State<DrawerScreen> {
 
         Navigator.of(context).pushNamedAndRemoveUntil(
           '/signIn',
-              (Route<dynamic> route) => false,
+          (Route<dynamic> route) => false,
         );
       }
     } catch (e) {
@@ -179,29 +178,28 @@ class _DrawerScreenState extends State<DrawerScreen> {
     }
   }
 
-  //Check login status
   Future<void> _checkLoginStatus() async {
     final user = await UserPrefs.getUser();
     setState(() {
-      isLoggedIn = user['isLoggedIn'] == true; // đảm bảo boolean đúng
+      isLoggedIn = user['isLoggedIn'] == true;
       _fullName = user['full_name'] ?? 'User';
       _email = user['email'] ?? 'No email';
       _avatarUrl = user['avatar_url'];
       _isLoading = false;
     });
   }
-  //Change title
-  String _getTitleForScreen(int index){
-    switch(index){
-      case 0 :
+
+  String _getTitleForScreen(int index) {
+    switch (index) {
+      case 0:
         return 'Trang chủ';
-      case 1 :
+      case 1:
         return 'Luyện đề';
-      case 2 :
+      case 2:
         return 'Ngữ pháp';
       case 3:
         return 'FashCard';
-      case 4 :
+      case 4:
         return 'Hồ sơ cá nhân';
       case 5:
         return 'Setting';
@@ -210,14 +208,21 @@ class _DrawerScreenState extends State<DrawerScreen> {
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_getTitleForScreen(_selectedItem), style: TextStyle(color: Colors.white)),
+        title: Text(
+          _getTitleForScreen(_selectedItem),
+          style: TextStyle(color: Colors.white),
+        ),
         backgroundColor: Colors.blue[600],
         iconTheme: IconThemeData(color: Colors.white),
+        actions: [
+        // Truyền authId thay vì userId
+        if (_userId != null)
+          NotificationBell(authId: _userId!),
+      ],
       ),
       body: Center(
         child: _widgetOptions.elementAt(_selectedItem),
@@ -226,46 +231,52 @@ class _DrawerScreenState extends State<DrawerScreen> {
         child: ListView(
           padding: EdgeInsets.zero,
           children: [
-            // Hiển thị loading hoặc user info
             _isLoading
                 ? UserAccountsDrawerHeader(
-              accountName: Text('Loading...', style: TextStyle(fontSize: 18, color: Colors.white)),
-              accountEmail: null,
-              currentAccountPicture: CircleAvatar(
-                child: CircularProgressIndicator(color: Colors.white),
-                backgroundColor: Colors.blue[300],
-              ),
-              decoration: BoxDecoration(color: Colors.lightBlue),
-            )
+                    accountName: Text('Loading...',
+                        style: TextStyle(fontSize: 18, color: Colors.white)),
+                    accountEmail: null,
+                    currentAccountPicture: CircleAvatar(
+                      child: CircularProgressIndicator(color: Colors.white),
+                      backgroundColor: Colors.blue[300],
+                    ),
+                    decoration: BoxDecoration(color: Colors.lightBlue),
+                  )
                 : UserAccountsDrawerHeader(
-              accountName: Text(
-                _fullName ?? 'User',
-                style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold),
-              ),
-              accountEmail: Text(
-                _email ?? '',
-                style: TextStyle(fontSize: 14, color: Colors.white70),
-              ),
-              currentAccountPicture: _avatarUrl != null
-                  ? CircleAvatar(
-                backgroundImage: NetworkImage(_avatarUrl!),
-                backgroundColor: Colors.white,
-              )
-                  : CircleAvatar(
-                child: Text(
-                  _fullName?.substring(0, 1).toUpperCase() ?? 'U',
-                  style: TextStyle(fontSize: 32, color: Colors.blue[600], fontWeight: FontWeight.bold),
-                ),
-                backgroundColor: Colors.white,
-              ),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [Colors.blue[400]!, Colors.blue[600]!],
-                ),
-              ),
-            ),
+                    accountName: Text(
+                      _fullName ?? 'User',
+                      style: TextStyle(
+                          fontSize: 18,
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold),
+                    ),
+                    accountEmail: Text(
+                      _email ?? '',
+                      style: TextStyle(fontSize: 14, color: Colors.white70),
+                    ),
+                    currentAccountPicture: _avatarUrl != null
+                        ? CircleAvatar(
+                            backgroundImage: NetworkImage(_avatarUrl!),
+                            backgroundColor: Colors.white,
+                          )
+                        : CircleAvatar(
+                            child: Text(
+                              _fullName?.substring(0, 1).toUpperCase() ?? 'Name',
+                              style: TextStyle(
+                                  fontSize: 32,
+                                  color: Colors.blue[600],
+                                  fontWeight: FontWeight.bold),
+                            ),
+                            backgroundColor: Colors.white,
+                          ),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Colors.blue[400]!, Colors.blue[600]!],
+                      ),
+                    ),
+                  ),
             ListTile(
               leading: const Icon(Icons.home),
               title: const Text('Trang chủ'),
@@ -297,23 +308,24 @@ class _DrawerScreenState extends State<DrawerScreen> {
               onTap: () => _onItemTapped(5),
             ),
             Divider(),
-            //Swtich signIn and signOut
             isLoggedIn
                 ? ListTile(
-              leading: const Icon(Icons.logout, color: Colors.red),
-              title: const Text('Đăng xuất', style: TextStyle(color: Colors.red)),
-              onTap: _showLogoutDialog,
-            )
+                    leading: const Icon(Icons.logout, color: Colors.red),
+                    title: const Text('Đăng xuất',
+                        style: TextStyle(color: Colors.red)),
+                    onTap: _showLogoutDialog,
+                  )
                 : ListTile(
-              leading: const Icon(Icons.login, color: Colors.green),
-              title: const Text('Đăng nhập', style: TextStyle(color: Colors.green)),
-              onTap: () {
-                Navigator.of(context).pushNamedAndRemoveUntil(
-                  '/signIn',
-                      (route) => false,
-                );
-              },
-            ),
+                    leading: const Icon(Icons.login, color: Colors.green),
+                    title: const Text('Đăng nhập',
+                        style: TextStyle(color: Colors.green)),
+                    onTap: () {
+                      Navigator.of(context).pushNamedAndRemoveUntil(
+                        '/signIn',
+                        (route) => false,
+                      );
+                    },
+                  ),
           ],
         ),
       ),

@@ -4,7 +4,17 @@ class PlacementTestService {
   final supabase = Supabase.instance.client;
 
   /// Kiểm tra người dùng đã làm test hay skip chưa
-  Future<bool> shouldShowPlacementTest(String userId) async {
+  Future<bool> shouldShowPlacementTest(String authUserId) async {
+    final userRecord = await supabase
+      .from('users')
+      .select('id')
+      .eq('auth_id', authUserId)
+      .maybeSingle();
+
+    if (userRecord == null) return true; // Không tìm thấy user → coi như chưa test
+
+    final userId = userRecord['id'];
+
     final data = await supabase
         .from('user_placement_summary')
         .select('is_skipped, latest_result_id')
@@ -18,7 +28,17 @@ class PlacementTestService {
   }
 
   /// Ghi nhận bỏ qua test
-  Future<void> skipPlacementTest(String userId) async {
+  Future<void> skipPlacementTest(String authUserId) async {
+    
+    final userRecord = await supabase
+      .from('users')
+      .select('id')
+      .eq('auth_id', authUserId)
+      .maybeSingle();
+
+    if (userRecord == null) return ; // Không tìm thấy user → coi như chưa test
+
+    final userId = userRecord['id'];
     await supabase.from('user_placement_summary').upsert({
       'user_id': userId,
       'is_skipped': true,

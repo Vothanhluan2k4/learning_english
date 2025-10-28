@@ -31,8 +31,8 @@ class _ChooseCourseScreenState extends State<ChooseCourseScreen> {
   }
 
   Future<void> _skipTest() async {
-    final userId = Supabase.instance.client.auth.currentUser!.id;
-    await placementTestService.skipPlacementTest(userId);
+    final authUserId = Supabase.instance.client.auth.currentUser!.id;
+    await placementTestService.skipPlacementTest(authUserId);
     Navigator.pushNamed(context, '/homedrawer');
   }
 
@@ -84,7 +84,8 @@ class _ChooseCourseScreenState extends State<ChooseCourseScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('Chọn lộ trình học của bạn'),
+        title: const Text('Chọn lộ trình học của bạn', 
+        style: TextStyle(color: Colors.white),),
         centerTitle: true,
         backgroundColor: Colors.blueAccent,
       ),
@@ -105,13 +106,7 @@ class _ChooseCourseScreenState extends State<ChooseCourseScreen> {
                     color: Colors.black87,
                   ),
                 ),
-                const SizedBox(height: 20),
-                const Text(
-                  'Vui lòng chọn nhóm khóa học phù hợp trước khi làm bài kiểm tra đầu vào.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 16, color: Colors.black54),
-                ),
-                const SizedBox(height: 30),
+                const SizedBox(height: 60),
 
                 // 🔹 Dropdown chọn nhóm khóa học
                 if (_courseGroups.isNotEmpty)
@@ -156,7 +151,7 @@ class _ChooseCourseScreenState extends State<ChooseCourseScreen> {
                     ),
                   ),
 
-                const SizedBox(height: 20),
+                const SizedBox(height: 15),
 
                 TextButton(
                   onPressed: _isLoading ? null : _skipTest,
@@ -164,7 +159,7 @@ class _ChooseCourseScreenState extends State<ChooseCourseScreen> {
                     'Bỏ qua, tôi sẽ tự khám phá sau',
                     style: TextStyle(
                       fontSize: 15,
-                      color: Colors.grey,
+                      color: Colors.black,
                       decoration: TextDecoration.underline,
                     ),
                   ),

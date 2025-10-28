@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:learning_english/screens/drawer_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:async';
 import '../../models/question_group.dart';
 import '../../models/test_question.dart';
 import '../../widgets/audio_player.dart';
@@ -11,7 +13,7 @@ class PlacementTestScreen extends StatefulWidget {
   State<PlacementTestScreen> createState() => _PlacementTestScreenState();
 }
 
-class _PlacementTestScreenState extends State<PlacementTestScreen> {
+class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsBindingObserver {
   final supabase = Supabase.instance.client;
 
   String? _testId;
@@ -25,6 +27,10 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> {
 
   bool _isPanelOpen = false;
 
+  Timer? _timer;
+  int _timeRemaining = 0; // in seconds
+  bool _isTimeUp = false;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -36,25 +42,159 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> {
     }
   }
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      _saveTestProgress();
+    }
+  }
+
+  Future<void> _saveTestProgress() async {
+    if (_resultId != null) {
+      try {
+        await supabase.from('user_test_results').update({
+          'status': 'in_progress',
+          'time_remaining': _timeRemaining ~/ 60,
+          'last_activity': DateTime.now().toIso8601String(),
+        }).eq('id', _resultId as String);
+      } catch (e) {
+        debugPrint('Error saving test progress: $e');
+      }
+    }
+  }
+
+  // Add method to format time
+  String _formatTime(int seconds) {
+    int minutes = seconds ~/ 60;
+    int remainingSeconds = seconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
+  }
+
+  // Add method to start timer
+  void _startTimer(int minutes) {
+    _timeRemaining = minutes * 60;
+    _timer?.cancel();
+    _timer = Timer.periodic(Duration(seconds: 1), (timer) {
+      setState(() {
+        if (_timeRemaining > 0) {
+          _timeRemaining--;
+          // Update last activity every minute
+          if (_timeRemaining % 60 == 0) {
+            _updateLastActivity();
+          }
+        } else {
+          _isTimeUp = true;
+          timer.cancel();
+          _handleTimeout();
+        }
+      });
+    });
+  }
+
+  // Add method to update last activity
+  Future<void> _updateLastActivity() async {
+    if (_resultId == null) return;
+    
+    try {
+      await supabase.from('user_test_results').update({
+        'time_remaining': _timeRemaining ~/ 60,
+        'last_activity': DateTime.now().toIso8601String(),
+      }).eq('id', _resultId as String); // Cast to non-null String
+    } catch (e) {
+      debugPrint('❌ Error updating last activity: $e');
+    }
+  }
+
+  // Add method to handle timeout
+  Future<void> _handleTimeout() async {
+    if (_resultId == null) return;
+
+    try {
+      await supabase.from('user_test_results').update({
+        'status': 'timeout',
+        'completed_at': DateTime.now().toIso8601String(),
+        'time_remaining': 0,
+      }).eq('id', _resultId as String); // Cast to non-null String
+      
+      _showTimeoutDialog();
+    } catch (e) {
+      debugPrint('❌ Error handling timeout: $e');
+    }
+  }
+
+  // Add timeout dialog
+  void _showTimeoutDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.timer_off, color: Colors.red),
+            SizedBox(width: 8),
+            Text('Hết thời gian'),
+          ],
+        ),
+        content: Text('Thời gian làm bài đã hết. Hệ thống sẽ tự động nộp bài của bạn.'),
+        actions: [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _submitTest();
+            },
+            child: Text('Đồng ý',
+              style: TextStyle(
+                color: Colors.white,
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _fetchQuestions(String testId) async {
     try {
       setState(() => _isLoading = true);
 
+      // Fetch test info first including time limit
+      final testInfo = await supabase
+          .from('tests')
+          .select('time_limit, test_type')
+          .eq('id', testId)
+          .single();
+
       final allItems = <dynamic>[];
 
-      // 1. Lấy câu hỏi đơn (không thuộc group)
+      // 1. Lấy câu hỏi đơn (không thuộc group) và sắp xếp theo order_in_test
       final directRes = await supabase
           .from('test_questions')
           .select()
           .eq('test_id', testId)
           .isFilter('group_id', null)
-          .order('order_in_test', ascending: true);
+          .order('order_in_test', ascending: true); // Đảm bảo sắp xếp đúng thứ tự
 
-      final directQuestions =
-      (directRes as List).map((q) => TestQuestion.fromJson(q)).toList();
+      final directQuestions = 
+          (directRes as List).map((q) => TestQuestion.fromJson(q)).toList();
       allItems.addAll(directQuestions);
 
-      // 2. Lấy question groups (reading/listening passage)
+      // 2. Lấy question groups và sắp xếp theo order_in_test
       final groupRes = await supabase
           .from('question_groups')
           .select('''
@@ -64,12 +204,16 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> {
           .eq('test_id', testId)
           .order('order_in_test', ascending: true);
 
+      // Sắp xếp câu hỏi trong mỗi group theo order_in_test
       for (final g in groupRes) {
         final group = QuestionGroup.fromJson(g);
+        // Sắp xếp câu hỏi trong group
+        group.testQuestions.sort((a, b) => 
+            (a.orderInTest ?? 0).compareTo(b.orderInTest ?? 0));
         allItems.add(group);
       }
 
-      // Sort by order_in_test
+      // Sort theo order_in_test
       allItems.sort((a, b) {
         final orderA = a is TestQuestion ? a.orderInTest : (a as QuestionGroup).orderInTest;
         final orderB = b is TestQuestion ? b.orderInTest : (b as QuestionGroup).orderInTest;
@@ -80,13 +224,17 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> {
       // ✅ FIX: Thêm await để đảm bảo _resultId được gán trước khi user trả lời
       await _createUserTestResult();
 
+      // Start timer if time limit exists
+      if (testInfo['time_limit'] != null) {
+        _startTimer(testInfo['time_limit']);
+      }
+
       setState(() {
         _items = allItems;
-        _userId = supabase.auth.currentUser?.id;
         _isLoading = false;
       });
     } catch (e) {
-      debugPrint('❌ Error: $e');
+      debugPrint('❌ Error loading questions: $e');
       setState(() => _isLoading = false);
     }
   }
@@ -173,11 +321,11 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> {
 
       if (existing != null) {
         _resultId = existing['id'];
-
-        if (existing['status'] == 'completed') {
-          debugPrint('✅ Đã có kết quả completed: $_resultId');
-        } else {
-          debugPrint('🔄 Tiếp tục bài làm dở: $_resultId');
+        
+        // Resume timer if test was in progress
+        if (existing['status'] == 'in_progress' && 
+            existing['time_remaining'] != null) {
+          _startTimer(existing['time_remaining']);
         }
       } else {
         final newResult = await supabase.from('user_test_results').insert({
@@ -185,18 +333,21 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> {
           'test_id': _testId,
           'status': 'in_progress',
           'started_at': DateTime.now().toIso8601String(),
+          'last_activity': DateTime.now().toIso8601String(),
         }).select('id').single();
 
         _resultId = newResult['id'];
-        debugPrint('🆕 Tạo mới user_test_results: $_resultId');
       }
     } catch (e) {
       debugPrint('❌ Lỗi tạo user_test_results: $e');
     }
   }
+  
 
 
   Future<void> _submitTest() async {
+    _timer?.cancel(); // Stop the timer
+    
     int total = 0;
     int correct = 0;
 
@@ -222,8 +373,9 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> {
         'score': score,
         'total_questions': total,
         'correct_answers': correct,
-        'status': 'completed',
+        'status': _isTimeUp ? 'timeout' : 'completed',
         'completed_at': DateTime.now().toIso8601String(),
+        'time_remaining': 0,
       }).eq('id', _resultId as String);
     }
 
@@ -244,41 +396,263 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> {
         'updated_at': DateTime.now().toIso8601String(),
       });
     }
-
     // 🔹 Hiển thị kết quả
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Icon(Icons.emoji_events, color: Colors.amber, size: 40),
-            SizedBox(width: 12),
-            Text('Kết quả'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Điểm: ${score.toStringAsFixed(1)}%', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-            SizedBox(height: 8),
-            Text('Số câu đúng: $correct/$total'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Navigator.pop(context);
-            },
-            child: Text('Đóng'),
+    _showResultDialog(score, correct, total, testInfo['recommended_course_id']);
+  }
+
+  Future<void> _showResultDialog(double score, int correct, int total, String? recommendedCourseId) async {
+    try {
+      // Fetch course info from user_placement_summary and courses
+      final placementData = await supabase
+          .from('user_placement_summary')
+          .select('''
+            score,
+            courses:recommended_course_id (
+              course_name
+            )
+          ''')
+          .eq('user_id', _userId as String)
+          .eq('placement_test_id', _testId as String)
+          .single();
+
+      if (placementData == null) {
+        debugPrint('❌ Không tìm thấy thông tin placement test');
+        return;
+      }
+
+      debugPrint('✅ Tìm thấy khóa học phù hợp: ${placementData['courses']['course_name']}');
+
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
           ),
-        ],
-      ),
+          child: Container(
+            width: MediaQuery.of(context).size.width * 0.85,
+            padding: EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Trophy icon
+                Stack(
+                  clipBehavior: Clip.none,
+                  alignment: Alignment.center,
+                  children: [
+                    Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        color: Colors.amber.shade100,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    Icon(Icons.emoji_events, color: Colors.amber, size: 60),
+                  ],
+                ),
+                SizedBox(height: 24),
+
+                Text(
+                  'Kết quả bài kiểm tra',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blueGrey[800],
+                  ),
+                ),
+                SizedBox(height: 20),
+                
+                // Score circle
+                Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: [Colors.blue.shade400, Colors.blue.shade700],
+                    ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      '${score.toStringAsFixed(1)}%',
+                      style: TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(height: 20),
+
+                // Details section
+                Container(
+                  padding: EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[50],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey[200]!),
+                  ),
+                  child: Column(
+                    children: [
+                      _buildDetailRow(
+                        Icons.check_circle_outline,
+                        'Số câu đúng',
+                        '$correct/$total',
+                        Colors.green,
+                      ),
+                      SizedBox(height: 12),
+                      _buildDetailRow(
+                        Icons.school,
+                        'Khóa học phù hợp',
+                        placementData['courses']['course_name'] ?? 'Chưa xác định',
+                        Colors.blue,
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: 24),
+
+                // Action buttons
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                          padding: EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        onPressed: () {
+                          Navigator.pushAndRemoveUntil(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => DrawerScreen(initialIndex: 1),
+                            ),
+                            (route) => false, // This will remove all previous routes
+                          );
+                        },
+                        child: Text(
+                          'Xem khóa học',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 12),
+                    OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 24),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      onPressed: () {
+                        Navigator.pushReplacementNamed(context, '/homedrawer');
+                      },
+                      child: Text('Về trang chủ'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    } catch (e) {
+      debugPrint('❌ Lỗi khi lấy thông tin khóa học: $e');
+      // Hiển thị dialog đơn giản khi có lỗi
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          title: Text('Kết quả bài kiểm tra'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Điểm số: ${score.toStringAsFixed(1)}%'),
+              Text('Số câu đúng: $correct/$total'),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pushReplacementNamed(context, '/homedrawer'),
+              child: Text('Đóng'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+  Widget _buildDetailRow(IconData icon, String title, String value, Color iconColor) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Row(
+          children: [
+            Icon(icon, color: iconColor, size: 28),
+            SizedBox(width: 12),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+                color: Colors.blueGrey[800],
+              ),
+            ),
+          ],
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Colors.blueGrey[900],
+          ),
+        ),
+      ],
     );
   }
 
+  // Add this method to get the flattened question index
+  int _getFlattenedQuestionNumber() {
+    int currentNumber = 1;
+    
+    for (int i = 0; i < _currentQuestionIndex; i++) {
+      if (_items[i] is TestQuestion) {
+        currentNumber++;
+      } else if (_items[i] is QuestionGroup) {
+        currentNumber += (_items[i] as QuestionGroup).testQuestions.length;
+      }
+    }
+
+    // Add offset for current group questions
+    if (_items[_currentQuestionIndex] is QuestionGroup) {
+      return currentNumber;
+    }
+
+    return currentNumber;
+  }
+
+  // Add this method to get total questions count
+  int _getTotalQuestions() {
+    int total = 0;
+    for (var item in _items) {
+      if (item is TestQuestion) {
+        total++;
+      } else if (item is QuestionGroup) {
+        total += (item as QuestionGroup).testQuestions.length;
+      }
+    }
+    return total;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -288,7 +662,7 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> {
 
     if (_items.isEmpty) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Bài kiểm tra đầu vào')),
+        appBar: AppBar(title: const Text('Kiểm tra đầu vào')),
         body: const Center(child: Text('Không tìm thấy câu hỏi nào.')),
       );
     }
@@ -297,15 +671,35 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Bài kiểm tra đầu vào'),
+        title: const Text('Kiểm tra đầu vào'),
         centerTitle: true,
         backgroundColor: Colors.blueAccent,
         foregroundColor: Colors.white,
         actions: [
+          if (_timeRemaining > 0)
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              alignment: Alignment.center,
+              child: Row(
+                children: [
+                  Icon(Icons.timer,
+                      color: _timeRemaining < 300 ? Colors.red : Colors.white),
+                  SizedBox(width: 4),
+                  Text(
+                    _formatTime(_timeRemaining),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: _timeRemaining < 300 ? Colors.red : Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           IconButton(
             icon: Icon(_isPanelOpen ? Icons.close : Icons.menu),
             onPressed: () => setState(() => _isPanelOpen = !_isPanelOpen),
-          )
+          ),
         ],
       ),
       body: Stack(
@@ -381,7 +775,7 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              'Câu ${_currentQuestionIndex + 1}/${_items.length}',
+              'Câu ${_getFlattenedQuestionNumber()}/${_getTotalQuestions()}',
               style: TextStyle(
                 fontSize: 16,
                 color: Colors.grey[600],
@@ -449,20 +843,22 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> {
 
               if (_resultId != null) {
                 try {
+                  // Thêm delay nhỏ để tránh gọi API quá nhiều lần
+                  await Future.delayed(Duration(milliseconds: 300));
+                  
                   await supabase.from('user_test_answers').upsert({
                     'result_id': _resultId,
                     'question_id': question.id,
                     'user_answer': value,
-                    'is_correct': value == question.correctAnswer,
+                    'is_correct': value.trim().toLowerCase() == question.correctAnswer?.trim().toLowerCase(),
                     'answered_at': DateTime.now().toIso8601String(),
                   }, onConflict: 'result_id,question_id');
 
-                  debugPrint('✅ Đã lưu câu trả lời: ${question.id}');
+                  debugPrint('✅ Đã lưu câu trả lời: $value cho câu ${question.id}');
                 } catch (e) {
                   debugPrint('❌ Lỗi lưu user_test_answers: $e');
+                  // Có thể thêm thông báo cho người dùng nếu cần
                 }
-              } else {
-                debugPrint('⚠️ Chưa có result_id, không thể lưu câu trả lời');
               }
             },
           ),
@@ -588,36 +984,25 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Icon(
-                    group.mediaType == 'audio' ? Icons.headphones : Icons.article,
-                    color: Colors.purple,
+              if (group.title != null) ...[
+                Text(
+                  group.title!,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.purple.shade700,
                   ),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      group.title ?? 'Passage',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.purple.shade700,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              if (group.instruction != null) ...[
+                ),
                 SizedBox(height: 8),
+              ],
+              if (group.instruction != null)
                 Text(
                   group.instruction!,
                   style: TextStyle(
                     fontSize: 14,
                     color: Colors.grey[700],
-                    fontStyle: FontStyle.italic,
                   ),
                 ),
-              ],
             ],
           ),
         ),
@@ -655,6 +1040,7 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> {
         ...group.testQuestions.asMap().entries.map((entry) {
           final qIndex = entry.key;
           final question = entry.value;
+          final questionNumber = qIndex + 1;
 
           // Xử lý options (có thể là Map, List hoặc List<Object>)
           List<MapEntry<String, String>> options = [];
@@ -696,7 +1082,7 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${qIndex + 1}. ${question.questionText ?? ''}',
+                  '$questionNumber. ${question.questionText ?? ''}',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
                 SizedBox(height: 12),
@@ -716,11 +1102,14 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> {
 
                       if (_resultId != null) {
                         try {
+                          // Thêm delay nhỏ để tránh gọi API quá nhiều lần
+                          await Future.delayed(Duration(milliseconds: 300));
+                          
                           await supabase.from('user_test_answers').upsert({
                             'result_id': _resultId,
                             'question_id': question.id,
                             'user_answer': value,
-                            'is_correct': value == question.correctAnswer,
+                            'is_correct': value.trim().toLowerCase() == question.correctAnswer?.trim().toLowerCase(),
                             'answered_at': DateTime.now().toIso8601String(),
                           }, onConflict: 'result_id,question_id');
 
@@ -877,24 +1266,24 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> {
   }
 
   Widget _buildSidebarPanel() {
-    // Count total questions
-    int totalQuestions = 0;
-    for (final item in _items) {
+    // Create a flattened list of all questions
+    List<TestQuestion> allQuestions = [];
+    for (var item in _items) {
       if (item is TestQuestion) {
-        totalQuestions++;
+        allQuestions.add(item);
       } else if (item is QuestionGroup) {
-        totalQuestions += item.testQuestions.length;
+        allQuestions.addAll(item.testQuestions);
       }
     }
 
     return AnimatedPositioned(
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeInOut,
-      right: _isPanelOpen ? 0 : -250,
+      right: _isPanelOpen ? 0 : -300,
       top: 0,
       bottom: 0,
       child: Container(
-        width: 250,
+        width: 300,
         decoration: BoxDecoration(
           color: Colors.white,
           boxShadow: [
@@ -907,48 +1296,45 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> {
         child: Column(
           children: [
             Expanded(
-              child: ListView.builder(
-                padding: EdgeInsets.all(8),
-                itemCount: _items.length,
-                itemBuilder: (context, index) {
-                  final item = _items[index];
-                  final isCurrent = index == _currentQuestionIndex;
+              child: SingleChildScrollView(
+                padding: EdgeInsets.all(16),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: List.generate(allQuestions.length, (index) {
+                    final question = allQuestions[index];
+                    final isAnswered = _userAnswers[question.id]?.trim().isNotEmpty ?? false;
+                    final isCurrent = _getCurrentQuestionIndex(index);
 
-                  if (item is TestQuestion) {
-                    final answered = _userAnswers[item.id]?.trim().isNotEmpty ?? false;
-                    return _buildSidebarItem(
-                      index: index,
-                      label: '${index + 1}',
+                    return _buildQuestionCircle(
+                      index: index + 1, // Start from 1 instead of 0
                       isCurrent: isCurrent,
-                      isAnswered: answered,
+                      isAnswered: isAnswered,
+                      isGroup: false,
                     );
-                  } else if (item is QuestionGroup) {
-                    final allAnswered = item.testQuestions.every(
-                            (q) => _userAnswers[q.id]?.trim().isNotEmpty ?? false
-                    );
-                    return _buildSidebarItem(
-                      index: index,
-                      label: '${index + 1}\n(${item.testQuestions.length})',
-                      isCurrent: isCurrent,
-                      isAnswered: allAnswered,
-                      isGroup: true,
-                    );
-                  }
-                  return SizedBox();
-                },
+                  }),
+                ),
               ),
             ),
-            Container(
+            Divider(),
+            Padding(
               padding: EdgeInsets.all(16),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Text(
+                    'Chú thích:',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  SizedBox(height: 12),
                   _buildLegend(Colors.orange, 'Hiện tại'),
                   SizedBox(height: 8),
                   _buildLegend(Colors.blueAccent, 'Đã trả lời'),
                   SizedBox(height: 8),
                   _buildLegend(Colors.grey.shade200, 'Chưa trả lời'),
-                  SizedBox(height: 8),
-                  _buildLegend(Colors.purple, 'Nhóm câu hỏi'),
                 ],
               ),
             ),
@@ -958,25 +1344,48 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> {
     );
   }
 
-  Widget _buildSidebarItem({
+  // Helper method to determine if question is current
+  bool _getCurrentQuestionIndex(int flatIndex) {
+    int currentFlatIndex = 0;
+    
+    for (int i = 0; i < _items.length; i++) {
+      if (i == _currentQuestionIndex) {
+        if (_items[i] is TestQuestion) {
+          return currentFlatIndex == flatIndex;
+        } else if (_items[i] is QuestionGroup) {
+          QuestionGroup group = _items[i] as QuestionGroup;
+          return flatIndex >= currentFlatIndex && 
+                 flatIndex < currentFlatIndex + group.testQuestions.length;
+        }
+      }
+      
+      if (_items[i] is TestQuestion) {
+        currentFlatIndex++;
+      } else if (_items[i] is QuestionGroup) {
+        currentFlatIndex += (_items[i] as QuestionGroup).testQuestions.length;
+      }
+    }
+    
+    return false;
+  }
+
+  // Modified question circle
+  Widget _buildQuestionCircle({
     required int index,
-    required String label,
     required bool isCurrent,
     required bool isAnswered,
-    bool isGroup = false,
+    required bool isGroup,
   }) {
     return GestureDetector(
-      onTap: () => _jumpToQuestion(index),
+      onTap: () => _jumpToFlattenedQuestion(index - 1), // Subtract 1 because index starts at 1
       child: Container(
-        margin: EdgeInsets.only(bottom: 8),
-        padding: EdgeInsets.all(12),
+        width: 40,
+        height: 40,
         decoration: BoxDecoration(
+          shape: BoxShape.circle,
           color: isCurrent
               ? Colors.orange
-              : (isAnswered
-              ? (isGroup ? Colors.purple : Colors.blueAccent)
-              : Colors.grey.shade200),
-          borderRadius: BorderRadius.circular(8),
+              : (isAnswered ? Colors.blueAccent : Colors.grey.shade200),
           border: Border.all(
             color: isCurrent ? Colors.orange.shade700 : Colors.transparent,
             width: 2,
@@ -984,8 +1393,7 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> {
         ),
         child: Center(
           child: Text(
-            label,
-            textAlign: TextAlign.center,
+            '$index',
             style: TextStyle(
               color: (isAnswered || isCurrent) ? Colors.white : Colors.grey[700],
               fontWeight: FontWeight.bold,
@@ -997,22 +1405,58 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> {
     );
   }
 
-  Widget _buildLegend(Color color, String label) {
+  // Add this method to handle jumping to flattened question index
+  void _jumpToFlattenedQuestion(int flatIndex) {
+    int currentIndex = 0;
+    int targetGroupIndex = 0;
+    
+    for (int i = 0; i < _items.length; i++) {
+      if (_items[i] is TestQuestion) {
+        if (currentIndex == flatIndex) {
+          setState(() {
+            _currentQuestionIndex = i;
+            _isPanelOpen = false;
+          });
+          return;
+        }
+        currentIndex++;
+      } else if (_items[i] is QuestionGroup) {
+        QuestionGroup group = _items[i] as QuestionGroup;
+        if (flatIndex >= currentIndex && 
+            flatIndex < currentIndex + group.testQuestions.length) {
+          setState(() {
+            _currentQuestionIndex = i;
+            _isPanelOpen = false;
+          });
+          return;
+        }
+        currentIndex += group.testQuestions.length;
+      }
+    }
+  }
+
+  Widget _buildLegend(Color color, String text) {
     return Row(
       children: [
         Container(
-          width: 20,
-          height: 20,
+          width: 24,
+          height: 24,
           decoration: BoxDecoration(
+            shape: BoxShape.circle,
             color: color,
-            borderRadius: BorderRadius.circular(4),
+            border: Border.all(
+              color: color == Colors.grey.shade200 
+                  ? Colors.grey.shade400 
+                  : Colors.transparent,
+            ),
           ),
         ),
         SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            label,
-            style: TextStyle(fontSize: 12),
+        Text(
+          text,
+          style: TextStyle(
+            fontSize: 14,
+            color: Colors.grey[700],
           ),
         ),
       ],

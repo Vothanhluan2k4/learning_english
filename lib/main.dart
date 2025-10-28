@@ -133,6 +133,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         '/home': (context) => const HomeScreen(),
         '/chooseCourse': (context) => const ChooseCourseScreen(),
         '/placementTest': (context) => const PlacementTestScreen(),
+        '/courses': (context) => const CourseScreen(),
       },
     );
   }
