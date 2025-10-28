@@ -24,14 +24,16 @@ class FlashcardService {
     return _cachedUserId!;
   }
 
-  // ====================================================================
+  // Public method to access user ID
+  Future<String> getUserId() async {
+    return await _getUserId();
+  }
+
+  // ... (rest of the FlashcardService code remains unchanged)
   // LIST WORD MANAGEMENT (CREATE, READ, UPDATE, DELETE)
-  // ====================================================================
-// SỬA ĐỔI: Gọi VIEW để lấy cột word_count
   Future<List<ListWord>> getListWords() async {
     try {
       final userId = await _getUserId();
-      // THAY ĐỔI: Gọi 'list_word_view' thay vì 'list_word'
       final response = await _client
           .from('list_word_view')
           .select()
@@ -41,7 +43,7 @@ class FlashcardService {
       throw Exception('Lỗi khi tải danh sách bộ thẻ: $e');
     }
   }
-  // CREATE
+
   Future<void> createListWord(ListWord listWord) async {
     try {
       await _client.from('list_word').insert(listWord.toJson());
@@ -50,13 +52,10 @@ class FlashcardService {
     }
   }
 
-  // UPDATE
   Future<void> updateListWord(ListWord listWord) async {
     try {
       if (listWord.id == null) throw Exception('ID của bộ thẻ không hợp lệ');
-
       final String id = listWord.id!;
-
       await _client
           .from('list_word')
           .update(listWord.toJson())
@@ -66,40 +65,30 @@ class FlashcardService {
     }
   }
 
-  // DELETE: XÓA LIST TỪ VÀ TẤT CẢ TỪ LIÊN QUAN (Sửa và Hoàn thiện)
   Future<void> deleteListWord(String listId) async {
     try {
-      // Giả định bảng 'word' có FOREIGN KEY với ON DELETE CASCADE
       await _client.from('list_word').delete().eq('id', listId);
     } catch (e) {
       throw Exception('Lỗi khi xóa list: $e');
     }
   }
-// Trong FlashcardService.dart
-  // ====================================================================
-  // WORD MANAGEMENT (CRUD)
-  // ====================================================================
 
-  // COUNT
+  // WORD MANAGEMENT (CRUD)
   Future<int> getWordCount(String listWordId) async {
     try {
       final query = _client
           .from('word')
           .select('id')
           .eq('list_word_id', listWordId);
-
       final postgrestFilterBuilder = query.count();
       final countResponse = await postgrestFilterBuilder;
-
       return countResponse.count.toInt();
-
     } catch (e) {
       print('Lỗi khi lấy số lượng từ cho list $listWordId: $e');
       return 0;
     }
   }
 
-  // READ
   Future<List<Word>> getWords(String listWordId) async {
     try {
       final response = await _client
@@ -112,7 +101,6 @@ class FlashcardService {
     }
   }
 
-  // CREATE
   Future<void> createWord(Word word) async {
     try {
       await _client.from('word').insert(word.toJson());
@@ -121,14 +109,9 @@ class FlashcardService {
     }
   }
 
-  // Trong FlashcardService.dart
-
-// UPDATE: CHỈNH SỬA NỘI DUNG TỪ
   Future<void> updateWord(Word word) async {
     try {
       if (word.id == null) throw Exception('ID của thẻ không hợp lệ');
-
-      // Tạo payload chỉ với các trường cần thiết, tránh gửi createdTime và các trường null
       final payload = {
         'word': word.word,
         'define': word.define,
@@ -138,18 +121,15 @@ class FlashcardService {
         'example': word.example,
         'note': word.note,
       };
-
       await _client
           .from('word')
-          .update(payload) // Gửi payload đã lọc
+          .update(payload)
           .eq('id', word.id!);
-
     } catch (e) {
       throw Exception('Lỗi khi cập nhật thẻ: $e');
     }
   }
 
-  // CREATE BULK
   Future<void> createWords(List<Word> words) async {
     try {
       final wordData = words.map((word) => word.toJson()).toList();
@@ -159,7 +139,6 @@ class FlashcardService {
     }
   }
 
-  // DELETE
   Future<void> deleteWord(String wordId) async {
     try {
       await _client.from('word').delete().eq('id', wordId);
@@ -168,33 +147,61 @@ class FlashcardService {
     }
   }
 
-
-  // BỔ SUNG: Hàm lấy dữ liệu tiến độ từ RPC Function
   Future<Map<String, int>> getProgress(String listId) async {
     try {
-      final data = await _client.rpc(
-          'get_list_progress',
-          params: {'list_id_param': listId}
-      );
+      final userId = await _getUserId();
+      // Count total words in the list
+      final totalWordsResponse = await _client
+          .from('word')
+          .select('id')
+          .eq('list_word_id', listId)
+          .count();
+      final totalWords = totalWordsResponse.count;
 
-      if (data != null && data.isNotEmpty) {
-        final progress = data[0];
-        return {
-          'total': (progress['total_words'] ?? 0) as int,
-          'studied': (progress['learning_words'] ?? 0) as int,
-          'remembered': (progress['mastered_words'] ?? 0) as int,
-          'to_review': (progress['new_words'] ?? 0) as int,
-        };
+      // Get word IDs for the given list
+      final wordIdsResponse = await _client
+          .from('word')
+          .select('id')
+          .eq('list_word_id', listId);
+      final wordIds = wordIdsResponse.map((w) => w['id'] as String).toList();
+
+      // Count words by status for the user and words in this list
+      final statusResponse = await _client
+          .from('user_word_status')
+          .select('status')
+          .eq('user_id', userId)
+          .inFilter('word_id', wordIds); // Replaced 'in_' with 'inFilter'
+
+      int studied = 0;
+      int remembered = 0;
+      int toReview = 0;
+
+      for (var record in statusResponse) {
+        final status = record['status'] as String;
+        if (status == 'studied' || status == 'remembered' || status == 'to_review') {
+          studied++;
+        }
+        if (status == 'remembered') {
+          remembered++;
+        }
+        if (status == 'to_review') {
+          toReview++;
+        }
       }
-      return {'total': 0, 'studied': 0, 'remembered': 0, 'to_review': 0};
+
+      return {
+        'total': totalWords,
+        'studied': studied,
+        'remembered': remembered,
+        'to_review': toReview,
+      };
     } catch (e) {
       print('Lỗi khi lấy tiến độ: $e');
       return {'total': 0, 'studied': 0, 'remembered': 0, 'to_review': 0};
     }
   }
-
-  // BỔ SUNG: Hàm cập nhật/thêm mới trạng thái của một từ
-  Future<void> updateWordStatus(String wordId, String status) async {
+  
+  Future<void> updateWordStatus(String wordId, String status, String listId) async {  // Thêm param listId
     try {
       final userId = await _getUserId();
       await _client.from('user_word_status').upsert({
@@ -202,22 +209,54 @@ class FlashcardService {
         'word_id': wordId,
         'status': status,
         'last_review': DateTime.now().toIso8601String(),
+        'list_word_id': listId,  // Thêm này
       }, onConflict: 'user_id, word_id');
     } catch (e) {
       throw Exception('Lỗi khi cập nhật trạng thái từ: $e');
     }
   }
-  // BỔ SUNG: Hàm chỉ tải các từ cần ôn tập
+
   Future<List<Word>> getReviewWords(String listId) async {
     try {
       final userId = await _getUserId();
       final response = await _client.rpc(
           'get_review_words_for_list',
-          params: {'p_list_id': listId, 'p_user_id': userId}
-      );
+          params: {'p_list_id': listId, 'p_user_id': userId});
       return (response as List).map((json) => Word.fromJson(json)).toList();
     } catch (e) {
       throw Exception('Lỗi khi tải từ cần ôn tập: $e');
+    }
+  }
+
+  Future<void> saveReviewHistory(String listId, int wordsReviewed, int wordsRemembered) async {
+    try {
+      final userId = await _getUserId();
+      print('Saving review history for user $userId, list $listId'); // Debug
+      await _client.from('review_history').insert({
+        'user_id': userId,
+        'list_word_id': listId,
+        'review_date': DateTime.now().toIso8601String(),
+        'words_reviewed': wordsReviewed,
+        'words_remembered': wordsRemembered,
+      });
+    } catch (e) {
+      print('Error saving review history: $e'); // Debug
+      throw Exception('Lỗi khi lưu lịch sử ôn tập: $e');
+    }
+  }
+
+  Future<bool> hasReviewHistory(String listId) async {
+    try {
+      final userId = await _getUserId();
+      final response = await _client
+          .from('review_history')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('list_word_id', listId)
+          .limit(1);
+      return response.isNotEmpty;
+    } catch (e) {
+      throw Exception('Lỗi khi kiểm tra lịch sử ôn tập: $e');
     }
   }
 }

@@ -2,12 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:learning_english/models/list_word.dart';
 import 'package:learning_english/service/flashcard_service.dart';
-import 'create_deck_screen.dart';
-import 'review_session_screen.dart';
-
-// Import thêm để dùng các widget giống trên web
-// Giả sử các model và service đã được định nghĩa đúng
-// Các màn hình CreateDeckScreen và ReviewSessionScreen đã tồn tại
+import 'package:learning_english/screens/flashcard/create_deck_screen.dart';
+import 'package:learning_english/screens/flashcard/review_session_screen.dart';
+import 'package:intl/intl.dart';
 
 class FlashcardsScreen extends StatefulWidget {
   const FlashcardsScreen({super.key});
@@ -16,7 +13,6 @@ class FlashcardsScreen extends StatefulWidget {
   State<FlashcardsScreen> createState() => _FlashcardsScreenState();
 }
 
-// Thêm SingleTickerProviderStateMixin để dùng TabController
 class _FlashcardsScreenState extends State<FlashcardsScreen> with SingleTickerProviderStateMixin {
   late Future<List<ListWord>> _listWordsFuture;
   late TabController _tabController;
@@ -24,15 +20,13 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> with SingleTickerPr
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this); // 3 tab: Của tôi, Đang học, Khám phá
+    _tabController = TabController(length: 3, vsync: this);
     _refreshListWords();
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Vẫn giữ logic reload khi quay lại từ CreateDeckScreen
-    // Dùng addPostFrameCallback để tránh lỗi setState trong didChangeDependencies
     if (ModalRoute.of(context)?.isCurrent == true) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _refreshListWords();
@@ -46,7 +40,6 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> with SingleTickerPr
     super.dispose();
   }
 
-  // Reload danh sách bộ thẻ
   void _refreshListWords() {
     setState(() {
       _listWordsFuture = FlashcardService().getListWords();
@@ -55,7 +48,6 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> with SingleTickerPr
 
   @override
   Widget build(BuildContext context) {
-    // Kiểm tra đăng nhập
     final userId = Supabase.instance.client.auth.currentUser?.id;
     if (userId == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -69,37 +61,30 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> with SingleTickerPr
         length: 3,
         child: Column(
           children: [
-            // Thanh điều hướng Tab Bar (thay thế cho AppBar)
             _buildTabBar(context),
-            // Banner thông báo
             _buildInfoBanner(),
-            // Phần thân của từng tab
             Expanded(
               child: TabBarView(
                 controller: _tabController,
                 children: [
-                  _buildMyListsTab(context), // Tab "List từ của tôi"
-                  _buildLearningTab(),      // Tab "Đang học"
-                  _buildExploreTab(),       // Tab "Khám phá"
+                  _buildMyListsTab(context),
+                  _buildLearningTab(),
+                  _buildExploreTab(),
                 ],
               ),
             ),
           ],
         ),
       ),
-      // Bỏ BottomNavigationBar
     );
   }
 
-  // Xây dựng thanh TabBar
   Widget _buildTabBar(BuildContext context) {
     return Container(
       padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top),
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border(
-          bottom: BorderSide(color: Colors.grey.shade300, width: 1.0),
-        ),
+        border: Border(bottom: BorderSide(color: Colors.grey.shade300, width: 1.0)),
       ),
       child: TabBar(
         controller: _tabController,
@@ -117,7 +102,6 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> with SingleTickerPr
     );
   }
 
-  // Xây dựng Banner thông báo
   Widget _buildInfoBanner() {
     return Container(
       color: Colors.green.shade100,
@@ -139,17 +123,13 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> with SingleTickerPr
     );
   }
 
-  // Xây dựng nội dung Tab "List từ của tôi" (My Lists)
   Widget _buildMyListsTab(BuildContext context) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'List từ đã tạo:',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
+          const Text('List từ đã tạo:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 16.0),
           FutureBuilder<List<ListWord>>(
             future: _listWordsFuture,
@@ -169,80 +149,37 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> with SingleTickerPr
     );
   }
 
-  // Xây dựng nội dung Tab "Đang học" (Learning)
   Widget _buildLearningTab() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Đang học:',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 16.0),
-          Center(
-            child: Column(
-              children: [
-                const Text(
-                  'Bạn chưa học list từ nào.',
-                  style: TextStyle(fontSize: 16),
-                ),
-                TextButton(
-                  onPressed: () {
-                    _tabController.animateTo(2); // Chuyển sang tab Khám phá
-                    // Hoặc thêm logic điều hướng khác
-                  },
-                  child: const Text(
-                    'Khám phá ngay',
-                    style: TextStyle(
-                      color: Colors.blue,
-                      decoration: TextDecoration.underline,
-                    ),
-                  ),
-                ),
-                const Text(
-                  'hoặc bắt đầu tạo các list từ mới.',
-                  style: TextStyle(fontSize: 16),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
+    return const Center(child: Text('Nội dung tab Đang học'));
   }
 
-  // Xây dựng nội dung Tab "Khám phá" (Explore) - Để trống hoặc thêm nội dung tương ứng
   Widget _buildExploreTab() {
-    return const Center(child: Text('Nội dung khám phá'));
+    return const Center(child: Text('Nội dung tab Khám phá'));
   }
 
-  // Xây dựng dạng Grid cho các bộ thẻ
   Widget _buildDeckGrid(BuildContext context, List<ListWord> lists) {
-    // Thêm list tạo bộ thẻ mới vào đầu danh sách
+    final isMobile = MediaQuery.of(context).size.width < 600;
+    final crossAxisCount = isMobile ? 2 : 4;
+
     List<Widget> deckCards = [
-      // Card "Tạo list từ"
       _buildCreateDeckCard(context),
-      // Danh sách các bộ thẻ đã tạo
       ...lists.map((list) => _buildDeckItemCard(context, list)).toList(),
     ];
 
     return GridView.builder(
       shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(), // Để cuộn cùng với SingleChildScrollView
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2, // 2 cột
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: crossAxisCount,
         crossAxisSpacing: 16.0,
         mainAxisSpacing: 16.0,
-        childAspectRatio: 1.0, // Tỉ lệ gần giống hình vuông
+        childAspectRatio: 1.0,
       ),
       itemCount: deckCards.length,
       itemBuilder: (context, index) => deckCards[index],
     );
   }
 
-  // Widget Card "Tạo list từ"
   Widget _buildCreateDeckCard(BuildContext context) {
     return InkWell(
       onTap: () async {
@@ -250,7 +187,7 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> with SingleTickerPr
           context,
           MaterialPageRoute(builder: (context) => const CreateDeckScreen()),
         );
-        _refreshListWords(); // Reload khi quay lại
+        _refreshListWords();
       },
       child: Card(
         elevation: 4.0,
@@ -264,10 +201,7 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> with SingleTickerPr
             children: [
               Icon(Icons.add, color: Colors.blue, size: 36),
               SizedBox(height: 8.0),
-              Text(
-                'Tạo list từ',
-                style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold),
-              ),
+              Text('Tạo list từ', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
             ],
           ),
         ),
@@ -275,20 +209,21 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> with SingleTickerPr
     );
   }
 
-  // Widget Card hiển thị thông tin bộ thẻ
+  // ==========================================================
+  // SỬA ĐỔI CHÍNH NẰM Ở ĐÂY
+  // ==========================================================
   Widget _buildDeckItemCard(BuildContext context, ListWord list) {
     return InkWell(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => ReviewSessionScreen(list: list),
-        ),
-      ),
+      onTap: () async {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => ReviewSessionScreen(list: list)),
+        );
+        _refreshListWords();
+      },
       child: Card(
         elevation: 4.0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8.0),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
         child: Padding(
           padding: const EdgeInsets.all(12.0),
           child: Column(
@@ -302,7 +237,7 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> with SingleTickerPr
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
-              // Số lượng từ và trạng thái
+              // Số lượng từ và mô tả
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -310,29 +245,32 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> with SingleTickerPr
                     children: [
                       const Icon(Icons.bookmark_outline, size: 16, color: Colors.grey),
                       const SizedBox(width: 4),
-                      // Logic này giờ sẽ hiển thị đúng số lượng từ
                       Text('${list.wordCount ?? 0} từ', style: const TextStyle(color: Colors.grey)),
                     ],
                   ),
                   const SizedBox(height: 4),
-                  const Text(
-                    'Learning', // Giả định trạng thái
-                    style: TextStyle(color: Colors.green, fontWeight: FontWeight.w600),
+                  // THAY ĐỔI 1: Thay "Learning" bằng mô tả
+                  Text(
+                    list.description ?? 'Không có mô tả',
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontSize: 12,
+                      fontStyle: list.description == null ? FontStyle.italic : FontStyle.normal,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
-              // Người tạo/Chia sẻ
+              // THAY ĐỔI 2: Thay avatar/tên bằng ngày tạo
               Row(
                 children: [
-                  const CircleAvatar(
-                    radius: 8,
-                    backgroundColor: Colors.grey,
-                    child: Text('Q', style: TextStyle(fontSize: 8, color: Colors.white)),
-                  ),
+                  const Icon(Icons.calendar_today_outlined, size: 12, color: Colors.grey),
                   const SizedBox(width: 4),
-                  // Cần lấy thông tin người tạo thực tế, giả định là 'quybi190804'
                   Text(
-                    list.creatorId?.substring(0, 8) ?? 'Unknown',
+                    list.createdAt != null
+                        ? DateFormat('dd/MM/yyyy').format(list.createdAt!)
+                        : 'Không rõ ngày',
                     style: const TextStyle(fontSize: 12, color: Colors.grey),
                   ),
                 ],
@@ -344,4 +282,3 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> with SingleTickerPr
     );
   }
 }
-

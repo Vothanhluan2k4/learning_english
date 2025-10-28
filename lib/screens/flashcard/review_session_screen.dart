@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:learning_english/models/list_word.dart';
 import 'package:learning_english/models/word.dart';
+import 'package:learning_english/screens/flashcard/ReviewLearningScreen.dart';
 import 'package:learning_english/service/flashcard_service.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:learning_english/screens/flashcard/ReviewLearningScreen.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:learning_english/screens/flashcard/random_review_screen.dart';
+
 class ReviewSessionScreen extends StatefulWidget {
   final ListWord list;
   const ReviewSessionScreen({super.key, required this.list});
@@ -19,8 +20,6 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
   late ListWord _currentList;
   FilePickerResult? _imageFileResult;
   final FlutterTts flutterTts = FlutterTts();
-
-  // --- STATE MỚI CHO TIẾN ĐỘ ---
   Map<String, int> _progressData = {'total': 0, 'studied': 0, 'remembered': 0, 'to_review': 0};
   bool _isProgressLoading = true;
 
@@ -29,7 +28,14 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
     super.initState();
     _currentList = widget.list;
     _initializeTts();
-    _refreshAllData(); // <-- SỬA LẠI HÀM NÀY
+    _refreshAllData();
+    if (_currentList.id != null) {
+      FlashcardService().hasReviewHistory(_currentList.id!).then((hasHistory) {
+        if (hasHistory && mounted) {
+          _showReviewOptionDialog();
+        }
+      });
+    }
   }
 
   @override
@@ -44,27 +50,32 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
     await flutterTts.setVolume(1.0);
   }
 
-  void _refreshWordsAndCount() {
-    if (_currentList.id == null) return;
-    setState(() {
-      _wordsFuture = FlashcardService().getWords(_currentList.id!);
-      FlashcardService().getWordCount(_currentList.id!).then((count) {
-        if (mounted) {
-          setState(() {
-            _currentList = ListWord(
-              id: _currentList.id,
-              userId: _currentList.userId,
-              title: _currentList.title,
-              description: _currentList.description,
-              wordCount: count,
-            );
-          });
-        }
-      });
-    });
+  void _showReviewOptionDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Tiếp tục ôn tập'),
+        content: const Text('Bạn đã ôn tập danh sách này trước đây. Bạn muốn ôn tiếp hay ôn lại từ đầu?'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.push(context, MaterialPageRoute(builder: (context) => ReviewLearningScreen(list: _currentList)));
+            },
+            child: const Text('Ôn tiếp'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.push(context, MaterialPageRoute(builder: (context) => ReviewLearningScreen(list: _currentList, resetProgress: true)));
+            },
+            child: const Text('Ôn lại'),
+          ),
+        ],
+      ),
+    );
   }
 
-// SỬA ĐỔI: Hàm này giờ sẽ tải cả từ và tiến độ thật
   void _refreshAllData() {
     if (_currentList.id == null) return;
 
@@ -72,7 +83,6 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
       _isProgressLoading = true;
     });
 
-    // Tải tiến độ thật từ CSDL
     FlashcardService().getProgress(_currentList.id!).then((progress) {
       if (mounted) {
         setState(() {
@@ -87,11 +97,11 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
       }
     });
 
-    // Tải danh sách từ
     setState(() {
       _wordsFuture = FlashcardService().getWords(_currentList.id!);
     });
   }
+
   Future<void> _playAudio(String word) async {
     if (word.isNotEmpty) {
       await flutterTts.speak(word);
@@ -104,7 +114,7 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
       context: context,
       builder: (context) => _buildAddCardDialog(context, _currentList),
     ).then((result) {
-      if (result == true && mounted) _refreshWordsAndCount();
+      if (result == true && mounted) _refreshAllData();
     });
   }
 
@@ -113,13 +123,10 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
     FlashcardService().deleteWord(wordId).then((_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Xóa thẻ thành công!')));
-        _refreshWordsAndCount();
+        _refreshAllData();
       }
-    }).catchError((e, stackTrace) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lỗi khi xóa: $e')));
-        print(stackTrace);
-      }
+    }).catchError((e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lỗi khi xóa: $e')));
     });
   }
 
@@ -200,7 +207,7 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
       context: context,
       builder: (context) => _buildBulkAddDialog(context, _currentList.id!),
     ).then((result) {
-      if (result == true && mounted) _refreshWordsAndCount();
+      if (result == true && mounted) _refreshAllData();
     });
   }
 
@@ -209,7 +216,7 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
       context: context,
       builder: (context) => _buildEditWordDialog(context, word),
     ).then((result) {
-      if (result == true && mounted) _refreshWordsAndCount();
+      if (result == true && mounted) _refreshAllData();
     });
   }
 
@@ -220,8 +227,7 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
       body: FutureBuilder<List<Word>>(
         future: _wordsFuture,
         builder: (context, snapshot) {
-          final words = snapshot.data ?? [];
-          return _buildBody(context, snapshot.connectionState, words);
+          return _buildBody(context, snapshot.connectionState, snapshot.data ?? []);
         },
       ),
     );
@@ -241,74 +247,57 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
   }
 
   Widget _buildBody(BuildContext context, ConnectionState state, List<Word> words) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Learning', style: TextStyle(fontSize: 14, color: Colors.grey.shade600)),
-          const SizedBox(height: 16.0),
-          _buildInfoBanner(),
-          const SizedBox(height: 16.0),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () async { // <-- Thêm async
-                Navigator.push(context, MaterialPageRoute(builder: (context) => ReviewLearningScreen(list: _currentList)));
-                },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue.shade600,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16.0),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
-              ),
-              child: const Text('Luyện tập flashcards', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            ),
-          ),
-          const SizedBox(height: 16.0),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 900),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              TextButton.icon(
-                onPressed: () {
-                  // SỬA ĐỔI: Thêm logic điều hướng tại đây
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      // Truyền đối tượng list hiện tại vào màn hình random
-                      builder: (context) => RandomReviewScreen(list: _currentList),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.shuffle, size: 18, color: Colors.blue),
-                label: const Text('Xem ngẫu nhiên', style: TextStyle(color: Colors.blue)),
-                style: TextButton.styleFrom(padding: EdgeInsets.zero, alignment: Alignment.centerLeft),
+              Text('Learning', style: TextStyle(fontSize: 14, color: Colors.grey.shade600)),
+              const SizedBox(height: 16.0),
+              _buildInfoBanner(),
+              const SizedBox(height: 16.0),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    await Navigator.push(context, MaterialPageRoute(builder: (context) => ReviewLearningScreen(list: _currentList)));
+                    _refreshAllData();
+                  },
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 16.0)),
+                  child: const Text('Luyện tập flashcards', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                ),
               ),
-              TextButton.icon(
-                onPressed: _handleStopLearning, // Giữ nguyên chức năng dừng học
-                icon: const Icon(Icons.calendar_today, size: 18, color: Colors.red),
-                label: const Text('Dừng học list từ này', style: TextStyle(color: Colors.red)),
-                style: TextButton.styleFrom(padding: EdgeInsets.zero),
-              ),
+              const SizedBox(height: 16.0),
+              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                TextButton.icon(
+                    onPressed: () {
+                      Navigator.push(context, MaterialPageRoute(builder: (context) => RandomReviewScreen(list: _currentList)));
+                    },
+                    icon: const Icon(Icons.shuffle, size: 18, color: Colors.blue),
+                    label: const Text('Xem ngẫu nhiên', style: TextStyle(color: Colors.blue))),
+                TextButton.icon(onPressed: _handleStopLearning, icon: const Icon(Icons.calendar_today, size: 18, color: Colors.red), label: const Text('Dừng học list từ này', style: TextStyle(color: Colors.red))),
+              ]),
+              const SizedBox(height: 24.0),
+              _buildProgressSection(),
+              const SizedBox(height: 24.0),
+              Text('List có ${words.length} từ', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16.0),
+              if (state == ConnectionState.waiting)
+                const Center(child: CircularProgressIndicator())
+              else if (words.isEmpty)
+                const Center(child: Text('Chưa có thẻ nào'))
+              else
+                _buildWordList(words),
             ],
           ),
-          const SizedBox(height: 24.0),
-          _buildProgressSection(), // SỬA: Không cần truyền tham số
-          const SizedBox(height: 24.0),
-          Text('List có ${_currentList.wordCount ?? words.length} từ', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 16.0),
-          state == ConnectionState.waiting
-              ? const Center(child: CircularProgressIndicator())
-              : words.isEmpty
-              ? const Center(child: Text('Chưa có thẻ nào'))
-              : _buildWordList(words),
-          const Center(child: Padding(padding: EdgeInsets.symmetric(vertical: 16.0), child: Text('1', style: TextStyle(fontWeight: FontWeight.bold)))),
-        ],
+        ),
       ),
     );
   }
 
-// SỬA ĐỔI: Widget xây dựng thanh tiến độ với dữ liệu thật
   Widget _buildProgressSection() {
     if (_isProgressLoading) {
       return const SizedBox(height: 120, child: Center(child: CircularProgressIndicator()));
@@ -340,7 +329,7 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
                 Container(height: 4, color: Colors.grey.shade300),
             ])));
   }
-// SỬA ĐỔI: Thêm tham số màu cho text
+
   Widget _buildStatItem(String value, String label, {Color textColor = Colors.black}) {
     return Column(mainAxisSize: MainAxisSize.min, children: [
       Text(value, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: textColor)),
@@ -348,6 +337,7 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
       Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)),
     ]);
   }
+
   Widget _buildInfoBanner() {
     return Container(
         padding: const EdgeInsets.all(16.0),
@@ -500,7 +490,14 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
                                 child: const Text('Choose File', style: TextStyle(fontSize: 14)),
                               )),
                           const SizedBox(width: 8),
-                          Text(fileName, style: const TextStyle(color: Colors.black54)),
+                          Expanded(
+                            child: Text(
+                              fileName,
+                              style: const TextStyle(color: Colors.black54),
+                              overflow: TextOverflow.ellipsis,
+                              softWrap: false,
+                            ),
+                          ),
                         ]),
                         const SizedBox(height: 16),
                         const Text('Hoặc Link Ảnh/URL'),
@@ -519,9 +516,6 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
         }));
   }
 
-  // ==========================================================
-  // HÀM MỚI: Dialog Chỉnh sửa Từ (Giao diện đầy đủ)
-  // ==========================================================
   Widget _buildEditWordDialog(BuildContext context, Word word) {
     final wordController = TextEditingController(text: word.word);
     final defineController = TextEditingController(text: word.define);
@@ -530,7 +524,7 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
     final exampleController = TextEditingController(text: word.example);
     final pictureUrlController = TextEditingController(text: word.pictureUrl);
     final noteController = TextEditingController(text: word.note);
-    bool _isExpanded = true; // Mặc định mở rộng để người dùng thấy các trường đã có
+    bool _isExpanded = true;
 
     Future<void> _chooseFileAction(StateSetter setState) async {
       final result = await FilePicker.platform.pickFiles(type: FileType.image);
@@ -544,8 +538,6 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
 
     Future<void> updateWord() async {
       if (wordController.text.isEmpty || defineController.text.isEmpty) return;
-
-      // TODO: Thêm logic tải file ảnh lên nếu _imageFileResult có giá trị
 
       final updatedWord = Word(
         id: word.id,
@@ -625,7 +617,14 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
                                 child: const Text('Choose File'),
                               )),
                           const SizedBox(width: 8),
-                          Text(fileName, style: const TextStyle(color: Colors.black54)),
+                          Expanded(
+                            child: Text(
+                              fileName,
+                              style: const TextStyle(color: Colors.black54),
+                              overflow: TextOverflow.ellipsis,
+                              softWrap: false,
+                            ),
+                          ),
                         ]),
                         const SizedBox(height: 16),
                         const Text('Hoặc Link Ảnh/URL'),
@@ -644,25 +643,15 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
         }));
   }
 
-  // ==========================================================
-  // HÀM MỚI: Dialog Tạo hàng loạt (Giao diện động)
-  // ==========================================================
   Widget _buildBulkAddDialog(BuildContext context, String listId) {
-    // Quản lý danh sách các hàng
     final List<Map<String, TextEditingController>> rows = [
       {'word': TextEditingController(), 'define': TextEditingController(), 'example': TextEditingController()}
     ];
 
-    void addNewRow(StateSetter setState) {
-      setState(() {
-        rows.add({'word': TextEditingController(), 'define': TextEditingController(), 'example': TextEditingController()});
-      });
-    }
-
+    void addNewRow(StateSetter setState) => setState(() => rows.add({'word': TextEditingController(), 'define': TextEditingController(), 'example': TextEditingController()}));
     void removeRow(int index, StateSetter setState) {
       if (rows.length > 1) {
         setState(() {
-          // Dispose controllers before removing
           rows[index].forEach((key, controller) => controller.dispose());
           rows.removeAt(index);
         });
@@ -670,22 +659,17 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
     }
 
     Future<void> saveBulkWords() async {
-      final List<Word> wordsToCreate = [];
-      for (final row in rows) {
-        final word = row['word']!.text.trim();
-        final define = row['define']!.text.trim();
-        if (word.isNotEmpty && define.isNotEmpty) {
-          wordsToCreate.add(Word(
-            listWordId: listId,
-            word: word,
-            define: define,
-            example: row['example']!.text.trim().isNotEmpty ? row['example']!.text.trim() : null,
-          ));
-        }
-      }
+      final wordsToCreate = rows
+          .where((row) => row['word']!.text.isNotEmpty && row['define']!.text.isNotEmpty)
+          .map((row) => Word(
+        listWordId: listId,
+        word: row['word']!.text.trim(),
+        define: row['define']!.text.trim(),
+        example: row['example']!.text.trim().isNotEmpty ? row['example']!.text.trim() : null,
+      ))
+          .toList();
 
       if (wordsToCreate.isEmpty) return;
-
       try {
         await FlashcardService().createWords(wordsToCreate);
         if (mounted) {
@@ -693,90 +677,58 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Đã thêm ${wordsToCreate.length} từ thành công!')));
         }
       } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lỗi khi thêm hàng loạt: $e')));
-        }
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lỗi khi thêm hàng loạt: $e')));
       }
     }
 
     return AlertDialog(
       titlePadding: EdgeInsets.zero,
       contentPadding: const EdgeInsets.symmetric(vertical: 24.0),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       title: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
         const Padding(padding: EdgeInsets.only(left: 24, top: 24), child: Text('Tạo hàng loạt', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 24))),
         IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context, false)),
       ]),
       content: StatefulBuilder(
-        builder: (context, setState) {
-          return SizedBox(
+        builder: (context, setState) => SizedBox(
             width: MediaQuery.of(context).size.width * 0.9,
             height: MediaQuery.of(context).size.height * 0.7,
-            child: Column(
-              children: [
-                // Header
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: Row(
-                    children: const [
-                      Expanded(flex: 2, child: Text('Từ mới', style: TextStyle(fontWeight: FontWeight.bold))),
-                      SizedBox(width: 8),
-                      Expanded(flex: 2, child: Text('Định nghĩa', style: TextStyle(fontWeight: FontWeight.bold))),
-                      SizedBox(width: 8),
-                      Expanded(flex: 3, child: Text('Ví dụ', style: TextStyle(fontWeight: FontWeight.bold))),
-                      SizedBox(width: 48), // For remove button
-                    ],
+            child: Column(children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Row(children: const [
+                  Expanded(flex: 2, child: Text('Từ mới', style: TextStyle(fontWeight: FontWeight.bold))),
+                  SizedBox(width: 8),
+                  Expanded(flex: 2, child: Text('Định nghĩa', style: TextStyle(fontWeight: FontWeight.bold))),
+                  SizedBox(width: 8),
+                  Expanded(flex: 3, child: Text('Ví dụ', style: TextStyle(fontWeight: FontWeight.bold))),
+                  SizedBox(width: 48),
+                ]),
+              ),
+              const Divider(),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: rows.length,
+                  itemBuilder: (context, index) => Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+                    child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+                      Expanded(flex: 2, child: TextField(controller: rows[index]['word'], decoration: const InputDecoration(hintText: 'Word...', border: OutlineInputBorder()))),
+                      const SizedBox(width: 8),
+                      Expanded(flex: 2, child: TextField(controller: rows[index]['define'], decoration: const InputDecoration(hintText: 'Definition...', border: OutlineInputBorder()))),
+                      const SizedBox(width: 8),
+                      Expanded(flex: 3, child: TextField(controller: rows[index]['example'], decoration: const InputDecoration(hintText: 'Example...', border: OutlineInputBorder()))),
+                      IconButton(icon: const Icon(Icons.remove_circle_outline, color: Colors.red), onPressed: () => removeRow(index, setState)),
+                    ]),
                   ),
                 ),
-                const Divider(),
-                // Body
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: rows.length,
-                    itemBuilder: (context, index) {
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Expanded(flex: 2, child: TextField(controller: rows[index]['word'], decoration: const InputDecoration(hintText: 'Word...'))),
-                            const SizedBox(width: 8),
-                            Expanded(flex: 2, child: TextField(controller: rows[index]['define'], decoration: const InputDecoration(hintText: 'Definition...'))),
-                            const SizedBox(width: 8),
-                            Expanded(flex: 3, child: TextField(controller: rows[index]['example'], decoration: const InputDecoration(hintText: 'Example...'))),
-                            IconButton(
-                              icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
-                              onPressed: () => removeRow(index, setState),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                // Footer
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      TextButton.icon(
-                        onPressed: () => addNewRow(setState),
-                        icon: const Icon(Icons.add),
-                        label: const Text('Thêm hàng'),
-                      ),
-                      ElevatedButton(
-                        onPressed: saveBulkWords,
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
-                        child: const Text('Lưu'),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
+              ),
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                  TextButton.icon(onPressed: () => addNewRow(setState), icon: const Icon(Icons.add), label: const Text('Thêm hàng')),
+                  ElevatedButton(onPressed: saveBulkWords, style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white), child: const Text('Lưu')),
+                ]),
+              ),
+            ])),
       ),
     );
   }
@@ -791,4 +743,3 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
     ]);
   }
 }
-

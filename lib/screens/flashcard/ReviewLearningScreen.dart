@@ -3,22 +3,21 @@ import 'package:learning_english/models/list_word.dart';
 import 'package:learning_english/models/word.dart';
 import 'package:learning_english/service/flashcard_service.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-// Enum để quản lý cấp độ khó (cũng dùng để xác định trạng thái ôn tập)
 enum Difficulty { none, easy, medium, hard }
-
 
 class ReviewLearningScreen extends StatefulWidget {
   final ListWord list;
+  final bool resetProgress;
 
-  const ReviewLearningScreen({super.key, required this.list});
+  const ReviewLearningScreen({super.key, required this.list, this.resetProgress = false});
 
   @override
   State<ReviewLearningScreen> createState() => _ReviewLearningScreenState();
 }
 
 class _ReviewLearningScreenState extends State<ReviewLearningScreen> {
-  // --- STATE CẦN THIẾT ---
   bool _isFlipped = false;
   int _currentIndex = 0;
   List<Word> _allWords = [];
@@ -27,19 +26,20 @@ class _ReviewLearningScreenState extends State<ReviewLearningScreen> {
   bool _isLoading = true;
   bool _showAnswer = false;
   bool _isSessionDone = false;
-
   Difficulty _currentReviewLevel = Difficulty.none;
   bool _showAllWordsInReview = true;
-
   final TextEditingController _answerController = TextEditingController();
   final TextEditingController _meaningController = TextEditingController();
   final FlutterTts flutterTts = FlutterTts();
+  Map<String, String> _wordStatuses = {}; // Bỏ từ khóa `final`
 
-  // ===================== LIFECYCLE VÀ DATA LOADING =====================
   @override
   void initState() {
     super.initState();
     _initializeTts();
+    if (widget.resetProgress) {
+      _resetProgress();
+    }
     _loadAllWords();
   }
 
@@ -57,17 +57,49 @@ class _ReviewLearningScreenState extends State<ReviewLearningScreen> {
     await flutterTts.setVolume(1.0);
   }
 
+  Future<void> _resetProgress() async {
+    try {
+      final userId = await FlashcardService().getUserId();
+      await Supabase.instance.client
+          .from('user_word_status')
+          .delete()
+          .eq('user_id', userId)
+          .eq('list_word_id', widget.list.id!);
+    } catch (e) {
+      print('Lỗi khi reset tiến độ: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lỗi khi reset tiến độ: $e')),
+        );
+      }
+    }
+  }
+
   Future<void> _loadAllWords() async {
     final listId = widget.list.id;
     if (listId == null) {
-      if(mounted) setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
       return;
     }
     try {
-      final words = await FlashcardService().getWords(listId);
+      final words = await FlashcardService().getReviewWords(listId);
+      // Lấy trạng thái từ
+      final userId = await FlashcardService().getUserId();
+      final statusResponse = await Supabase.instance.client
+          .from('user_word_status')
+          .select('word_id, status')
+          .eq('user_id', userId)
+          .eq('list_word_id', listId);
+
+      final wordStatuses = <String, String>{};
+      for (var record in statusResponse) {
+        wordStatuses[record['word_id'] as String] = record['status'] as String;
+      }
+
       if (mounted) {
         setState(() {
           _allWords = words;
+          _wordStatuses = wordStatuses; // Bây giờ dòng này sẽ hoạt động
           _reviewWords = List.from(words);
           _isLoading = false;
         });
@@ -75,13 +107,15 @@ class _ReviewLearningScreenState extends State<ReviewLearningScreen> {
     } catch (e) {
       if (mounted) {
         print('Lỗi khi tải từ: $e');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lỗi khi tải từ: $e')),
+        );
         setState(() => _isLoading = false);
       }
     }
   }
 
-  // ===================== LOGIC LUỒNG HỌC TẬP =====================
-
+  // Các phương thức còn lại không thay đổi
   Future<void> _playAudio(String word) async {
     if (word.isNotEmpty) {
       await flutterTts.speak(word);
@@ -99,15 +133,16 @@ class _ReviewLearningScreenState extends State<ReviewLearningScreen> {
         _currentReviewLevel = Difficulty.none;
       });
     } else {
-      setState(() => _isSessionDone = true);
+      _completeSession();
     }
   }
 
   void _skipCurrentWord() {
     if (_reviewWords.isEmpty) return;
-    final wordToSkip = _reviewWords[_currentIndex];
+    final word = _reviewWords[_currentIndex];
+    _wordStatuses[word.id!] = 'remembered';
     setState(() {
-      _skippedWords.add(wordToSkip);
+      _skippedWords.add(word);
       _reviewWords.removeAt(_currentIndex);
       if (_currentIndex >= _reviewWords.length) {
         _currentIndex = _reviewWords.isNotEmpty ? _reviewWords.length - 1 : 0;
@@ -122,6 +157,7 @@ class _ReviewLearningScreenState extends State<ReviewLearningScreen> {
         _currentReviewLevel = Difficulty.none;
       }
     });
+    _updateWordStatus(word.id!, 'remembered');
   }
 
   void _toggleCardFlip() {
@@ -132,10 +168,27 @@ class _ReviewLearningScreenState extends State<ReviewLearningScreen> {
 
   void _handleStopLearning() {
     flutterTts.stop();
-    Navigator.of(context).pop();
+    _completeSession();
   }
 
   void _startReviewLevel(Difficulty level) {
+    final word = _reviewWords[_currentIndex];
+    String status;
+    switch (level) {
+      case Difficulty.easy:
+        status = 'remembered';
+        break;
+      case Difficulty.medium:
+        status = 'studied';
+        break;
+      case Difficulty.hard:
+        status = 'to_review';
+        break;
+      default:
+        status = 'studied';
+    }
+    _wordStatuses[word.id!] = status;
+    _updateWordStatus(word.id!, status);
     setState(() {
       _currentReviewLevel = level;
       _isFlipped = false;
@@ -145,12 +198,51 @@ class _ReviewLearningScreenState extends State<ReviewLearningScreen> {
     });
   }
 
+  Future<void> _updateWordStatus(String wordId, String status) async {
+    try {
+      await FlashcardService().updateWordStatus(wordId, status, widget.list.id!);
+    } catch (e) {
+      print('Lỗi khi cập nhật trạng thái từ $wordId: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lỗi khi cập nhật trạng thái từ: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _completeSession() async {
+    setState(() => _isSessionDone = true);
+    try {
+      final wordsReviewed = _wordStatuses.length;
+      final wordsRemembered = _wordStatuses.values.where((status) => status == 'remembered').length;
+      await FlashcardService().saveReviewHistory(widget.list.id!, wordsReviewed, wordsRemembered);
+    } catch (e) {
+      print('Lỗi khi lưu lịch sử ôn tập: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lỗi khi lưu lịch sử ôn tập: $e')),
+        );
+      }
+    }
+    if (mounted) {
+      Navigator.of(context).pop();
+    }
+  }
+
   void _advanceDifficultyLevel() {
+    final word = _reviewWords[_currentIndex];
     if (_currentReviewLevel == Difficulty.easy) {
+      _wordStatuses[word.id!] = 'remembered';
+      _updateWordStatus(word.id!, 'remembered');
       setState(() => _currentReviewLevel = Difficulty.medium);
     } else if (_currentReviewLevel == Difficulty.medium) {
+      _wordStatuses[word.id!] = 'studied';
+      _updateWordStatus(word.id!, 'studied');
       setState(() => _currentReviewLevel = Difficulty.hard);
     } else if (_currentReviewLevel == Difficulty.hard) {
+      _wordStatuses[word.id!] = 'to_review';
+      _updateWordStatus(word.id!, 'to_review');
       _moveToNextWord();
     }
   }
@@ -196,10 +288,40 @@ class _ReviewLearningScreenState extends State<ReviewLearningScreen> {
       _advanceDifficultyLevel();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sai rồi. Vui lòng kiểm tra lại.')));
+      _wordStatuses[word.id!] = 'to_review';
+      _updateWordStatus(word.id!, 'to_review');
     }
   }
 
-  // ===================== HÀM HIỂN THỊ DIALOG MỚI =====================
+  void _advanceToNextMode(String difficulty) {
+    final word = _reviewWords[_currentIndex];
+    String status;
+    switch (difficulty) {
+      case 'Dễ':
+        status = 'remembered';
+        break;
+      case 'Trung bình':
+        status = 'studied';
+        break;
+      case 'Khó':
+        status = 'to_review';
+        break;
+      default:
+        status = 'studied';
+    }
+    _wordStatuses[word.id!] = status;
+    _updateWordStatus(word.id!, status);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Đánh giá: $difficulty. Chuyển sang chế độ điền từ.')),
+    );
+    setState(() {
+      _currentReviewLevel = Difficulty.medium;
+      _isFlipped = false;
+      _answerController.clear();
+      _meaningController.clear();
+      _showAnswer = false;
+    });
+  }
 
   void _showReviewSettingsDialog() {
     showDialog(
@@ -237,7 +359,6 @@ class _ReviewLearningScreenState extends State<ReviewLearningScreen> {
               actions: [
                 ElevatedButton(
                   onPressed: () {
-                    // Cập nhật state của màn hình chính và đóng dialog
                     setState(() {});
                     Navigator.of(context).pop();
                     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Đã lưu cài đặt.')));
@@ -328,9 +449,6 @@ class _ReviewLearningScreenState extends State<ReviewLearningScreen> {
     );
   }
 
-
-  // --- UI BUILDER ---
-
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -340,14 +458,15 @@ class _ReviewLearningScreenState extends State<ReviewLearningScreen> {
     if (_reviewWords.isEmpty && !_isSessionDone) {
       return Scaffold(
         appBar: AppBar(title: Text('Luyện tập: ${widget.list.title}')),
-        body: Center(child: _skippedWords.isNotEmpty
-            ? const Text('Tất cả các từ đã được bỏ qua.')
-            : const Text('Bộ thẻ chưa có từ nào để luyện tập.')),
+        body: Center(
+          child: _skippedWords.isNotEmpty
+              ? const Text('Tất cả các từ đã được bỏ qua.')
+              : const Text('Bộ thẻ chưa có từ nào để luyện tập.'),
+        ),
       );
     }
 
-    final currentWord = _reviewWords.isNotEmpty && _currentIndex < _reviewWords.length
-        ? _reviewWords[_currentIndex] : null;
+    final currentWord = _reviewWords.isNotEmpty && _currentIndex < _reviewWords.length ? _reviewWords[_currentIndex] : null;
 
     return Scaffold(
       appBar: AppBar(
@@ -355,7 +474,7 @@ class _ReviewLearningScreenState extends State<ReviewLearningScreen> {
         centerTitle: false,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: _handleStopLearning,
         ),
       ),
       body: SingleChildScrollView(
@@ -365,7 +484,6 @@ class _ReviewLearningScreenState extends State<ReviewLearningScreen> {
           children: [
             _buildHeaderLinks(context),
             const SizedBox(height: 16),
-
             if (!_isSessionDone) ...[
               _buildNoticeBanner(),
               const SizedBox(height: 24),
@@ -379,8 +497,6 @@ class _ReviewLearningScreenState extends State<ReviewLearningScreen> {
       ),
     );
   }
-
-  // Các hàm build khác giữ nguyên logic
 
   Widget _buildMainCard(BuildContext context, Word currentWord) {
     final isMobile = MediaQuery.of(context).size.width < 600;
@@ -396,9 +512,7 @@ class _ReviewLearningScreenState extends State<ReviewLearningScreen> {
             padding: const EdgeInsets.all(32.0),
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 300),
-              child: _currentReviewLevel == Difficulty.none
-                  ? _buildLearningModeContent(currentWord)
-                  : _buildReviewModeContent(currentWord),
+              child: _currentReviewLevel == Difficulty.none ? _buildLearningModeContent(currentWord) : _buildReviewModeContent(currentWord),
             ),
           ),
         ),
@@ -465,9 +579,7 @@ class _ReviewLearningScreenState extends State<ReviewLearningScreen> {
       children: [
         const Text('Định nghĩa:', style: TextStyle(fontSize: 16, color: Colors.grey, fontWeight: FontWeight.w500)),
         const SizedBox(height: 12),
-        Text(word.define,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 36, color: Colors.black, fontWeight: FontWeight.bold)),
+        Text(word.define, textAlign: TextAlign.center, style: const TextStyle(fontSize: 36, color: Colors.black, fontWeight: FontWeight.bold)),
       ],
     );
   }
@@ -478,16 +590,18 @@ class _ReviewLearningScreenState extends State<ReviewLearningScreen> {
       mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (_currentReviewLevel == Difficulty.easy)
-          _buildMultipleChoice(word),
-        if (_currentReviewLevel == Difficulty.medium || _currentReviewLevel == Difficulty.hard)
-          _buildFillInInputs(),
+        if (_currentReviewLevel == Difficulty.easy) _buildMultipleChoice(word),
+        if (_currentReviewLevel == Difficulty.medium || _currentReviewLevel == Difficulty.hard) _buildFillInInputs(),
       ],
     );
   }
 
   Widget _buildMultipleChoice(Word word) {
     List<String> options = [word.define];
+    final otherWords = _allWords.where((w) => w.id != word.id).toList();
+    otherWords.shuffle();
+    options.addAll(otherWords.take(3).map((w) => w.define));
+    options.shuffle();
 
     return Column(
       children: [
@@ -572,7 +686,7 @@ class _ReviewLearningScreenState extends State<ReviewLearningScreen> {
               onPressed: _skipCurrentWord,
               icon: Icon(Icons.keyboard_double_arrow_right, color: Colors.blue.shade600),
               label: Text('Đã biết, loại khỏi danh sách ôn tập', style: TextStyle(color: Colors.blue.shade600, fontWeight: FontWeight.w500)),
-            )
+            ),
           ],
         ),
       ),
@@ -609,9 +723,9 @@ class _ReviewLearningScreenState extends State<ReviewLearningScreen> {
                 ElevatedButton(
                   onPressed: () => _checkAnswerAndAdvance(),
                   style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10)
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                   ),
                   child: const Text('Tiếp tục'),
                 ),
@@ -634,16 +748,16 @@ class _ReviewLearningScreenState extends State<ReviewLearningScreen> {
             const SizedBox(height: 16),
             const Text('Chúc mừng! Bạn đã hoàn thành việc ôn tập.', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            Text('Bạn đã ôn tập ${_allWords.length} từ trong List ${widget.list.title}.', style: const TextStyle(fontSize: 16)),
+            Text('Bạn đã ôn tập ${_wordStatuses.length} từ trong List ${widget.list.title}.', style: const TextStyle(fontSize: 16)),
             const SizedBox(height: 32),
             ElevatedButton.icon(
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: _handleStopLearning,
               icon: const Icon(Icons.list),
               label: const Text('Xem tất cả & Tiến độ học tập'),
               style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12)
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               ),
-            )
+            ),
           ],
         ),
       ),
@@ -660,20 +774,19 @@ class _ReviewLearningScreenState extends State<ReviewLearningScreen> {
             spacing: 8.0,
             runSpacing: 4.0,
             children: [
-              TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('<< Xem tất cả', style: TextStyle(color: Colors.blue))),
+              TextButton(onPressed: _handleStopLearning, child: const Text('<< Xem tất cả', style: TextStyle(color: Colors.blue))),
               TextButton.icon(
                 onPressed: _showReviewSettingsDialog,
                 icon: const Icon(Icons.settings, size: 14, color: Colors.blue),
                 label: const Text('Cài đặt chế độ review', style: TextStyle(color: Colors.blue)),
               ),
               TextButton(
-                  onPressed: _showSkippedWordsDialog,
-                  child: const Text('• Các từ đã bỏ qua', style: TextStyle(color: Colors.blue))
+                onPressed: _showSkippedWordsDialog,
+                child: const Text('• Các từ đã bỏ qua', style: TextStyle(color: Colors.blue)),
               ),
             ],
           ),
         ),
-
         TextButton.icon(
           onPressed: _handleStopLearning,
           icon: const Icon(Icons.calendar_today, size: 14, color: Colors.red),
@@ -684,17 +797,71 @@ class _ReviewLearningScreenState extends State<ReviewLearningScreen> {
   }
 
   Widget _buildNoticeBanner() {
+    // Kiểm tra xem có từ mới hay không
+    bool hasNewWords = _allWords.any((word) => !_wordStatuses.containsKey(word.id!));
+    bool allWordsReviewed = _allWords.isNotEmpty &&
+        _allWords.every((word) => _wordStatuses.containsKey(word.id!) && _wordStatuses[word.id!] != 'to_review');
+
+    if (allWordsReviewed && hasNewWords) {
+      // Hiển thị dialog hỏi người dùng
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _showReviewChoiceDialog();
+      });
+      return const SizedBox.shrink(); // Không hiển thị banner tĩnh
+    }
+
     return Container(
       padding: const EdgeInsets.all(12.0),
       decoration: BoxDecoration(
-          color: Colors.orange.shade100,
-          borderRadius: BorderRadius.circular(8.0),
-          border: Border.all(color: Colors.orange.shade300)
+        color: Colors.orange.shade100,
+        borderRadius: BorderRadius.circular(8.0),
+        border: Border.all(color: Colors.orange.shade300),
       ),
       child: Text(
-        'Chú ý: bạn đã học xong số lượng từ cần ôn tập trong hôm nay. Bạn có thể dừng lại việc ôn tập và quay lại vào hôm sau. TUY NHIÊN, nếu bây giờ bạn vẫn muốn ôn tập tiếp, các từ bạn đang học sẽ xuất hiện NGẪU NHIÊN ở dưới.',
+        'Chú ý: bạn đã học xong số lượng từ cần ôn tập trong hôm nay. Bạn có thể dừng lại việc ôn tập và quay lại vào hôm sau.',
         style: TextStyle(color: Colors.brown.shade800, fontSize: 13),
       ),
+    );
+  }
+
+  void _showReviewChoiceDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          title: const Text('Chọn chế độ ôn tập', style: TextStyle(fontWeight: FontWeight.bold)),
+          content: const Text(
+            'Bạn đã ôn tập hết các từ trong danh sách. Có muốn ôn lại từ đầu hay chỉ ôn các từ mới vừa thêm?',
+            style: TextStyle(fontSize: 14),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                // Ôn lại tất cả từ
+                setState(() {
+                  _reviewWords = List.from(_allWords);
+                  _showAllWordsInReview = true;
+                });
+                Navigator.of(context).pop();
+              },
+              child: const Text('Ôn lại tất cả'),
+            ),
+            TextButton(onPressed: () {
+                // Chỉ ôn từ mới
+                setState(() {
+                  _reviewWords = _allWords
+                      .where((word) => !_wordStatuses.containsKey(word.id!) || _wordStatuses[word.id!] == 'to_review')
+                      .toList();
+                  _showAllWordsInReview = false;
+                });
+                Navigator.of(context).pop();
+              },
+              child: const Text('Chỉ ôn từ mới'),
+            ),
+          ],
+        );
+      },
     );
   }
 }

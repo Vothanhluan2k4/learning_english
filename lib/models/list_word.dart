@@ -3,7 +3,7 @@ class ListWord {
   final String userId; // Giữ nguyên userId, dùng nó cho creatorId
   final String title;
   final String? description;
-
+  final DateTime? createdAt; // <-- 1. ADD THIS PROPERTY
   // Thuộc tính mới cần thiết cho giao diện
   final int? wordCount;
   // Thêm một getter để gọi userId bằng tên creatorId
@@ -15,6 +15,7 @@ class ListWord {
     required this.title,
     this.description,
     this.wordCount, // Thêm vào constructor
+    this.createdAt,
   });
 
   // Tạo instance từ JSON (cập nhật để bao gồm wordCount)
@@ -27,6 +28,9 @@ class ListWord {
       // GIẢ ĐỊNH: Supabase trả về 'word_count' hoặc bạn tính toán nó sau
       // Nếu bạn lấy nó từ một view/join:
       wordCount: json['word_count'] as int?,
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'] as String)
+          : null,
     );
   }
 
