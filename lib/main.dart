@@ -5,7 +5,7 @@ import 'package:learning_english/core/uni_links.dart';
 import 'package:learning_english/screens/drawer_screen.dart';
 import 'package:learning_english/screens/home_screen.dart';
 import 'package:learning_english/screens/setting_screen.dart';
-import 'package:learning_english/screens/note_screen.dart';
+import 'package:learning_english/screens/flashcard/flashcards_screen.dart';
 import 'package:learning_english/screens/course_screen.dart';
 import 'package:learning_english/screens/grammar_screen.dart';
 import 'package:learning_english/screens/login_screen.dart';
