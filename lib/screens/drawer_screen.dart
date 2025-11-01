@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:learning_english/screens/profile/profile_screen.dart';
-import 'package:learning_english/screens/setting_screen.dart';
 import 'package:learning_english/screens/course/course_screen.dart';
 import 'package:learning_english/screens/flashcards_screen.dart' hide FlashcardsScreen;
 import 'package:learning_english/screens/course/course_screen.dart';
 import 'package:learning_english/screens/grammar_screen.dart';
 import 'package:learning_english/screens/home_screen.dart';
+import 'package:learning_english/screens/statistical_screen.dart';
 import 'package:learning_english/services/auth_service.dart';
 import 'package:learning_english/services/user_service.dart';
 import 'package:learning_english/screens/flashcard/flashcards_screen.dart';
@@ -42,8 +42,9 @@ class _DrawerScreenState extends State<DrawerScreen> {
     CourseScreen(),
     GrammarScreen(),
     FlashcardsScreen(),
+    StatisticalScreen(),
     ProfileScreen(),
-    SettingScreen(),
+    
   ];
 
   @override
@@ -204,9 +205,9 @@ class _DrawerScreenState extends State<DrawerScreen> {
       case 3:
         return 'FashCard';
       case 4:
-        return 'Hồ sơ cá nhân';
+        return 'Thống kê';
       case 5:
-        return 'Setting';
+        return 'Hồ sơ cá nhân';
       default:
         return 'Learning English';
     }
@@ -302,15 +303,16 @@ class _DrawerScreenState extends State<DrawerScreen> {
               onTap: () => _onItemTapped(3),
             ),
             ListTile(
-              leading: const Icon(FontAwesomeIcons.userCircle),
-              title: const Text('Hồ sơ cá nhân'),
+              leading: const Icon(FontAwesomeIcons.chartColumn),
+              title: const Text('Thống kê'),
               onTap: () => _onItemTapped(4),
             ),
             ListTile(
-              leading: const Icon(Icons.settings),
-              title: const Text('Cài đặt'),
+              leading: const Icon(FontAwesomeIcons.userCircle),
+              title: const Text('Hồ sơ cá nhân'),
               onTap: () => _onItemTapped(5),
             ),
+            
             Divider(),
             isLoggedIn
                 ? ListTile(
