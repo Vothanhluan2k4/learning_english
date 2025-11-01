@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/material.dart';
 
 class GoogleAuthService {
   final SupabaseClient _supabase = Supabase.instance.client;
@@ -80,63 +81,166 @@ class GoogleAuthService {
   }
 
   Future<AuthResponse?> _signInToSupabase(GoogleSignInAccount account) async {
+  try {
+    final GoogleSignInAuthentication googleAuth = await account.authentication;
+
+    if (googleAuth.idToken == null) {
+      throw Exception('Failed to get ID token from Google');
+    }
+
+    debugPrint('🔐 Got ID token, signing in to Supabase');
+
     try {
-      // Lấy authentication
-      final GoogleSignInAuthentication googleAuth = await account.authentication;
-
-      // Kiểm tra idToken
-      if (googleAuth.idToken == null) {
-        throw Exception('Failed to get ID token from Google');
-      }
-
-      print('Got ID token, signing in to Supabase');
-
-      // Sign in to Supabase - CHỈ CẦN idToken
+      // ✅ FIX: Thêm delay trước khi sign in
       final response = await _supabase.auth.signInWithIdToken(
         provider: OAuthProvider.google,
         idToken: googleAuth.idToken!,
-      );
+      ).timeout(Duration(seconds: 15));
 
-      print('Supabase sign in success: ${response.user?.email}');
+      debugPrint('✅ Supabase sign in success: ${response.user?.email}');
 
       if (response.user != null) {
+        // ✅ Delay để auth complete
+        await Future.delayed(Duration(milliseconds: 500));
         await _createOrUpdateProfile(response.user!);
       }
 
       return response;
     } catch (e) {
-      print('Supabase sign in error: $e');
+      debugPrint('❌ Supabase auth error: $e');
+      
+      // ✅ Check if user was created despite error
+      if (e.toString().contains('Database error saving new user')) {
+        debugPrint('⚠️ Profile trigger failed, trying manual creation...');
+        
+        final currentUser = _supabase.auth.currentUser;
+        if (currentUser != null) {
+          await Future.delayed(Duration(milliseconds: 500));
+          try {
+            await _createOrUpdateProfile(currentUser);
+            debugPrint('✅ Manual profile creation succeeded');
+            return AuthResponse(user: currentUser, session: null);
+          } catch (e2) {
+            debugPrint('❌ Manual creation failed: $e2');
+          }
+        }
+      }
       rethrow;
     }
+  } catch (e) {
+    debugPrint('❌ _signInToSupabase error: $e');
+    rethrow;
   }
+}
 
-  Future<void> _createOrUpdateProfile(User user) async {
+Future<void> _createOrUpdateProfile(User user) async {
+  try {
+    debugPrint('═══════════════════════════════════════');
+    debugPrint('👤 Creating/Updating user profile');
+    debugPrint('═══════════════════════════════════════');
+    debugPrint('   auth_id: ${user.id}');
+    debugPrint('   email: ${user.email}');
+    debugPrint('   displayName: ${_currentUser?.displayName}');
+
+    // ✅ FIX: Thêm try-catch riêng cho select
+    Map<String, dynamic>? existing;
     try {
-      final existing = await _supabase
+      existing = await _supabase
           .from('users')
           .select()
           .eq('auth_id', user.id)
-          .maybeSingle();
+          .maybeSingle()
+          .timeout(Duration(seconds: 10));
+      debugPrint('   Existing user: ${existing != null ? 'Yes' : 'No'}');
+    } catch (e) {
+      debugPrint('⚠️ Error checking existing user: $e');
+      existing = null;
+    }
 
-      if (existing == null) {
-        await _supabase.from('users').insert({
-          'auth_id': user.id,
-          'email': user.email,
-          'full_name': _currentUser?.displayName ?? user.email?.split('@')[0],
-          'avatar_url': _currentUser?.photoUrl,
-          'last_login_at': DateTime.now().toIso8601String(),
-        });
-      } else {
+    if (existing == null) {
+      final insertData = {
+        'auth_id': user.id,
+        'email': user.email ?? 'unknown@example.com',
+        'full_name': _currentUser?.displayName ?? 
+            user.email?.split('@')[0] ?? 'User',
+        'avatar_url': _currentUser?.photoUrl,
+        'last_login_at': DateTime.now().toIso8601String(),
+      };
+
+      debugPrint('📝 Insert data:');
+      debugPrint('   auth_id: ${insertData['auth_id']}');
+      debugPrint('   email: ${insertData['email']}');
+      debugPrint('   full_name: ${insertData['full_name']}');
+
+      // ✅ Validate
+      if ((insertData['auth_id'] as String).isEmpty) {
+        throw Exception('auth_id không được để trống');
+      }
+      if ((insertData['email'] as String).isEmpty) {
+        throw Exception('email không được để trống');
+      }
+
+      // ✅ Try insert with timeout
+      try {
+        await _supabase
+            .from('users')
+            .insert(insertData)
+            .timeout(Duration(seconds: 10));
+        debugPrint('✅ User created successfully');
+      } catch (e) {
+        debugPrint('⚠️ Insert failed: $e');
+        
+        // ✅ Fallback: Thử upsert
+        debugPrint('🔄 Trying upsert instead...');
+        try {
+          await _supabase
+              .from('users')
+              .upsert(
+                insertData,
+                onConflict: 'auth_id',
+              )
+              .timeout(Duration(seconds: 10));
+          debugPrint('✅ User upserted successfully');
+        } catch (e2) {
+          debugPrint('❌ Upsert also failed: $e2');
+          
+          // ✅ Last resort: try update
+          debugPrint('🔄 Trying update instead...');
+          try {
+            await _supabase
+                .from('users')
+                .update({'last_login_at': insertData['last_login_at']})
+                .eq('auth_id', user.id)
+                .timeout(Duration(seconds: 10));
+            debugPrint('✅ User updated (fallback)');
+          } catch (e3) {
+            debugPrint('❌ All operations failed: $e3');
+            // Don't rethrow - user is already authenticated
+          }
+        }
+      }
+    } else {
+      debugPrint('📝 Updating existing user...');
+      try {
         await _supabase
             .from('users')
             .update({'last_login_at': DateTime.now().toIso8601String()})
-            .eq('auth_id', user.id);
+            .eq('auth_id', user.id)
+            .timeout(Duration(seconds: 10));
+        debugPrint('✅ User updated successfully');
+      } catch (e) {
+        debugPrint('⚠️ Update failed: $e');
+        // Don't rethrow - user already exists
       }
-    } catch (e) {
-      print('Profile error: $e');
     }
-  }
 
+    debugPrint('═══════════════════════════════════════');
+  } catch (e, stackTrace) {
+    debugPrint('❌ Profile error: $e');
+    debugPrint('📍 Stack trace: $stackTrace');
+    // Don't rethrow - user is already authenticated
+  }
+}
   Future<bool> authenticate() async {
     try {
       if (!_isInitialized) {

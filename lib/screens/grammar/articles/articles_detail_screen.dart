@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:learning_english/service/grammar_service.dart';
+import 'package:learning_english/services/grammar_service.dart';
 import 'package:learning_english/models/lesson_content.dart';
 import 'package:learning_english/screens/grammar/exercise_screen.dart';
 

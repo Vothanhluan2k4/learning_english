@@ -6,11 +6,11 @@ import 'package:learning_english/screens/flashcards_screen.dart';
 import 'package:learning_english/screens/course/course_screen.dart';
 import 'package:learning_english/screens/grammar_screen.dart';
 import 'package:learning_english/screens/home_screen.dart';
-import 'package:learning_english/service/google_auth_service.dart';
-import 'package:learning_english/service/auth_service.dart';
-import 'package:learning_english/service/user_service.dart';
+import 'package:learning_english/services/google_auth_service.dart';
+import 'package:learning_english/services/auth_service.dart';
+import 'package:learning_english/services/user_service.dart';
 import 'package:learning_english/widgets/notification_bell.dart';
-import '../service/user_prefs.dart';
+import '../services/user_prefs.dart';
 
 class DrawerScreen extends StatefulWidget {
   final int? initialIndex;

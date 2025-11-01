@@ -671,10 +671,15 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Kiểm tra đầu vào'),
+        title: const Text('Kiểm tra đầu vào', 
+        ),
         centerTitle: true,
         backgroundColor: Colors.blueAccent,
         foregroundColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: _showExitDialog,
+        ),
         actions: [
           if (_timeRemaining > 0)
             Container(
@@ -734,6 +739,106 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
       ),
     );
   }
+
+  // ✅ Thêm method hiển thị dialog xác nhận thoát
+  Future<void> _showExitDialog() async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Row(
+          children: [
+            Icon(Icons.warning_outlined, color: Colors.orange, size: 28),
+            const SizedBox(width: 12),
+            const Text('Xác nhận thoát'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 8),
+            const Text(
+              'Bạn chắc chắn muốn thoát khỏi bài kiểm tra?',
+              style: TextStyle(fontSize: 16),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    color: Colors.orange.shade700,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Tiến độ hiện tại sẽ được lưu lại.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.orange.shade900,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Tiếp tục làm bài',
+              style: TextStyle(color: Colors.blue),
+            ),
+          ),
+          const SizedBox(width: 8),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _exitTest();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red.shade400,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              'Thoát',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Thoát khỏi bài test và lưu tiến độ
+  Future<void> _exitTest() async {
+    // Lưu tiến độ trước khi thoát
+    await _saveTestProgress();
+
+    // Dừng timer
+    _timer?.cancel();
+
+    if (mounted) {
+      // Quay lại màn hình trước
+      Navigator.pop(context);
+    }
+  }
+
 
   Widget _buildSingleQuestion(TestQuestion question) {
     // Parse options - FIX: Xử lý cả Map và List

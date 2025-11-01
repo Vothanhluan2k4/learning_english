@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../models/notification_appBar.dart';
+import '../models/notification.dart';
 
 class NotificationService {
   final supabase = Supabase.instance.client;

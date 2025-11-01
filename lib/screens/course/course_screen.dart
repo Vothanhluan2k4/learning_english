@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:learning_english/models/course.dart';
+import 'package:learning_english/models/course_group.dart';
+import 'package:learning_english/services/course_unlock_service.dart';
+import 'package:learning_english/widgets/courses/course_card_widget.dart';
+import 'package:learning_english/widgets/courses/placement_banner_widget.dart';
+import 'package:learning_english/widgets/courses/recommended_course_card.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../../service/course_service.dart';
-import '../../../service/placement_test_service.dart';
-import '../../../models/course_group.dart';
+import '../../services/course_service.dart';
+import '../../services/placement_test_service.dart';
 
 class CourseScreen extends StatefulWidget {
   const CourseScreen({super.key});
@@ -13,16 +18,19 @@ class CourseScreen extends StatefulWidget {
 
 class _CourseScreenState extends State<CourseScreen> {
   final _courseService = CourseService();
+  final _courseUnlockService = CourseUnlockService();
   final _placementService = PlacementTestService();
   final _supabase = Supabase.instance.client;
-  
+
   bool _isLoading = true;
   bool _showPlacement = false;
-  List<Map<String, dynamic>> _courses = [];
-  Map<String, dynamic>? _recommendedCourse;
+  List<Course> _courses = [];
+  Course? _recommendedCourse;
   String _groupName = 'Lộ trình học';
   String? _currentGroupId;
-  Map<String, bool> _completedCourses = {};
+
+  // ✅ Maps để track unlock status
+  Map<String, bool> _unlockedCourses = {};
 
   @override
   void initState() {
@@ -34,9 +42,10 @@ class _CourseScreenState extends State<CourseScreen> {
     try {
       setState(() => _isLoading = true);
       final authUserId = _supabase.auth.currentUser!.id;
-      
-      final shouldShowTest = await _placementService.shouldShowPlacementTest(authUserId);
-      
+
+      final shouldShowTest =
+          await _placementService.shouldShowPlacementTest(authUserId);
+
       if (shouldShowTest) {
         setState(() {
           _showPlacement = true;
@@ -59,22 +68,23 @@ class _CourseScreenState extends State<CourseScreen> {
         _courseService.fetchCoursesByGroup(groupId),
       ]);
 
-      final groupDetails = results[0] as Map<String, dynamic>?;
-      final recommendedCourse = results[1] as Map<String, dynamic>?;
-      final courses = List<Map<String, dynamic>>.from(results[2] as List);
+      final groupDetails = results[0] as CourseGroup?;
+      final recommendedCourse = results[1] as Course?;
+      final courses = results[2] as List<Course>;
 
-      for (var course in courses) {
-        if (course['required_course_id'] != null) {
-          _completedCourses[course['required_course_id']] = 
-              await _courseService.hasCompletedCourse(authUserId, course['required_course_id']);
-        }
-      }
+      // ✅ Kiểm tra unlock status cho tất cả khóa học
+      final unlockedStatus =
+          await _courseUnlockService.checkAllCourseUnlockStatus(
+        authUserId,
+        courses,
+      );
 
       setState(() {
         _currentGroupId = groupId;
-        _groupName = groupDetails?['group_name'] ?? 'Lộ trình học';
+        _groupName = groupDetails?.groupName ?? 'Lộ trình học';
         _recommendedCourse = recommendedCourse;
         _courses = courses;
+        _unlockedCourses = unlockedStatus;
         _isLoading = false;
       });
     } catch (e) {
@@ -86,181 +96,52 @@ class _CourseScreenState extends State<CourseScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return Scaffold(
+      return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       );
     }
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_groupName,
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-            )),
+        title: Text(
+          _groupName,
+          style: const TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         centerTitle: true,
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
       ),
       body: Column(
         children: [
-          // Hiển thị notification banner thay vì dialog
           if (_showPlacement)
-            _buildPlacementNotificationBanner(),
-          
+            PlacementBannerWidget(
+              onTakePlacementTest: () {
+                Navigator.pushNamed(context, '/chooseCourse');
+              },
+            ),
           Expanded(
             child: SingleChildScrollView(
               child: Column(
                 children: [
                   if (!_showPlacement) ...[
-                    _buildRecommendedCourseCard(),
+                    RecommendedCourseCard(
+                      recommendedCourse: _recommendedCourse,
+                      onTap: () {
+                        // ✅ Sử dụng pushNamed với courseId
+                        Navigator.pushNamed(
+                          context,
+                          '/courseModules',
+                          arguments: {'courseId': _recommendedCourse!.id},
+                        );
+                      },
+                    ),
                     _buildCourseList(),
                   ] else
-                    SizedBox(height: 40),
+                    const SizedBox(height: 40),
                 ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPlacementNotificationBanner() {
-    return Container(
-      margin: EdgeInsets.all(16),
-      padding: EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.orange.shade50,
-        border: Border.all(color: Colors.orange.shade300, width: 2),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.orange.withOpacity(0.1),
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.info_outline,
-                color: Colors.orange.shade700,
-                size: 28,
-              ),
-              SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'Bạn cần làm bài kiểm tra đầu vào',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.orange.shade900,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 12),
-          Text(
-            'Bạn cần hoàn thành bài kiểm tra đầu vào để xác định trình độ và lộ trình học phù hợp nhất.',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.orange.shade800,
-              height: 1.5,
-            ),
-          ),
-          SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: () {
-                Navigator.pushNamed(context, '/chooseCourse');
-              },
-              icon: Icon(Icons.arrow_forward),
-              label: Text('Làm bài kiểm tra'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.orange.shade600,
-                foregroundColor: Colors.white,
-                padding: EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRecommendedCourseCard() {
-    if (_recommendedCourse == null) return SizedBox.shrink();
-
-    return Container(
-      margin: EdgeInsets.all(16),
-      padding: EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Colors.blue[100]!, Colors.blue[50]!],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.blue.withOpacity(0.1),
-            blurRadius: 10,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.recommend, color: Colors.blue[700]),
-              SizedBox(width: 8),
-              Text(
-                'Khóa học phù hợp với bạn',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.blue[900],
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 12),
-          Text(
-            _recommendedCourse!['course_name'],
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          SizedBox(height: 16),
-          ElevatedButton.icon(
-            onPressed: () {
-              Navigator.pushNamed(
-                context,
-                '/courseDetail',
-                arguments: {'courseId': _recommendedCourse!['id']},
-              );
-            },
-            icon: Icon(Icons.arrow_forward),
-            label: Text('Xem chi tiết'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
-              foregroundColor: Colors.white,
-              padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
               ),
             ),
           ),
@@ -271,66 +152,77 @@ class _CourseScreenState extends State<CourseScreen> {
 
   Widget _buildCourseList() {
     return ListView.builder(
-      padding: EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
       shrinkWrap: true,
-      physics: NeverScrollableScrollPhysics(),
+      physics: const NeverScrollableScrollPhysics(),
       itemCount: _courses.length,
       itemBuilder: (context, index) {
         final course = _courses[index];
-        final isRecommended = _recommendedCourse != null && 
-            course['id'] == _recommendedCourse!['id'];
+        final isRecommended =
+            _recommendedCourse != null && course.id == _recommendedCourse!.id;
 
-        return Card(
-          margin: EdgeInsets.only(bottom: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: isRecommended
-                ? BorderSide(color: Colors.blue, width: 2)
-                : BorderSide.none,
-          ),
-          elevation: isRecommended ? 4 : 2,
-          child: InkWell(
-            onTap: () {
-              Navigator.pushNamed(
-                context,
-                '/courseDetail',
-                arguments: {'courseId': course['id']},
-              );
-            },
-            borderRadius: BorderRadius.circular(16),
-            child: Padding(
-              padding: EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          course['course_name'],
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      if (isRecommended)
-                        Chip(
-                          label: Text('Đề xuất'),
-                          backgroundColor: Colors.blue[50],
-                          labelStyle: TextStyle(
-                            color: Colors.blue[700],
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                    ],
-                  ),
-                ],
+        // ✅ Lấy unlock status
+        final isUnlocked = _unlockedCourses[course.id] ?? false;
+
+        return CourseCardWidget(
+          course: course,
+          isRecommended: isRecommended,
+          isUnlocked: isUnlocked,
+          // ✅ Lấy tên khóa học cần hoàn thành
+          prerequisiteName:
+              _courseUnlockService.getNextCourseToUnlock(
+                course.id,
+                _courses,
+                _unlockedCourses,
               ),
-            ),
-          ),
+          onTap: isUnlocked
+              ? () {
+                  // ✅ Sử dụng pushNamed với courseId
+                  Navigator.pushNamed(
+                    context,
+                    '/courseModules',
+                    arguments: {'courseId': course.id},
+                  );
+                }
+              : () {
+                  // ✅ Hiển thị snackbar
+                  _showLockedSnackbar(context, course);
+                },
         );
       },
+    );
+  }
+
+  // ✅ Hiển thị snackbar khi khóa học bị khóa
+  void _showLockedSnackbar(BuildContext context, Course course) {
+    final nextCourse = _courseUnlockService.getNextCourseToUnlock(
+      course.id,
+      _courses,
+      _unlockedCourses,
+    );
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(Icons.lock, color: Colors.white, size: 20),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Hoàn thành "$nextCourse" để mở khóa',
+                style: const TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: Colors.red.shade600,
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+      ),
     );
   }
 }

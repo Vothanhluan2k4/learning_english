@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../service/placement_test_service.dart';
+import '../../services/placement_test_service.dart';
 
 class ChooseCourseScreen extends StatefulWidget {
   const ChooseCourseScreen({super.key});

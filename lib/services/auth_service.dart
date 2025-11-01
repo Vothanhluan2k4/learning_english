@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AuthService{
@@ -10,6 +8,23 @@ class AuthService{
 
   //Track login status
   Stream<AuthState> get authStateChanges => _supabase.auth.onAuthStateChange;
+
+  // Lấy user_id từ auth_id
+  Future<String?> getUserIdFromAuthId(String authId) async {
+    try {
+
+      final response = await _supabase
+          .from('users')
+          .select('id')
+          .eq('auth_id', authId)
+          .single();
+
+      final userId = response['id'] as String?;
+      return userId;
+    } catch (e) {
+      return null;
+    }
+  }
 
   //SignUp
   Future<AuthResponse> signUp({

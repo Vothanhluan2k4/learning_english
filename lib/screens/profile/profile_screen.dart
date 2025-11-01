@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:learning_english/service/profile_service.dart';
+import 'package:learning_english/services/profile_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'package:learning_english/service/google_auth_service.dart';
-import 'package:learning_english/service/auth_service.dart';
-import 'package:learning_english/service/user_service.dart';
-import 'package:learning_english/service/user_prefs.dart';
+import 'package:learning_english/services/google_auth_service.dart';
+import 'package:learning_english/services/auth_service.dart';
+import 'package:learning_english/services/user_service.dart';
+import 'package:learning_english/services/user_prefs.dart';
 import 'package:learning_english/widgets/profile_widet.dart';
 import 'package:learning_english/screens/profile/profile_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:learning_english/helpers/notification_helper.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -22,7 +23,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _authService = AuthService();
   final _userService = UserService();
   final _googleAuthService = GoogleAuthService();
-
+  
+  final _notificationHelper = NotificationHelper();
+  
   // Biến lưu thông tin user
   bool isLoggedIn = false;
   String? _fullName;
@@ -34,10 +37,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool isLoading = true;
   bool isDarkMode = false; // Thêm state cho dark mode
 
+  bool _notificationEnabled = false;
+  int _notificationHour = 9;
+  int _notificationMinute = 0;
+
   @override
   void initState() {
     super.initState();
     _loadUserData();
+    _loadNotificationSettings(); // ✅ Add this
   }
   Future<void> _logout() async {
     try {
@@ -135,6 +143,190 @@ class _ProfileScreenState extends State<ProfileScreen> {
       print('Error loading user data: $e');
       setState(() => isLoading = false);
     }
+  }
+
+  // ✅ Load notification settings
+  Future<void> _loadNotificationSettings() async {
+    final savedTime = await _notificationHelper.getSavedTime();
+    setState(() {
+      _notificationEnabled = savedTime['enabled'];
+      _notificationHour = savedTime['hour'];
+      _notificationMinute = savedTime['minute'];
+    });
+  }
+
+  // ✅ Show time picker dialog
+  Future<void> _showNotificationDialog() async {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        int tempHour = _notificationHour;
+        int tempMinute = _notificationMinute;
+
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              title: Row(
+                children: const [
+                  Icon(Icons.notifications_active, color: Colors.blue),
+                  SizedBox(width: 12),
+                  Text('Cài đặt thông báo'),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Chọn giờ nhận thông báo học tiếng Anh hàng ngày',
+                    style: TextStyle(fontSize: 14, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 20),
+                  
+                  // Time Picker
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        // Hour
+                        _buildTimePicker(
+                          value: tempHour,
+                          max: 23,
+                          onChanged: (val) => setState(() => tempHour = val),
+                        ),
+                        const Text(' : ', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
+                        // Minute
+                        _buildTimePicker(
+                          value: tempMinute,
+                          max: 59,
+                          onChanged: (val) => setState(() => tempMinute = val),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    await _notificationHelper.scheduleDailyNotification(
+                      hour: tempHour,
+                      minute: tempMinute,
+                    );
+
+                    this.setState(() {
+                      _notificationHour = tempHour;
+                      _notificationMinute = tempMinute;
+                      _notificationEnabled = true;
+                    });
+
+                    Navigator.pop(context);
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          '⏰ Đã đặt thông báo lúc ${tempHour.toString().padLeft(2, '0')}:${tempMinute.toString().padLeft(2, '0')}',
+                        ),
+                        backgroundColor: Colors.green,
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text('Lưu', style: TextStyle(color: Colors.white)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // ✅ Time picker widget
+  Widget _buildTimePicker({
+    required int value,
+    required int max,
+    required Function(int) onChanged,
+  }) {
+    return Container(
+      width: 80,
+      height: 100,
+      child: ListWheelScrollView.useDelegate(
+        itemExtent: 40,
+        diameterRatio: 1.5,
+        physics: const FixedExtentScrollPhysics(),
+        controller: FixedExtentScrollController(initialItem: value),
+        onSelectedItemChanged: onChanged,
+        childDelegate: ListWheelChildBuilderDelegate(
+          builder: (context, index) {
+            return Center(
+              child: Text(
+                index.toString().padLeft(2, '0'),
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: index == value ? FontWeight.bold : FontWeight.normal,
+                  color: index == value ? Colors.blue : Colors.grey,
+                ),
+              ),
+            );
+          },
+          childCount: max + 1,
+        ),
+      ),
+    );
+  }
+
+  // ✅ Update notification tile
+  Widget _buildNotificationTile() {
+    return ListTile(
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: const Color(0xFF2196F3).withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Icon(Icons.notifications, color: Colors.blue, size: 20),
+      ),
+      title: const Text('Thông báo', style: TextStyle(fontSize: 16)),
+      subtitle: _notificationEnabled
+          ? Text(
+              'Hàng ngày lúc ${_notificationHour.toString().padLeft(2, '0')}:${_notificationMinute.toString().padLeft(2, '0')}',
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+            )
+          : const Text('Tắt', style: TextStyle(fontSize: 12, color: Colors.grey)),
+      trailing: Switch(
+        value: _notificationEnabled,
+        onChanged: (value) async {
+          if (value) {
+            _showNotificationDialog(); // ✅ Show dialog when turn on
+          } else {
+            await _notificationHelper.toggleNotification(false);
+            setState(() => _notificationEnabled = false);
+          }
+        },
+        activeColor: Colors.blue,
+      ),
+    );
   }
 
   @override
@@ -344,67 +536,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
 
-            // Learning Progress Section (Modern Design)
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.white, const Color(0xFFF7F9FC)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.15),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'TIẾN ĐỘ HỌC TẬP',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black54,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      buildProgressCard(
-                        title: 'Đề đã luyện',
-                        value: '3',
-                        color: const Color(0xFF4CAF50),
-                        icon: Icons.assignment_turned_in,
-                      ),
-                      buildProgressCard(
-                        title: 'Từ đã học',
-                        value: '40',
-                        color: const Color(0xFF2196F3),
-                        icon: Icons.menu_book_rounded,
-                      ),
-                      buildProgressCard(
-                        title: 'Điểm TB',
-                        value: '8.5',
-                        color: const Color(0xFFFF9800),
-                        icon: Icons.star_rate_rounded,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            SizedBox(height: 16),
-
             // Settings Section
             Container(
               margin: EdgeInsets.symmetric(horizontal: 16),
@@ -435,20 +566,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
 
-                  buildSettingTile(
-                    icon: Icons.language,
-                    title: 'Thay đổi ngôn ngữ',
-                    onTap: () {
-                    },
-                  ),
+                  // buildSettingTile(
+                  //   icon: Icons.language,
+                  //   title: 'Thay đổi ngôn ngữ',
+                  //   onTap: () {
+                  //   },
+                  // ),
 
-                  _buildDarkModeToggle(),
+                  // _buildDarkModeToggle(),
 
-                  buildSettingTile(
-                    icon: Icons.notifications,
-                    title: 'Thông báo',
-                    onTap: () {},
-                  ),
+                  _buildNotificationTile(),
                 ],
               ),
             ),
@@ -615,6 +742,4 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
-
-
 }

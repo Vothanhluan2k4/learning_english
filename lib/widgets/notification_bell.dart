@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../service/notification_appBar_service.dart';
-import '../models/notification_appBar.dart';
+import '../services/notification_appBar_service.dart';
+import '../models/notification.dart';
 
 class NotificationBell extends StatefulWidget {
   final String authId;

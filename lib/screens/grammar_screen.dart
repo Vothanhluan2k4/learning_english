@@ -5,7 +5,7 @@ import 'package:learning_english/screens/grammar/pronunciation_screen.dart';
 import 'package:learning_english/screens/grammar/tenses/tenses_screen.dart';
 import 'package:learning_english/widgets/grammar_category.dart';
 import '../widgets/grammar_card.dart';
-import '../service/grammar_service.dart';
+import '../services/grammar_service.dart';
 import '../models/topic.dart';
 import 'grammar/articles/articles_screen.dart';
 import 'grammar/modalverbs/modalVerbs_screen.dart';

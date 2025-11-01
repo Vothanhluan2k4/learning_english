@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:learning_english/models/exercise_progress.dart';
-import 'package:learning_english/service/exercise_progress_service.dart';
-import 'package:learning_english/service/grammar_service.dart';
+import 'package:learning_english/services/exercise_progress_service.dart';
+import 'package:learning_english/services/grammar_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ExerciseScreen extends StatefulWidget {
