@@ -3,7 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:learning_english/models/list_word.dart';
 import 'package:learning_english/models/word.dart';
 import 'package:learning_english/screens/flashcard/ReviewLearningScreen.dart';
-import 'package:learning_english/service/flashcard_service.dart';
+import 'package:learning_english/services/flashcard_service.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:learning_english/screens/flashcard/random_review_screen.dart';

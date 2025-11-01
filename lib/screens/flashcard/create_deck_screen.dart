@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:learning_english/models/list_word.dart';
-import 'package:learning_english/service/flashcard_service.dart';
+import 'package:learning_english/services/flashcard_service.dart';
 
 class CreateDeckScreen extends StatefulWidget {
   const CreateDeckScreen({super.key});

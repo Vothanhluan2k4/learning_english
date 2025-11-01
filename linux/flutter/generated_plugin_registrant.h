@@ -13,3 +13,10 @@
 void fl_register_plugins(FlPluginRegistry* registry);
 
 #endif  // GENERATED_PLUGIN_REGISTRANT_
+
+{
+  "C_Cpp.errorSquiggles": "disabled",
+  "files.exclude": {
+    "linux/**": true
+  }
+}

@@ -2,7 +2,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:learning_english/models/list_word.dart';
 import 'package:learning_english/models/word.dart';
-import 'package:learning_english/service/flashcard_service.dart';
+import 'package:learning_english/services/flashcard_service.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 
 class RandomReviewScreen extends StatefulWidget {
