@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../service/auth_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../services/auth_service.dart';
+import '../services/google_auth_service.dart';
+import '../services/user_prefs.dart';
+import '../services/placement_test_service.dart';
+
 
 class SignInScreen extends StatefulWidget {
   @override
@@ -9,12 +14,15 @@ class SignInScreen extends StatefulWidget {
 
 class _SignInScreenState extends State<SignInScreen> with SingleTickerProviderStateMixin {
   final _authService = AuthService();
+  final SupabaseClient _supabase = Supabase.instance.client;
+  final _googleAuthService = GoogleAuthService();
   final _formKey = GlobalKey<FormState>();
 
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
   bool _isLoading = false;
+  bool _isLoadingGoogle = false;
   bool _obscurePassword = true;
 
   late AnimationController _animationController;
@@ -50,6 +58,7 @@ class _SignInScreenState extends State<SignInScreen> with SingleTickerProviderSt
   }
 
   Future<void> _signIn() async {
+
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -63,6 +72,22 @@ class _SignInScreenState extends State<SignInScreen> with SingleTickerProviderSt
       );
 
       if (response.user != null) {
+        //Lấy dữ liệu người dùng
+        final userData = await _authService.getUserData(response.user!.id);
+
+        //Save SharedPreferences
+        await UserPrefs.saveUser(userData);
+
+        final placementService = PlacementTestService();
+        final shouldShowTest = await placementService.shouldShowPlacementTest(response.user!.id);
+
+        if (shouldShowTest) {
+          Navigator.pushReplacementNamed(context, '/chooseCourse');
+        } else {
+          Navigator.pushReplacementNamed(context, '/homedrawer');
+        }
+
+        //Notification
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(
@@ -77,7 +102,6 @@ class _SignInScreenState extends State<SignInScreen> with SingleTickerProviderSt
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
         );
-        Navigator.pushReplacementNamed(context, '/homedrawer');
       }
     } catch (e) {
       String errorMsg = 'Lỗi đăng nhập: ${e.toString()}';
@@ -100,6 +124,77 @@ class _SignInScreenState extends State<SignInScreen> with SingleTickerProviderSt
       );
     } finally {
       setState(() => _isLoading = false);
+    }
+  }
+
+  // Trong _signInWithGoogle method:
+  Future<void> _signInWithGoogle() async {
+    setState(() => _isLoadingGoogle  = true);
+
+    try {
+      print('Initiating Google Sign In...');
+
+      final success = await _googleAuthService.authenticate();
+
+      if (!mounted) return;
+
+      if (success && _googleAuthService.isSignedIn) {
+        // Lấy thông tin người dùng
+        final supabase = Supabase.instance.client;
+        final user = supabase.auth.currentUser;
+
+        if (user != null) {
+          // Gọi service kiểm tra Placement Test
+          final placementService = PlacementTestService();
+          final shouldShowTest = await placementService.shouldShowPlacementTest(user.id);
+
+          // Hiển thị thông báo đăng nhập thành công
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.check_circle, color: Colors.white),
+                  SizedBox(width: 12),
+                  Text('Đăng nhập Google thành công!'),
+                ],
+              ),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          );
+
+          // Điều hướng dựa theo kết quả kiểm tra
+          if (shouldShowTest) {
+            Navigator.pushReplacementNamed(context, '/chooseCourse');
+          } else {
+            Navigator.pushReplacementNamed(context, '/homedrawer');
+          }
+        } else {
+          throw Exception("Không thể lấy thông tin người dùng Google.");
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Đăng nhập bị hủy'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+
+    }  catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Lỗi: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingGoogle  = false);
+      }
     }
   }
 
@@ -229,20 +324,14 @@ class _SignInScreenState extends State<SignInScreen> with SingleTickerProviderSt
                                 return null;
                               },
                             ),
-                            SizedBox(height: 16),
+                            SizedBox(height: 10),
 
                             // Forgot Password Link
                             Align(
                               alignment: Alignment.centerRight,
                               child: TextButton(
-                                onPressed: () async {
-                                  await _authService.resetPassword(_emailController.text.trim());
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('Đã gửi email đặt lại mật khẩu!'),
-                                      backgroundColor: Colors.green,
-                                    ),
-                                  );
+                                onPressed: () {
+                                  Navigator.pushNamed(context, '/forgotPassword');
                                 },
                                 child: Text(
                                   'Quên mật khẩu?',
@@ -250,7 +339,7 @@ class _SignInScreenState extends State<SignInScreen> with SingleTickerProviderSt
                                 ),
                               ),
                             ),
-                            SizedBox(height: 15),
+                            SizedBox(height: 5),
 
                             // Sign In Button
                             Container(
@@ -296,7 +385,76 @@ class _SignInScreenState extends State<SignInScreen> with SingleTickerProviderSt
                                 ),
                               ),
                             ),
+
+                            SizedBox(height: 24),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Divider(
+                                    color: Colors.grey[400],
+                                    thickness: 1,
+                                  ),
+                                ),
+                                Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 16),
+                                  child: Text(
+                                    'hoặc',
+                                    style: TextStyle(
+                                      color: Colors.grey[600],
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: Divider(
+                                    color: Colors.grey[400],
+                                    thickness: 1,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: 20),
+
+                            SizedBox(
+                              height: 56,
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                onPressed: _isLoadingGoogle ? null : _signInWithGoogle,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.white,
+                                  foregroundColor: Colors.black,
+                                  elevation: 2,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                    side: BorderSide(color: Colors.grey.shade300),
+                                  ),
+                                ),
+                                icon: _isLoadingGoogle
+                                    ? SizedBox(
+                                  height: 24,
+                                  width: 24,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
+                                  ),
+                                )
+                                    : Image.asset(
+                                  'assets/google_logo.png',
+                                  height: 24,
+                                  width: 24,
+                                ),
+                                label: Text(
+                                  'Đăng nhập bằng Google',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
                             SizedBox(height: 15,),
+
                             // Sign Up Link
                             Row(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -320,6 +478,7 @@ class _SignInScreenState extends State<SignInScreen> with SingleTickerProviderSt
                               ],
                             ),
                             SizedBox(height: 24),
+
                           ],
                         ),
                       ),

@@ -4,12 +4,15 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   app_links
+  audioplayers_windows
+  file_selector_windows
   flutter_inappwebview_windows
   flutter_tts
   url_launcher_windows
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST
+  flutter_local_notifications_windows
 )
 
 set(PLUGIN_BUNDLED_LIBRARIES)
