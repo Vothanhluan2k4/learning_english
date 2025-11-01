@@ -2,6 +2,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:learning_english/models/list_word.dart';
 import 'package:learning_english/models/word.dart';
 import 'package:file_picker/file_picker.dart';
+import 'dart:io';
+import 'dart:typed_data';
+
 class FlashcardService {
   // Instance variables
   final SupabaseClient _client = Supabase.instance.client;
@@ -113,38 +116,59 @@ class FlashcardService {
   Future<void> createWord(Word word, {FilePickerResult? imageFile}) async {
     try {
       if (imageFile != null && imageFile.files.isNotEmpty) {
-        if (imageFile.files.first.bytes == null) {
-          throw Exception('Dữ liệu hình ảnh không hợp lệ');
+        final file = imageFile.files.first;
+
+        // Đọc dữ liệu bytes: nếu không có bytes thì đọc từ path (fix cho emulator)
+        Uint8List? fileBytes = file.bytes;
+        if (fileBytes == null && file.path != null) {
+          fileBytes = await File(file.path!).readAsBytes();
         }
 
-        final fileExtension = imageFile.files.first.extension ?? 'jpg';
-        final fileName = '${DateTime.now().millisecondsSinceEpoch}_${imageFile.files.first.name}';
+        if (fileBytes == null || fileBytes.isEmpty) {
+          throw Exception('Dữ liệu hình ảnh không hợp lệ: File không chứa dữ liệu byte');
+        }
+
+        // Kiểm tra kích thước file (giới hạn 10MB)
+        if (file.size > 10 * 1024 * 1024) {
+          throw Exception('Kích thước file vượt quá 10MB');
+        }
+
+        // Kiểm tra định dạng file
+        final extension = file.extension?.toLowerCase();
+        if (extension != 'jpg' && extension != 'png' && extension != 'jpeg') {
+          throw Exception('Định dạng ảnh không hợp lệ. Vui lòng chọn .jpg, .png hoặc .jpeg');
+        }
+
+        final fileExtension = file.extension ?? 'jpg';
+        final fileName = '${DateTime.now().millisecondsSinceEpoch}_${file.name}';
         final filePath = fileName;
         final contentType = 'image/$fileExtension';
 
-        print('Attempting to upload to: WordImage/$filePath with contentType: $contentType');
+        print('Attempting to upload to: WordImage/$filePath with contentType: $contentType, size: ${fileBytes.length} bytes');
 
-        // Upload file
-        await _client.storage
-            .from('WordImage')
-            .uploadBinary(
+        // Upload file lên Supabase
+        await _client.storage.from('WordImage').uploadBinary(
           filePath,
-          imageFile.files.first.bytes!,
+          fileBytes,
           fileOptions: FileOptions(contentType: contentType),
         );
 
         // Lấy URL công khai
         final imageUrl = _client.storage.from('WordImage').getPublicUrl(filePath);
         print('Generated public URL: $imageUrl');
+
+        // Cập nhật thông tin ảnh cho word
         word = word.copyWith(pictureUrl: imageUrl);
       }
 
+      // Thêm word vào cơ sở dữ liệu
       await _client.from('word').insert(word.toJson());
     } catch (e) {
-      print('Error during createWord: $e'); // Debug log
+      print('Error during createWord: $e');
       throw Exception('Lỗi khi tạo thẻ: $e');
     }
   }
+
 
   Future<void> updateWord(Word word, {FilePickerResult? imageFile}) async {
     try {
@@ -152,7 +176,14 @@ class FlashcardService {
 
       if (imageFile != null && imageFile.files.isNotEmpty) {
         final file = imageFile.files.first;
-        if (file.bytes == null) {
+
+        // Đọc dữ liệu bytes: nếu không có bytes thì đọc từ path (dành cho emulator)
+        Uint8List? fileBytes = file.bytes;
+        if (fileBytes == null && file.path != null) {
+          fileBytes = await File(file.path!).readAsBytes();
+        }
+
+        if (fileBytes == null || fileBytes.isEmpty) {
           throw Exception('Dữ liệu hình ảnh không hợp lệ: File không chứa dữ liệu byte');
         }
 
@@ -172,14 +203,13 @@ class FlashcardService {
         final filePath = fileName;
         final contentType = 'image/$fileExtension';
 
-        print('Attempting to upload to: WordImage/$filePath with contentType: $contentType, size: ${file.size} bytes');
+        print(
+            'Attempting to upload to: WordImage/$filePath with contentType: $contentType, size: ${fileBytes.length} bytes');
 
-        // Upload file
-        await _client.storage
-            .from('WordImage')
-            .uploadBinary(
+        // Upload file lên Supabase
+        await _client.storage.from('WordImage').uploadBinary(
           filePath,
-          file.bytes!,
+          fileBytes,
           fileOptions: FileOptions(contentType: contentType),
         );
 
@@ -189,6 +219,7 @@ class FlashcardService {
         word = word.copyWith(pictureUrl: imageUrl);
       }
 
+      // Cập nhật thông tin từ điển
       final payload = {
         'word': word.word,
         'define': word.define,
@@ -201,10 +232,11 @@ class FlashcardService {
 
       await _client.from('word').update(payload).eq('id', word.id!);
     } catch (e) {
-      print('Error during updateWord: $e'); // Debug log
+      print('Error during updateWord: $e');
       throw Exception('Lỗi khi cập nhật thẻ: $e');
     }
   }
+
   Future<void> createWords(List<Word> words) async {
     try {
       final wordData = words.map((word) => word.toJson()).toList();
