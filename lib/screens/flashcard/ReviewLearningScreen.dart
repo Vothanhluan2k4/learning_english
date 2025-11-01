@@ -664,15 +664,37 @@ class _ReviewLearningScreenState extends State<ReviewLearningScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Wrap(spacing: 8, children: [
-          TextButton(onPressed: _handleStopLearning, child: const Text('<< Xem tất cả', style: TextStyle(color: Colors.blue))),
-          TextButton.icon(onPressed: () => _showReviewSettingsDialog(), icon: const Icon(Icons.settings, size: 14), label: const Text('Cài đặt')),
-          TextButton(onPressed: () => _showSkippedWordsDialog(), child: const Text('Từ đã bỏ qua')),
-        ]),
-        TextButton.icon(
-          onPressed: _handleStopLearning,
-          icon: const Icon(Icons.stop, size: 14, color: Colors.red),
-          label: const Text('Dừng học', style: TextStyle(color: Colors.red)),
+        // Bọc Wrap trong Expanded để giới hạn chiều rộng và co giãn
+        Expanded(
+          child: Wrap(
+            spacing: 8,
+            alignment: WrapAlignment.start,
+            runSpacing: 4, // Thêm khoảng cách giữa các dòng nếu có
+            children: [
+              TextButton(
+                onPressed: _handleStopLearning,
+                child: const Text('<< Xem tất cả', style: TextStyle(color: Colors.blue)),
+              ),
+              TextButton.icon(
+                onPressed: () => _showReviewSettingsDialog(),
+                icon: const Icon(Icons.settings, size: 14),
+                label: const Text('Cài đặt'),
+              ),
+              TextButton(
+                onPressed: () => _showSkippedWordsDialog(),
+                child: const Text('Từ đã bỏ qua'),
+              ),
+            ],
+          ),
+        ),
+        // Giới hạn chiều rộng của nút "Dừng học" bằng SizedBox
+        SizedBox(
+          width: 100, // Giới hạn chiều rộng cố định (có thể điều chỉnh)
+          child: TextButton.icon(
+            onPressed: _handleStopLearning,
+            icon: const Icon(Icons.stop, size: 14, color: Colors.red),
+            label: const Text('Dừng học', style: TextStyle(color: Colors.red)),
+          ),
         ),
       ],
     );

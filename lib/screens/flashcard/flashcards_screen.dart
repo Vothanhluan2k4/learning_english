@@ -228,8 +228,8 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> with SingleTickerPr
   }
 
   Widget _buildLearningTab() {
-    return StreamBuilder<List<ListWord>>(
-      stream: Stream.fromFuture(_listWordsFuture),
+    return FutureBuilder<List<ListWord>>(
+      future: _listWordsFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator(color: primaryColor));
@@ -250,6 +250,7 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> with SingleTickerPr
             message: 'Các bộ thẻ bạn đang học sẽ xuất hiện tại đây.',
           );
         }
+
 
         final activeLists = lists.where((l) => (l.wordCount ?? 0) > 0).toList();
         if (activeLists.isEmpty) {

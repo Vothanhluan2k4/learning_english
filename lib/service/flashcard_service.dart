@@ -151,23 +151,35 @@ class FlashcardService {
       if (word.id == null) throw Exception('ID của thẻ không hợp lệ');
 
       if (imageFile != null && imageFile.files.isNotEmpty) {
-        if (imageFile.files.first.bytes == null) {
-          throw Exception('Dữ liệu hình ảnh không hợp lệ');
+        final file = imageFile.files.first;
+        if (file.bytes == null) {
+          throw Exception('Dữ liệu hình ảnh không hợp lệ: File không chứa dữ liệu byte');
         }
 
-        final fileExtension = imageFile.files.first.extension ?? 'jpg';
-        final fileName = '${DateTime.now().millisecondsSinceEpoch}_${imageFile.files.first.name}';
+        // Kiểm tra kích thước file (giới hạn 10MB)
+        if (file.size > 10 * 1024 * 1024) {
+          throw Exception('Kích thước file vượt quá 10MB');
+        }
+
+        // Kiểm tra định dạng file (chỉ chấp nhận .jpg, .png, .jpeg)
+        final extension = file.extension?.toLowerCase();
+        if (extension != 'jpg' && extension != 'png' && extension != 'jpeg') {
+          throw Exception('Định dạng ảnh không hợp lệ. Vui lòng chọn .jpg, .png hoặc .jpeg');
+        }
+
+        final fileExtension = file.extension ?? 'jpg';
+        final fileName = '${DateTime.now().millisecondsSinceEpoch}_${file.name}';
         final filePath = fileName;
         final contentType = 'image/$fileExtension';
 
-        print('Attempting to upload to: WordImage/$filePath with contentType: $contentType');
+        print('Attempting to upload to: WordImage/$filePath with contentType: $contentType, size: ${file.size} bytes');
 
         // Upload file
         await _client.storage
             .from('WordImage')
             .uploadBinary(
           filePath,
-          imageFile.files.first.bytes!,
+          file.bytes!,
           fileOptions: FileOptions(contentType: contentType),
         );
 
@@ -404,4 +416,5 @@ class FlashcardService {
       throw Exception('Lỗi khi đặt lại tiến độ: $e');
     }
   }
+
 }
