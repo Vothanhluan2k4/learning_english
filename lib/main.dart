@@ -14,7 +14,7 @@ import 'package:learning_english/screens/forgot_password_screen.dart';
 import 'package:learning_english/screens/home_screen.dart';
 import 'package:learning_english/screens/profile/infor_user_screen.dart';
 import 'package:learning_english/screens/setting_screen.dart';
-import 'package:learning_english/screens/flashcards_screen.dart';
+import 'package:learning_english/screens/flashcard/flashcards_screen.dart';
 import 'package:learning_english/screens/course/course_screen.dart';
 import 'package:learning_english/screens/grammar_screen.dart';
 import 'package:learning_english/screens/signIn_screen.dart';
