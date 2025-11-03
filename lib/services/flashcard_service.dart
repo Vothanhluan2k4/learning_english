@@ -4,11 +4,14 @@ import 'package:learning_english/models/word.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:io';
 import 'dart:typed_data';
+import '../../services/auth_service.dart';
 
 class FlashcardService {
   // Instance variables
   final SupabaseClient _client = Supabase.instance.client;
   String? _cachedUserId;
+  final _authService = AuthService();
+  final _supabase = Supabase.instance.client;
 
   // PHƯƠNG THỨC MỚI ĐỂ XÓA CACHE
   void clearUserCache() {
@@ -39,8 +42,6 @@ class FlashcardService {
   Future<String> getUserId() async {
     return await _getUserId();
   }
-
-  // ... (TOÀN BỘ PHẦN CÒN LẠI CỦA FILE GIỮ NGUYÊN) ...
 
   // LIST WORD MANAGEMENT (CREATE, READ, UPDATE, DELETE)
   Future<List<ListWord>> getListWords() async {
@@ -366,27 +367,66 @@ class FlashcardService {
   }
   // Thay thế hàm saveReviewHistory cũ bằng hàm này
   Future<void> saveReviewHistory(String listId, int wordsReviewed, int wordsRemembered) async {
-    try {
-      // Lấy trực tiếp ID xác thực để đảm bảo tính nhất quán
-      final authId = _client.auth.currentUser?.id;
-      if (authId == null) {
-        throw Exception('Người dùng chưa đăng nhập');
-      }
+  try {
+    final authUser = _supabase.auth.currentUser;
+    if (authUser == null) throw Exception('User not authenticated');
 
-      print('Saving review history for user $authId, list $listId');
+    final authId = authUser.id;
+    print('🔍 Step 1: authId = $authId');
 
-      await _client.from('review_history').insert({
-        'user_id': authId, // Luôn sử dụng authId cho bảng này
-        'list_word_id': listId,
-        'review_date': DateTime.now().toIso8601String(),
-        'words_reviewed': wordsReviewed,
-        'words_remembered': wordsRemembered,
-      });
-    } catch (e) {
-      print('Error saving review history: $e');
-      throw Exception('Lỗi khi lưu lịch sử ôn tập: $e');
+    final userId = await _authService.getUserIdFromAuthId(authId);
+    print('🔍 Step 2: userId = $userId');
+
+    if (userId == null) {
+      throw Exception('❌ User not found in users table for authId: $authId');
     }
+
+    // ✅ KIỂM TRA user có tồn tại trong bảng users không
+    final userCheck = await _client
+        .from('users')
+        .select('id, auth_id, email')
+        .eq('id', userId)
+        .maybeSingle();
+
+    print('🔍 Step 3: User exists in users table: $userCheck');
+
+    if (userCheck == null) {
+      throw Exception('❌ userId $userId does not exist in users table!');
+    }
+
+    // ✅ KIỂM TRA list_word_id có tồn tại không
+    final listCheck = await _client
+        .from('list_word')
+        .select('id')
+        .eq('id', listId)
+        .maybeSingle();
+
+    print('🔍 Step 4: List exists: $listCheck');
+
+    if (listCheck == null) {
+      throw Exception('❌ listId $listId does not exist in list_word table!');
+    }
+
+    print('✅ All checks passed. Inserting review history...');
+    print('   - userId: $userId');
+    print('   - listId: $listId');
+    print('   - wordsReviewed: $wordsReviewed');
+    print('   - wordsRemembered: $wordsRemembered');
+
+    await _client.from('review_history').insert({
+      'user_id': userId,
+      'list_word_id': listId,
+      'review_date': DateTime.now().toIso8601String(),
+      'words_reviewed': wordsReviewed,
+      'words_remembered': wordsRemembered,
+    });
+
+    print('✅ Review history saved successfully!');
+  } catch (e) {
+    print('❌ Error saving review history: $e');
+    rethrow;
   }
+}
 
   Future<bool> hasReviewHistory(String listId) async {
     try {

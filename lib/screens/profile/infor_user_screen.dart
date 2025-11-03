@@ -93,21 +93,8 @@ class _InforUserScreenState extends State<InforUserScreen> {
 
   Future<void> _changePassword() async {
     // Điều hướng đến màn hình đổi mật khẩu hoặc hiển thị dialog
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Thay đổi mật khẩu'),
-        content: const Text('Chức năng đang được phát triển'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Đóng'),
-          ),
-        ],
-      ),
-    );
+    Navigator.pushNamed(context, '/forgotPassword');
   }
-
 
 
   @override
@@ -141,49 +128,49 @@ class _InforUserScreenState extends State<InforUserScreen> {
         child: Column(
           children: [
             // Header với thông báo liên hệ email
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              color: Colors.white,
-              child: GestureDetector(
-                onTap: () {
-                  // Mở ứng dụng email khi nhấn vào
-                  final Uri emailLaunchUri = Uri(
-                    scheme: 'mailto',
-                    path: 'luandangnhap@gmail.com',
-                  );
-                  launchUrl(emailLaunchUri); // Sử dụng package url_launcher để mở email
-                },
-                child: RichText(
-                  text: TextSpan(
-                    children: [
-                      TextSpan(
-                        text: 'Liên hệ ',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      TextSpan(
-                        text: 'luandangnhap@gmail.com',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.red, // Màu đỏ cho email
-                          decoration: TextDecoration.underline, // Thêm gạch chân để trông như link
-                        ),
-                      ),
-                      TextSpan(
-                        text: ' nếu cần hỗ trợ.',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.black87,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
+            // Container(
+            //   width: double.infinity,
+            //   padding: const EdgeInsets.all(16),
+            //   color: Colors.white,
+            //   child: GestureDetector(
+            //     onTap: () {
+            //       // Mở ứng dụng email khi nhấn vào
+            //       final Uri emailLaunchUri = Uri(
+            //         scheme: 'mailto',
+            //         path: 'luandangnhap@gmail.com',
+            //       );
+            //       launchUrl(emailLaunchUri); // Sử dụng package url_launcher để mở email
+            //     },
+            //     child: RichText(
+            //       text: TextSpan(
+            //         children: [
+            //           TextSpan(
+            //             text: 'Liên hệ ',
+            //             style: TextStyle(
+            //               fontSize: 16,
+            //               color: Colors.black87,
+            //             ),
+            //           ),
+            //           TextSpan(
+            //             text: 'luandangnhap@gmail.com',
+            //             style: TextStyle(
+            //               fontSize: 16,
+            //               color: Colors.red, // Màu đỏ cho email
+            //               decoration: TextDecoration.underline, // Thêm gạch chân để trông như link
+            //             ),
+            //           ),
+            //           TextSpan(
+            //             text: ' nếu cần hỗ trợ.',
+            //             style: TextStyle(
+            //               fontSize: 16,
+            //               color: Colors.black87,
+            //             ),
+            //           ),
+            //         ],
+            //       ),
+            //     ),
+            //   ),
+            // ),
             const SizedBox(height: 12),
 
             // Họ và tên

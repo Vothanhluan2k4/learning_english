@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:intl/intl.dart';
 import '../services/statistics_service.dart';
 
 class StatisticalScreen extends StatefulWidget {
@@ -14,20 +15,46 @@ class _StatisticalScreenState extends State<StatisticalScreen> {
   final _statisticsService = StatisticsService();
   
   StatisticsData? _statistics;
-  bool isLoading = true;
+  bool isLoadingData = true;
+  bool isRefreshing = false; // refresh vs full load
+
+  // Date range filter
+  DateTime? _startDate;
+  DateTime? _endDate;
+  
+  // Predefined filters
+  String _selectedFilter = '30_days';
 
   @override
   void initState() {
     super.initState();
-    _loadStatistics();
+    _initializeDateRange();
+    _loadStatistics(showFullLoading: true);
   }
 
-  Future<void> _loadStatistics() async {
-    setState(() => isLoading = true);
+  void _initializeDateRange() {
+    _endDate = DateTime.now();
+    _startDate = _endDate!.subtract(const Duration(days: 30));
+  }
+
+  Future<void> _loadStatistics({bool showFullLoading = false}) async {
+    if (showFullLoading) {
+      setState(() => isLoadingData = true);
+    } else {
+      setState(() => isRefreshing = true);
+    }
     
     try {
-      _statistics = await _statisticsService.loadStatistics();
-      setState(() => isLoading = false);
+      final data = await _statisticsService.loadStatistics(
+        startDate: _startDate,
+        endDate: _endDate,
+      );
+      
+      setState(() {
+        _statistics = data;
+        isLoadingData = false;
+        isRefreshing = false;
+      });
     } catch (e) {
       print('Error loading statistics: $e');
       if (mounted) {
@@ -35,47 +62,128 @@ class _StatisticalScreenState extends State<StatisticalScreen> {
           SnackBar(
             content: Text('Lỗi tải thống kê: ${e.toString()}'),
             backgroundColor: Colors.red,
-            duration: const Duration(seconds: 5),
+            duration: const Duration(seconds: 3),
           ),
         );
       }
-      setState(() => isLoading = false);
+      setState(() {
+        isLoadingData = false;
+        isRefreshing = false;
+      });
+    }
+  }
+
+  void _applyQuickFilter(String filter) {
+    setState(() {
+      _selectedFilter = filter;
+      _endDate = DateTime.now();
+      
+      switch (filter) {
+        case '7_days':
+          _startDate = _endDate!.subtract(const Duration(days: 7));
+          break;
+        case '30_days':
+          _startDate = _endDate!.subtract(const Duration(days: 30));
+          break;
+        case '90_days':
+          _startDate = _endDate!.subtract(const Duration(days: 90));
+          break;
+        case 'all_time':
+          _startDate = DateTime(2025, 9, 1);
+          break;
+      }
+    });
+    _loadStatistics(showFullLoading: false); // Không show full loading
+  }
+
+  Future<void> _selectDateRange() async {
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2025, 9, 1),
+      lastDate: DateTime.now(),
+      initialDateRange: _startDate != null && _endDate != null
+          ? DateTimeRange(start: _startDate!, end: _endDate!)
+          : null,
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: Colors.blue,
+              onPrimary: Colors.white,
+              surface: Colors.white,
+              onSurface: Colors.black,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      setState(() {
+        _selectedFilter = 'custom';
+        _startDate = picked.start;
+        _endDate = picked.end;
+      });
+      _loadStatistics(showFullLoading: false); // Không show full loading
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (isLoading || _statistics == null) {
+    // Chỉ show loading spinner lần đầu
+    if (isLoadingData && _statistics == null) {
       return const Center(child: CircularProgressIndicator());
     }
 
     return Scaffold(
       body: RefreshIndicator(
-        onRefresh: _loadStatistics,
+        onRefresh: () => _loadStatistics(showFullLoading: false),
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Date Filter Section
+              _buildDateFilter(),
+              const SizedBox(height: 16),
+
+              // Linear progress indicator khi refresh - GỌN GÀN HƠN
+              if (isRefreshing)
+                Column(
+                  children: const [
+                    LinearProgressIndicator(color: Colors.blue),
+                    SizedBox(height: 16),
+                  ],
+                ),
+
               // Overview Cards
-              _buildSectionTitle('Tổng quan'),
-              const SizedBox(height: 12),
-              _buildOverviewCards(),
-              const SizedBox(height: 24),
+              AnimatedOpacity(
+                opacity: isRefreshing ? 0.6 : 1.0,
+                duration: const Duration(milliseconds: 200),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildSectionTitle('Tổng quan'),
+                    const SizedBox(height: 12),
+                    _buildOverviewCards(),
+                    const SizedBox(height: 24),
 
-              // Exercise Progress Chart
-              _buildSectionTitle('Bài tập ngữ pháp'),
-              const SizedBox(height: 12),
-              _buildWeeklyExercisesBarChart(),
-              const SizedBox(height: 24),
+                    // Exercise Progress Chart
+                    _buildSectionTitle('Bài tập ngữ pháp'),
+                    const SizedBox(height: 12),
+                    _buildWeeklyExercisesBarChart(),
+                    const SizedBox(height: 24),
 
-              // Exercise Accuracy Pie Chart
-              _buildSectionTitle('Tỷ lệ làm bài ngữ pháp'),
-              const SizedBox(height: 12),
-              _buildAccuracyPieChart(),
-              const SizedBox(height: 24),
-
+                    // Exercise Accuracy Pie Chart
+                    _buildSectionTitle('Tỷ lệ làm bài ngữ pháp'),
+                    const SizedBox(height: 12),
+                    _buildAccuracyPieChart(),
+                    const SizedBox(height: 24),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
@@ -83,7 +191,106 @@ class _StatisticalScreenState extends State<StatisticalScreen> {
     );
   }
 
+  Widget _buildDateFilter() {
+    final dateFormat = DateFormat('dd/MM/yyyy');
+    
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.filter_list, size: 20),
+                const SizedBox(width: 8),
+                const Text(
+                  'Lọc theo thời gian',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const Spacer(),
+                if (_startDate != null && _endDate != null)
+                  Text(
+                    '${dateFormat.format(_startDate!)} - ${dateFormat.format(_endDate!)}',
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            
+            // Quick filter buttons
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _buildFilterChip('7 ngày', '7_days'),
+                  const SizedBox(width: 8),
+                  _buildFilterChip('30 ngày', '30_days'),
+                  const SizedBox(width: 8),
+                  _buildFilterChip('90 ngày', '90_days'),
+                  const SizedBox(width: 8),
+                  _buildFilterChip('Tất cả', 'all_time'),
+                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    onPressed: _selectDateRange,
+                    icon: const Icon(Icons.calendar_today, size: 16),
+                    label: const Text('Tùy chỉnh'),
+                    style: OutlinedButton.styleFrom(
+                      backgroundColor: _selectedFilter == 'custom'
+                          ? Colors.blue.withOpacity(0.1)
+                          : null,
+                      foregroundColor: _selectedFilter == 'custom'
+                          ? Colors.blue
+                          : Colors.grey[700],
+                      side: BorderSide(
+                        color: _selectedFilter == 'custom'
+                            ? Colors.blue
+                            : Colors.grey[300]!,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterChip(String label, String value) {
+    final isSelected = _selectedFilter == value;
+    
+    return FilterChip(
+      label: Text(label),
+      selected: isSelected,
+      onSelected: (selected) {
+        if (selected) _applyQuickFilter(value);
+      },
+      backgroundColor: Colors.white,
+      selectedColor: Colors.blue.withOpacity(0.2),
+      checkmarkColor: Colors.blue,
+      labelStyle: TextStyle(
+        color: isSelected ? Colors.blue : Colors.grey[700],
+        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+      ),
+      side: BorderSide(
+        color: isSelected ? Colors.blue : Colors.grey[300]!,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+      ),
+    );
+  }
+
   Widget _buildOverviewCards() {
+    if (_statistics == null) return const SizedBox.shrink();
+    
     return GridView.count(
       crossAxisCount: 2,
       shrinkWrap: true,
@@ -116,7 +323,6 @@ class _StatisticalScreenState extends State<StatisticalScreen> {
           _statistics!.totalLessonsCourseCompleted.toString(),
           Colors.teal,
         ),
-       
       ],
     );
   }
@@ -162,7 +368,7 @@ class _StatisticalScreenState extends State<StatisticalScreen> {
   }
 
   Widget _buildWeeklyExercisesBarChart() {
-    if (_statistics!.weeklyExercises.isEmpty) {
+    if (_statistics == null || _statistics!.weeklyExercises.isEmpty) {
       return Container(
         height: 200,
         alignment: Alignment.center,
@@ -247,7 +453,7 @@ class _StatisticalScreenState extends State<StatisticalScreen> {
   }
 
   Widget _buildAccuracyPieChart() {
-    if (_statistics!.totalExercisesCompleted == 0) {
+    if (_statistics == null || _statistics!.totalExercisesCompleted == 0) {
       return Container(
         height: 200,
         alignment: Alignment.center,

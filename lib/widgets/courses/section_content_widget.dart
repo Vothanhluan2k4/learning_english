@@ -1,25 +1,125 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:chewie/chewie.dart';
+import 'package:video_player/video_player.dart';
 import '../../models/lesson_section.dart';
 import '../../models/section_media.dart';
 import '../../models/lesson_question.dart';
 import '../../services/lesson_section_service.dart';
-import 'media_player_widget.dart';
 
-class SectionContentWidget extends StatelessWidget {
+class SectionContentWidget extends StatefulWidget {
   final LessonSection section;
   final List<SectionMedia> medias;
   final List<Map<String, dynamic>> questionsWithOptions;
   final bool allowReplay;
-  final _sectionService = LessonSectionService();
 
-  SectionContentWidget({
+  const SectionContentWidget({
     required this.section,
     required this.medias,
     required this.questionsWithOptions,
     this.allowReplay = true,
     super.key,
   });
+
+  @override
+  State<SectionContentWidget> createState() => _SectionContentWidgetState();
+}
+
+class _SectionContentWidgetState extends State<SectionContentWidget> {
+  final _sectionService = LessonSectionService();
+  final Map<int, VideoPlayerController> _videoControllers = {};
+  final Map<int, ChewieController> _chewieControllers = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeVideoPlayers();
+  }
+
+  @override
+  void dispose() {
+    // Dispose all controllers
+    _chewieControllers.forEach((_, controller) => controller.dispose());
+    _videoControllers.forEach((_, controller) => controller.dispose());
+    super.dispose();
+  }
+
+  /// Initialize video players for all video medias
+  void _initializeVideoPlayers() {
+    for (var i = 0; i < widget.medias.length; i++) {
+      final media = widget.medias[i];
+      if (media.mediaType == 'video') {
+        _initializeVideoPlayer(i, media.mediaUrl);
+      }
+    }
+  }
+
+  /// Initialize single video player
+  Future<void> _initializeVideoPlayer(int index, String videoUrl) async {
+    try {
+      final videoController = VideoPlayerController.networkUrl(
+        Uri.parse(videoUrl),
+      );
+
+      await videoController.initialize();
+
+      final chewieController = ChewieController(
+        videoPlayerController: videoController,
+        autoPlay: false,
+        looping: widget.allowReplay,
+        aspectRatio: videoController.value.aspectRatio,
+        allowFullScreen: true,
+        allowMuting: true,
+        showControls: true,
+        materialProgressColors: ChewieProgressColors(
+          playedColor: Colors.blue,
+          handleColor: Colors.blueAccent,
+          backgroundColor: Colors.grey,
+          bufferedColor: Colors.lightBlue,
+        ),
+        placeholder: Container(
+          color: Colors.black,
+          child: const Center(
+            child: CircularProgressIndicator(),
+          ),
+        ),
+        errorBuilder: (context, errorMessage) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.error_outline,
+                  color: Colors.red,
+                  size: 48,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Lỗi tải video',
+                  style: TextStyle(color: Colors.red.shade700),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  errorMessage,
+                  style: const TextStyle(fontSize: 12),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          );
+        },
+      );
+
+      if (mounted) {
+        setState(() {
+          _videoControllers[index] = videoController;
+          _chewieControllers[index] = chewieController;
+        });
+      }
+    } catch (e) {
+      debugPrint('❌ Error initializing video $index: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -33,9 +133,9 @@ class SectionContentWidget extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min, // ✅ IMPORTANT: Prevent unbounded height
+          mainAxisSize: MainAxisSize.min,
           children: [
-            // ✅ Section title
+            // Section title
             Row(
               children: [
                 Icon(
@@ -46,7 +146,7 @@ class SectionContentWidget extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    section.sectionTitle,
+                    widget.section.sectionTitle,
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -57,20 +157,20 @@ class SectionContentWidget extends StatelessWidget {
             ),
             const SizedBox(height: 12),
 
-            // ✅ Content markdown - render với ký hiệu
-            if (section.content != null) ...[
-              _buildMarkdownContent(context, section.content!),
+            // Content markdown
+            if (widget.section.content != null) ...[
+              _buildMarkdownContent(context, widget.section.content!),
               const SizedBox(height: 16),
             ],
 
-            // ✅ Media content
-            if (medias.isNotEmpty) ...[
+            // Media content
+            if (widget.medias.isNotEmpty) ...[
               _buildMediaContent(context),
               const SizedBox(height: 16),
             ],
 
-            // ✅ Questions
-            if (questionsWithOptions.isNotEmpty) ...[
+            // Questions
+            if (widget.questionsWithOptions.isNotEmpty) ...[
               _buildQuestionsContent(),
             ],
           ],
@@ -79,292 +179,243 @@ class SectionContentWidget extends StatelessWidget {
     );
   }
 
-  /// ✅ Build markdown content với styling
+  /// Build markdown content
   Widget _buildMarkdownContent(BuildContext context, String content) {
-    return SingleChildScrollView( // ✅ FIX: Wrap with SingleChildScrollView
-      child: MarkdownBody(
-        data: content,
-        selectable: true,
-        shrinkWrap: true, // ✅ IMPORTANT: Allow markdown to shrink
-        styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
-          // ✅ Heading styles
-          h1: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Colors.blue.shade900,
-            height: 1.5,
-            letterSpacing: 0.5,
-          ),
-          h2: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Colors.blue.shade800,
-            height: 1.4,
-            letterSpacing: 0.3,
-          ),
-          h3: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            color: Colors.blue.shade700,
-            height: 1.3,
-            letterSpacing: 0.2,
-          ),
-          // ✅ Paragraph style
-          p: TextStyle(
-            fontSize: 14,
-            color: Colors.grey.shade700,
-            height: 1.6,
-          ),
-          // ✅ Code inline style
-          code: TextStyle(
-            backgroundColor: Colors.grey.shade200,
-            color: Colors.red.shade700,
-            fontFamily: 'Courier New',
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-          ),
-          // ✅ Code block decoration
-          codeblockDecoration: BoxDecoration(
-            color: Colors.grey.shade900,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: Colors.grey.shade700,
-              width: 1,
-            ),
-          ),
-          codeblockPadding: const EdgeInsets.all(12),
-          // ✅ List bullet style
-          listBullet: TextStyle(
-            fontSize: 14,
-            color: Colors.grey.shade700,
-            height: 1.6,
-          ),
-          // ✅ Blockquote style
-          blockquote: TextStyle(
-            fontSize: 13,
-            color: Colors.grey.shade600,
-            fontStyle: FontStyle.italic,
-            height: 1.5,
-          ),
-          blockquoteDecoration: BoxDecoration(
-            color: Colors.blue.shade50,
-            border: Border(
-              left: BorderSide(
-                color: Colors.blue.shade300,
-                width: 4,
-              ),
-            ),
-            borderRadius: BorderRadius.circular(4),
-          ),
-          blockquotePadding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-          // ✅ Table styles
-          tableHead: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-            backgroundColor: Colors.blue.shade700,
-          ),
-          tableBody: TextStyle(
-            fontSize: 12,
-            color: Colors.grey.shade700,
-            height: 1.5,
-          ),
-          tableBorder: TableBorder.all(
-            color: Colors.grey.shade300,
-            width: 1,
-            borderRadius: BorderRadius.circular(4),
-          ),
-          tableCellsPadding: const EdgeInsets.symmetric(
-            horizontal: 12,
-            vertical: 8,
-          ),
-          // ✅ Link style
-          a: TextStyle(
-            color: Colors.blue.shade700,
-            decoration: TextDecoration.underline,
-            fontWeight: FontWeight.w500,
-          ),
-          // ✅ Horizontal rule
-          horizontalRuleDecoration: BoxDecoration(
-            border: Border(
-              top: BorderSide(
-                color: Colors.grey.shade300,
-                width: 2,
-              ),
-            ),
-          ),
+    return MarkdownBody(
+      data: content,
+      selectable: true,
+      shrinkWrap: true,
+      styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
+        h1: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+          color: Colors.blue.shade900,
+          height: 1.5,
         ),
-        // ✅ Image builder
-        imageBuilder: (uri, title, alt) {
-          return Container(
-            margin: const EdgeInsets.symmetric(vertical: 8),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.grey.shade300),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.network(
-                uri.toString(),
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    height: 150,
-                    color: Colors.grey.shade200,
-                    child: const Center(
-                      child: Icon(Icons.image_not_supported),
-                    ),
-                  );
-                },
-              ),
-            ),
-          );
-        },
-        // ✅ Link callback
-        onTapLink: (text, href, title) {
-          debugPrint('Link tapped: $href');
-          // TODO: Implement link handling
-        },
+        h2: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+          color: Colors.blue.shade800,
+          height: 1.4,
+        ),
+        p: TextStyle(
+          fontSize: 14,
+          color: Colors.grey.shade700,
+          height: 1.6,
+        ),
+        code: TextStyle(
+          backgroundColor: Colors.grey.shade200,
+          color: Colors.red.shade700,
+          fontFamily: 'Courier New',
+          fontSize: 12,
+        ),
       ),
     );
   }
 
-  /// ✅ Build media - hỗ trợ nhiều video
+  /// Build media content với Chewie player
   Widget _buildMediaContent(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        // ✅ Tiêu đề media section
-        if (medias.isNotEmpty)
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-            decoration: BoxDecoration(
-              color: Colors.teal.shade50,
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.video_library,
-                  color: Colors.teal.shade700,
-                  size: 18,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'Tài liệu học tập (${medias.length})',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.teal.shade700,
-                  ),
-                ),
-              ],
-            ),
+        // Media section header
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+          decoration: BoxDecoration(
+            color: Colors.teal.shade50,
+            borderRadius: BorderRadius.circular(6),
           ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.video_library,
+                color: Colors.teal.shade700,
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Tài liệu học tập (${widget.medias.length})',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.teal.shade700,
+                ),
+              ),
+            ],
+          ),
+        ),
         const SizedBox(height: 12),
 
-        // ✅ Danh sách media
-        ...medias.asMap().entries.map((entry) {
+        // Media list
+        ...widget.medias.asMap().entries.map((entry) {
           final index = entry.key;
           final media = entry.value;
-          final isVideo = media.mediaType == 'video';
-          final isAudio = media.mediaType == 'audio';
-          final isImage = media.mediaType == 'image';
-
-          return Container(
-            margin: const EdgeInsets.only(bottom: 16),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.grey.shade50,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.grey.shade200),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // ✅ Media header
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isVideo
-                            ? Colors.red.shade700
-                            : isAudio
-                                ? Colors.blue.shade700
-                                : Colors.green.shade700,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        isVideo ? 'VIDEO' : isAudio ? 'AUDIO' : 'IMAGE',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (media.caption != null)
-                            Text(
-                              media.caption!,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            )
-                          else
-                            Text(
-                              'Media ${index + 1}',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          const SizedBox(height: 2),
-                          Text(
-                            media.mediaUrl.split('/').last,
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Colors.grey.shade600,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-
-                // ✅ Media player
-                MediaPlayerWidget(
-                  mediaType: media.mediaType,
-                  mediaUrl: media.mediaUrl,
-                  caption: null, // Đã show ở trên
-                  allowReplay: allowReplay,
-                ),
-              ],
-            ),
-          );
+          
+          return _buildMediaItem(index, media);
         }).toList(),
       ],
     );
   }
 
-  /// ✅ Build questions
+  /// Build single media item
+  Widget _buildMediaItem(int index, SectionMedia media) {
+    final isVideo = media.mediaType == 'video';
+    final isAudio = media.mediaType == 'audio';
+    final isImage = media.mediaType == 'image';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Media header
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: isVideo
+                      ? Colors.red.shade700
+                      : isAudio
+                          ? Colors.blue.shade700
+                          : Colors.green.shade700,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  isVideo ? 'VIDEO' : isAudio ? 'AUDIO' : 'IMAGE',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  media.caption ?? 'Media ${index + 1}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Media player
+          if (isVideo)
+            _buildVideoPlayer(index)
+          else if (isAudio)
+            _buildAudioPlayer(media.mediaUrl)
+          else if (isImage)
+            _buildImageViewer(media.mediaUrl),
+        ],
+      ),
+    );
+  }
+
+  /// Build Chewie video player
+  Widget _buildVideoPlayer(int index) {
+    final chewieController = _chewieControllers[index];
+
+    if (chewieController == null) {
+      return Container(
+        height: 200,
+        decoration: BoxDecoration(
+          color: Colors.black,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Center(
+          child: CircularProgressIndicator(color: Colors.white),
+        ),
+      );
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: AspectRatio(
+        aspectRatio: chewieController.videoPlayerController.value.aspectRatio,
+        child: Chewie(controller: chewieController),
+      ),
+    );
+  }
+
+  /// Build audio player
+  Widget _buildAudioPlayer(String audioUrl) {
+    return Container(
+      height: 80,
+      decoration: BoxDecoration(
+        color: Colors.blue.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.blue.shade200),
+      ),
+      child: Center(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.audiotrack, color: Colors.blue.shade700),
+            const SizedBox(width: 8),
+            Text(
+              'Audio Player',
+              style: TextStyle(color: Colors.blue.shade700),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Build image viewer
+  Widget _buildImageViewer(String imageUrl) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: Image.network(
+        imageUrl,
+        fit: BoxFit.cover,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return Container(
+            height: 200,
+            color: Colors.grey.shade200,
+            child: Center(
+              child: CircularProgressIndicator(
+                value: loadingProgress.expectedTotalBytes != null
+                    ? loadingProgress.cumulativeBytesLoaded /
+                        loadingProgress.expectedTotalBytes!
+                    : null,
+              ),
+            ),
+          );
+        },
+        errorBuilder: (context, error, stackTrace) {
+          return Container(
+            height: 200,
+            color: Colors.grey.shade200,
+            child: const Center(
+              child: Icon(Icons.broken_image, size: 48),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  /// Build questions content
   Widget _buildQuestionsContent() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -386,7 +437,7 @@ class SectionContentWidget extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        ...questionsWithOptions.asMap().entries.map((entry) {
+        ...widget.questionsWithOptions.asMap().entries.map((entry) {
           final index = entry.key;
           final data = entry.value;
           final question = data['question'] as LessonQuestion;
@@ -398,8 +449,8 @@ class SectionContentWidget extends StatelessWidget {
     );
   }
 
-  /// ✅ Question card
-  Widget _buildQuestionCard(int number, dynamic question, List options) {
+  /// Question card
+  Widget _buildQuestionCard(int number, LessonQuestion question, List options) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
@@ -500,7 +551,7 @@ class SectionContentWidget extends StatelessWidget {
   }
 
   IconData _getSectionIcon() {
-    switch (section.sectionType) {
+    switch (widget.section.sectionType) {
       case 'text':
         return Icons.description;
       case 'video':

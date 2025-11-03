@@ -102,34 +102,34 @@ class _HomeScreenState extends State<HomeScreen> {
                       SizedBox(height: 24),
 
                       // CHALLENGE CARD
-                      // Padding(
-                      //   padding: EdgeInsets.symmetric(horizontal: 16),
-                      //   child: Column(
-                      //     crossAxisAlignment: CrossAxisAlignment.start,
-                      //     children: [
-                      //       Text(
-                      //         'Hoạt động nổi bật',
-                      //         style: TextStyle(
-                      //           fontSize: 20,
-                      //           fontWeight: FontWeight.bold,
-                      //           color: Color(0xFF1A1A1A),
-                      //         ),
-                      //       ),
-                      //       SizedBox(height: 16),
-                      //       _buildChallengeCard(),
-                      //     ],
-                      //   ),
-                      // ),
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Hoạt động nổi bật',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF1A1A1A),
+                              ),
+                            ),
+                            SizedBox(height: 16),
+                            _buildChallengeCard(),
+                          ],
+                        ),
+                      ),
 
-                      // SizedBox(height: 24),
+                      SizedBox(height: 24),
 
-                      // // LEARNING TIP
-                      // Padding(
-                      //   padding: EdgeInsets.symmetric(horizontal: 16),
-                      //   child: _buildLearningTipCard(),
-                      // ),
+                      // LEARNING TIP
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 16),
+                        child: _buildLearningTipCard(),
+                      ),
 
-                      // SizedBox(height: 24),
+                      SizedBox(height: 24),
 
                       // NOTIFICATIONS
                       // ...existing code...

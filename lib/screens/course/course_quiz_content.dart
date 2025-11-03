@@ -53,10 +53,6 @@ class _CourseQuizContentState extends State<CourseQuizContent> {
     _attemptIsPassed = null; // ✅ Initialize is_passed
      _correctCount = 0;
 
-    debugPrint('🎯 Quiz initialized');
-    debugPrint('   Target Score: ${widget.targetScore}');
-    debugPrint('   Total Questions: ${widget.totalQuestions}');
-    debugPrint('   Required Correct: ${_calculateRequiredCorrect()}');
 
     for (var q in widget.questions) {
       final question = q['question'] as LessonQuestion;

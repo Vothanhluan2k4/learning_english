@@ -99,8 +99,8 @@ class NotificationHelper {
           interruptionLevel: InterruptionLevel.active,
         ),
       ),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      matchDateTimeComponents: DateTimeComponents.time, // ✅ Repeat daily
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle, //  Ensure exact timing Idle
+      matchDateTimeComponents: DateTimeComponents.time, //  Repeat daily
     );
 
     // Save to SharedPreferences

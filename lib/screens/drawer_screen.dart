@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:learning_english/screens/profile/profile_screen.dart';
 import 'package:learning_english/screens/course/course_screen.dart';
-import 'package:learning_english/screens/flashcards_screen.dart' hide FlashcardsScreen;
 import 'package:learning_english/screens/course/course_screen.dart';
 import 'package:learning_english/screens/grammar_screen.dart';
 import 'package:learning_english/screens/home_screen.dart';
