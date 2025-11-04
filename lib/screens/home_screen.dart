@@ -499,7 +499,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 SizedBox(height: 8),
                 Text(
-                  'Bạn làm sai 3 câu về thì quá khứ – hãy ôn lại chủ đề Past Simple nhé!',
+                  'Bạn làm sai :..............!',
                   style: TextStyle(
                     fontSize: 14,
                     color: Color(0xFF1565C0),
@@ -509,7 +509,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 SizedBox(height: 12),
                 GestureDetector(
                   onTap: () {
-                    debugPrint('View lesson');
+                    Navigator.pushNamed(context, '/chooseLearning');
                   },
                   child: Container(
                     padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),

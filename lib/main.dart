@@ -3,7 +3,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:learning_english/core/supabase_config.dart';
 import 'package:learning_english/core/uni_links.dart';
 import 'package:learning_english/helpers/notification_helper.dart';
-import 'package:learning_english/screens/course/chosse_course_screen.dart';
+import 'package:learning_english/screens/course/choose_course_screen.dart';
 import 'package:learning_english/screens/course/course_lesson_detail_screen.dart';
 import 'package:learning_english/screens/course/course_lessons_screen.dart';
 import 'package:learning_english/screens/course/course_modules_screen.dart';
@@ -12,6 +12,7 @@ import 'package:learning_english/screens/course/placement_test_screen.dart';
 import 'package:learning_english/screens/drawer_screen.dart';
 import 'package:learning_english/screens/forgot_password_screen.dart';
 import 'package:learning_english/screens/home_screen.dart';
+import 'package:learning_english/screens/learning_hub/choose_learning_screen.dart';
 import 'package:learning_english/screens/profile/infor_user_screen.dart';
 import 'package:learning_english/screens/flashcard/flashcards_screen.dart';
 import 'package:learning_english/screens/course/course_screen.dart';
@@ -137,6 +138,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         '/home': (context) => const HomeScreen(),
         '/grammar': (context) => const GrammarScreen(),
         '/chooseCourse': (context) => const ChooseCourseScreen(),
+        '/chooseLearning': (context) => const ChooseLearningScreen(),
         '/placementTest': (context) => const PlacementTestScreen(),
         '/courses': (context) => const CourseScreen(),
         '/courseModules': (context) {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:learning_english/models/exercise_progress.dart';
+import 'package:learning_english/services/auth_service.dart';
 import 'package:learning_english/services/exercise_progress_service.dart';
 import 'package:learning_english/services/grammar_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -13,16 +14,20 @@ class ExerciseScreen extends StatefulWidget {
 }
 
 class _ExerciseScreenState extends State<ExerciseScreen> {
-  final userId = Supabase.instance.client.auth.currentUser?.id;
   final _exerciseProgressService = ExerciseProgressService();
   final GrammarService _grammarService = GrammarService();
+  final _authService = AuthService();
+  final _supabase = Supabase.instance.client;
 
   List<Map<String, dynamic>> _exercises = [];
-  Map<String, bool> _progressResults = {}; // Kết quả từ DB
+  Map<String, bool> _progressResults = {};
   Map<String, String?> _answers = {};
-  Set<String> _submittedExercises = {}; // Track câu đã nộp
+  Set<String> _submittedExercises = {};
   bool _loading = true;
   int _correctCount = 0;
+  
+  // ✅ Cache userId để tránh gọi nhiều lần
+  String? _cachedUserId;
 
   @override
   void initState() {
@@ -30,13 +35,34 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
     _loadExercisesAndProgress();
   }
 
+  // ✅ Sửa lại hàm _getUserId() để cache kết quả
+  Future<String> _getUserId() async {
+    // Nếu đã cache, trả về luôn
+    if (_cachedUserId != null) return _cachedUserId!;
+
+    final authUser = _supabase.auth.currentUser;
+    if (authUser == null) throw Exception('User not authenticated');
+
+    final authId = authUser.id;
+    final userId = await _authService.getUserIdFromAuthId(authId);
+    if (userId == null) throw Exception('User not found');
+    
+    // Cache lại để dùng sau
+    _cachedUserId = userId;
+    return userId;
+  }
+
+  // ✅ Sửa lại _loadExercisesAndProgress()
   Future<void> _loadExercisesAndProgress() async {
     setState(() => _loading = true);
 
     try {
+      final userId = await _getUserId();
+      
       final exercises = await _grammarService.getExercisesByLesson(widget.lessonId);
+      
       final progress = await _exerciseProgressService.getProgressByLesson(
-        userId!,
+        userId,  
         widget.lessonId,
       );
 
@@ -68,125 +94,142 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
     }
   }
 
-  // Nộp từng câu
+  // Successfully submit a single exercise
   Future<void> _submitSingleExercise(Map<String, dynamic> exercise) async {
-    if (userId == null) return;
+    try {
+      final userId = await _getUserId();  
 
-    final exerciseId = exercise['id'];
-    final userAnswer = _answers[exerciseId]?.trim().toLowerCase() ?? '';
-    final correctAnswer = exercise['correct_answer']?.trim().toLowerCase() ?? '';
-    final isCorrect = userAnswer == correctAnswer;
+      final exerciseId = exercise['id'];
+      final userAnswer = _answers[exerciseId]?.trim().toLowerCase() ?? '';
+      final correctAnswer = exercise['correct_answer']?.trim().toLowerCase() ?? '';
+      final isCorrect = userAnswer == correctAnswer;
 
-    // Save vào DB
-    await _exerciseProgressService.saveProgress(
-      ExerciseProgress(
-        userId: userId!,
-        lessonId: widget.lessonId,
-        exerciseId: exerciseId,
-        userAnswer: userAnswer,
-        isCorrect: isCorrect,
-        explanation: exercise['explanation'] ?? '',
-        completedAt: DateTime.now(),
-      ),
-    );
+      // Save vào DB
+      await _exerciseProgressService.saveProgress(
+        ExerciseProgress(
+          userId: userId, 
+          lessonId: widget.lessonId,
+          exerciseId: exerciseId,
+          userAnswer: userAnswer,
+          isCorrect: isCorrect,
+          explanation: exercise['explanation'] ?? '',
+          completedAt: DateTime.now(),
+        ),
+      );
 
-    setState(() {
-      _progressResults[exerciseId] = isCorrect;
-      _submittedExercises.add(exerciseId);
-      if (isCorrect) {
-        _correctCount++;
-      } else {
-        // Nếu submit lại câu đã đúng trước đó mà bây giờ sai
-        if (_progressResults[exerciseId] == true && !isCorrect) {
-          _correctCount--;
+      setState(() {
+        _progressResults[exerciseId] = isCorrect;
+        _submittedExercises.add(exerciseId);
+        if (isCorrect) {
+          _correctCount++;
+        } else {
+          if (_progressResults[exerciseId] == true && !isCorrect) {
+            _correctCount--;
+          }
         }
-      }
-    });
+      });
 
-    // Show snackbar feedback
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(
-              isCorrect ? Icons.check_circle : Icons.cancel,
-              color: Colors.white,
+      // Show snackbar feedback
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(
+                isCorrect ? Icons.check_circle : Icons.cancel,
+                color: Colors.white,
+              ),
+              SizedBox(width: 12),
+              Text(isCorrect ? 'Chính xác! 🎉' : 'Sai rồi, xem giải thích nhé!'),
+            ],
+          ),
+          backgroundColor: isCorrect ? Colors.green : Colors.red,
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      print('❌ Error submitting exercise: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Lỗi khi nộp bài: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  //  Reset a single exercise
+  Future<void> _resetSingleExercise(String exerciseId) async {
+    try {
+      final userId = await _getUserId();  
+
+      await _exerciseProgressService.deleteSingleProgress(userId, exerciseId);
+
+      setState(() {
+        final wasCorrect = _progressResults[exerciseId] ?? false;
+        if (wasCorrect) _correctCount--;
+
+        _answers.remove(exerciseId);
+        _progressResults.remove(exerciseId);
+        _submittedExercises.remove(exerciseId);
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Đã reset câu này. Hãy làm lại!'),
+          backgroundColor: Colors.blue[600],
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      print('❌ Error resetting exercise: $e');
+    }
+  }
+
+  //  Reset all exercises
+  Future<void> _resetAll() async {
+    try {
+      final userId = await _getUserId();  
+
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text('Reset tất cả?'),
+          content: Text('Bạn có chắc muốn reset toàn bộ bài tập?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text('Hủy', style: TextStyle(color: Colors.black)),
             ),
-            SizedBox(width: 12),
-            Text(isCorrect ? 'Chính xác! 🎉' : 'Sai rồi, xem giải thích nhé!'),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              child: Text('Reset', style: TextStyle(color: Colors.white)),
+            ),
           ],
         ),
-        backgroundColor: isCorrect ? Colors.green : Colors.red,
-        behavior: SnackBarBehavior.floating,
-        duration: Duration(seconds: 2),
-      ),
-    );
-  }
+      );
 
-  // Reset 1 câu
-  Future<void> _resetSingleExercise(String exerciseId) async {
-    if (userId == null) return;
+      if (confirm != true) return;
 
-    await _exerciseProgressService.deleteSingleProgress(userId!, exerciseId);
+      await _exerciseProgressService.resetProgress(userId, widget.lessonId);
 
-    setState(() {
-      final wasCorrect = _progressResults[exerciseId] ?? false;
-      if (wasCorrect) _correctCount--;
+      setState(() {
+        _answers.clear();
+        _progressResults.clear();
+        _submittedExercises.clear();
+        _correctCount = 0;
+      });
 
-      _answers.remove(exerciseId);
-      _progressResults.remove(exerciseId);
-      _submittedExercises.remove(exerciseId);
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Đã reset câu này. Hãy làm lại!'),
-        backgroundColor: Colors.blue[600],
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
-
-  // Reset toàn bộ
-  Future<void> _resetAll() async {
-    if (userId == null) return;
-
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Reset tất cả?'),
-        content: Text('Bạn có chắc muốn reset toàn bộ bài tập?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text('Hủy', style: TextStyle(color: Colors.black),),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: Text('Reset', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm != true) return;
-
-    await _exerciseProgressService.resetProgress(userId!, widget.lessonId);
-
-    setState(() {
-      _answers.clear();
-      _progressResults.clear();
-      _submittedExercises.clear();
-      _correctCount = 0;
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Đã reset toàn bộ bài tập!'),
-        backgroundColor: Colors.blue[600],
-      ),
-    );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Đã reset toàn bộ bài tập!'),
+          backgroundColor: Colors.blue[600],
+        ),
+      );
+    } catch (e) {
+      print('❌ Error resetting all: $e');
+    }
   }
 
   @override
