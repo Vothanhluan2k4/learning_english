@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart' hide Notification;
 import 'package:learning_english/models/notification.dart';
-import 'package:learning_english/utils/date_formatter.dart';
+import 'package:learning_english/core/utils/date_formatter.dart';
 
 class CommunityNotificationsScreen extends StatelessWidget {
   final List<CommunityNotification> notifications;

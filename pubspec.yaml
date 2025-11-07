@@ -36,6 +36,8 @@ dependencies:
   timezone: ^0.10.1
   flutter_local_notifications: ^19.5.0
   fl_chart: ^1.1.1
+  encrypt: ^5.0.3
+  confetti: ^0.8.0
 
 dev_dependencies:
   flutter_test:

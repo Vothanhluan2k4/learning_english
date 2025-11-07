@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:learning_english/models/notification.dart';
 import 'package:learning_english/services/notification_service.dart';
-import 'package:learning_english/utils/date_formatter.dart';
+import 'package:learning_english/core/utils/date_formatter.dart';
 
 class AllCommunityNotificationsScreen extends StatefulWidget {
   const AllCommunityNotificationsScreen({super.key});

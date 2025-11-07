@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'package:learning_english/core/supabase_config.dart';
-import 'package:learning_english/core/uni_links.dart';
+import 'package:learning_english/core/config/supabase_config.dart';
 import 'package:learning_english/helpers/notification_helper.dart';
 import 'package:learning_english/screens/course/choose_course_screen.dart';
 import 'package:learning_english/screens/course/course_lesson_detail_screen.dart';
@@ -10,16 +8,13 @@ import 'package:learning_english/screens/course/course_modules_screen.dart';
 import 'package:learning_english/screens/course/final_test_screen.dart';
 import 'package:learning_english/screens/course/placement_test_screen.dart';
 import 'package:learning_english/screens/drawer_screen.dart';
-import 'package:learning_english/screens/forgot_password_screen.dart';
+import 'package:learning_english/screens/auth/forgot_password_screen.dart';
 import 'package:learning_english/screens/home_screen.dart';
-import 'package:learning_english/screens/learning_hub/choose_learning_screen.dart';
 import 'package:learning_english/screens/profile/infor_user_screen.dart';
-import 'package:learning_english/screens/flashcard/flashcards_screen.dart';
 import 'package:learning_english/screens/course/course_screen.dart';
-import 'package:learning_english/screens/grammar_screen.dart';
-import 'package:learning_english/screens/signIn_screen.dart';
-import 'package:learning_english/screens/signUp_screen.dart';
-import 'package:learning_english/screens/verify_otp_screen.dart' hide ForgotPasswordScreen;
+import 'package:learning_english/screens/grammar/grammar_screen.dart';
+import 'package:learning_english/screens/auth/signIn_screen.dart';
+import 'package:learning_english/screens/auth/signUp_screen.dart';
 import 'package:learning_english/screens/welcome_screen.dart';
 import 'package:learning_english/services/auth_service.dart'; // Import AuthService
 import 'dart:async';
@@ -32,11 +27,8 @@ void main() async{
   WidgetsFlutterBinding.ensureInitialized();
   final prefs = await SharedPreferences.getInstance();
   final bool isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
-
   //initialize Supabase
   await SupabaseConfig.initialize();
-  final deepLinkService = DeepLinkService();
-  await deepLinkService.initDeepLinks();
 
   // Initialize Google Sign In
   final googleAuth = GoogleAuthService();
@@ -138,7 +130,6 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         '/home': (context) => const HomeScreen(),
         '/grammar': (context) => const GrammarScreen(),
         '/chooseCourse': (context) => const ChooseCourseScreen(),
-        '/chooseLearning': (context) => const ChooseLearningScreen(),
         '/placementTest': (context) => const PlacementTestScreen(),
         '/courses': (context) => const CourseScreen(),
         '/courseModules': (context) {

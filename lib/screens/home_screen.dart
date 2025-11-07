@@ -4,8 +4,10 @@ import 'package:learning_english/screens/drawer_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:learning_english/models/notification.dart';
 import 'package:learning_english/services/notification_service.dart';
-import 'package:learning_english/utils/date_formatter.dart';
+import 'package:learning_english/services/learning_service.dart'; // 🔥 NEW
+import 'package:learning_english/core/utils/date_formatter.dart';
 import 'package:learning_english/screens/community_notifications_screen.dart';
+import 'package:learning_english/screens/learning_hub/choose_learning_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -16,12 +18,18 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   late NotificationService _notificationService;
-  late String userId;
+  late LearningService _learningService;
+  late String authId;
+  String? userId; // User ID from users table
 
   UserInfo? userInfo;
   NotificationModel? personalNotification;
   List<CommunityNotification> communityNotifications = [];
   int unreadCount = 0;
+  
+  String? learningSuggestion;
+  LearningMistake? topMistake;
+  List<LearningMistake> allMistakes = []; // 🔥 NEW: Store all mistakes
 
   bool isLoading = true;
 
@@ -35,28 +43,77 @@ class _HomeScreenState extends State<HomeScreen> {
   void _initializeService() {
     final supabase = Supabase.instance.client;
     _notificationService = NotificationService(supabase: supabase);
-    userId = supabase.auth.currentUser?.id ?? '';
+    _learningService = LearningService(supabase: supabase);
+    authId = supabase.auth.currentUser?.id ?? '';
   }
 
   Future<void> _loadData() async {
     try {
       setState(() => isLoading = true);
 
-      // 1. Lấy thông tin user hiện tại
-      userInfo = await _notificationService.getUserInfo(userId);
-      // 2. Lấy thông báo CỘNG ĐỒNG (tất cả users có điểm > 70)
-      communityNotifications =
-          await _notificationService.getCommunityNotifications(limit: 10);
+      // 🔥 FIX: Get userId using LearningService
+      userId = await _learningService.getCurrentUserId();
       
-      // 3. Đếm thông báo chưa đọc (chỉ của user hiện tại)
-      unreadCount = await _notificationService.getUnreadCount(userId);
+      if (userId == null) {
+        debugPrint('⚠️ Could not get user ID');
+        setState(() => isLoading = false);
+        return;
+      }
 
-      debugPrint('📊 Personal: ${personalNotification != null ? 1 : 0}, Community: ${communityNotifications.length}');
+      debugPrint('✅ User ID loaded: $userId');
+
+      // Load data in parallel
+      await Future.wait([
+        _loadUserInfo(),
+        _loadNotifications(),
+        _loadLearningSuggestion(),
+      ]);
 
       setState(() => isLoading = false);
     } catch (e) {
       debugPrint('❌ Error loading data: $e');
       setState(() => isLoading = false);
+    }
+  }
+
+  Future<void> _loadUserInfo() async {
+    userInfo = await _notificationService.getUserInfo(authId);
+  }
+
+  Future<void> _loadNotifications() async {
+    communityNotifications = await _notificationService.getCommunityNotifications(limit: 10);
+    unreadCount = await _notificationService.getUnreadCount(authId);
+  }
+
+  Future<void> _loadLearningSuggestion() async {
+    try {
+      if (userId == null) {
+        debugPrint('⚠️ User ID not available, skipping learning suggestion');
+        learningSuggestion = 'Hãy làm thêm bài tập để nhận gợi ý học tập!';
+        return;
+      }
+
+      debugPrint('📊 Loading learning suggestion for user: $userId');
+      
+      // 🔥 FIX: Get ALL mistakes
+      allMistakes = await _learningService.getTopMistakes(userId!);
+      
+      if (allMistakes.isNotEmpty) {
+        topMistake = allMistakes.first;
+        
+        // Calculate total mistakes
+        final totalMistakes = allMistakes.fold<int>(0, (sum, m) => sum + m.mistakeCount);
+        
+        learningSuggestion = 'Bạn làm sai $totalMistakes câu trong ${allMistakes.length} chủ đề!';
+        debugPrint('💡 Learning suggestion: $learningSuggestion');
+        debugPrint('📋 All mistakes: ${allMistakes.map((m) => '${m.lessonName}: ${m.mistakeCount}').join(', ')}');
+      } else {
+        learningSuggestion = 'Hãy làm thêm bài tập để nhận gợi ý học tập!';
+        debugPrint('💡 No mistakes found');
+      }
+    } catch (e) {
+      debugPrint('❌ Error loading learning suggestion: $e');
+      learningSuggestion = 'Không thể tải gợi ý học tập';
     }
   }
 
@@ -123,80 +180,77 @@ class _HomeScreenState extends State<HomeScreen> {
 
                       SizedBox(height: 24),
 
-                      // LEARNING TIP
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 16),
-                        child: _buildLearningTipCard(),
-                      ),
+                      // 🔥 LEARNING TIP - UPDATED
+                      if (learningSuggestion != null)
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 16),
+                          child: _buildLearningTipCard(),
+                        ),
 
                       SizedBox(height: 24),
 
                       // NOTIFICATIONS
-                      // ...existing code...
-
-                    // NOTIFICATIONS SECTION - FIX XEM THÊM BUTTON
-                    if (personalNotification != null || communityNotifications.isNotEmpty)
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Thông báo mới nhất',
-                                  style: TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF1A1A1A),
-                                  ),
-                                ),
-                                // ✅ XEM THÊM BUTTON - ALWAYS SHOW IF THERE ARE COMMUNITY NOTIFICATIONS
-                                if (communityNotifications.isNotEmpty)
-                                  TextButton(
-                                    onPressed: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => AllCommunityNotificationsScreen(),
-                                        ),
-                                      );
-                                    },
-                                    style: TextButton.styleFrom(
-                                      padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                      backgroundColor: Color(0xFFE3F2FD),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(20),
-                                      ),
+                      if (personalNotification != null || communityNotifications.isNotEmpty)
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'Thông báo mới nhất',
+                                    style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF1A1A1A),
                                     ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(
-                                          'Xem thêm',
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w600,
+                                  ),
+                                  if (communityNotifications.isNotEmpty)
+                                    TextButton(
+                                      onPressed: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => AllCommunityNotificationsScreen(),
+                                          ),
+                                        );
+                                      },
+                                      style: TextButton.styleFrom(
+                                        padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                        backgroundColor: Color(0xFFE3F2FD),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(20),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            'Xem thêm',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w600,
+                                              color: Color(0xFF2196F3),
+                                            ),
+                                          ),
+                                          SizedBox(width: 4),
+                                          Icon(
+                                            Icons.arrow_forward_ios,
+                                            size: 12,
                                             color: Color(0xFF2196F3),
                                           ),
-                                        ),
-                                        SizedBox(width: 4),
-                                        Icon(
-                                          Icons.arrow_forward_ios,
-                                          size: 12,
-                                          color: Color(0xFF2196F3),
-                                        ),
-                                      ],
+                                        ],
+                                      ),
                                     ),
-                                  ),
-                              ],
-                            ),
-                            SizedBox(height: 16),
-                            _buildNotificationsSection(),
-                          ],
+                                ],
+                              ),
+                              SizedBox(height: 16),
+                              _buildNotificationsSection(),
+                            ],
+                          ),
                         ),
-                      ),
                       SizedBox(height: 32),
                     ],
                   ),
@@ -456,15 +510,36 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // LEARNING TIP - REFINED
+  // LEARNING TIP - UPDATED WITH ALL MISTAKES INFO
   Widget _buildLearningTipCard() {
+    // Calculate total mistakes
+    final totalMistakes = allMistakes.fold<int>(0, (sum, m) => sum + m.mistakeCount);
+    
+    // Determine icon and color based on total mistake count
+    IconData tipIcon = Icons.tips_and_updates;
+    Color iconColor = Color(0xFF1976D2);
+    Color bgColor = Color(0xFFE3F2FD);
+    Color borderColor = Color(0xFF90CAF9);
+    
+    if (totalMistakes > 20) {
+      tipIcon = Icons.warning_amber_rounded;
+      iconColor = Color(0xFFFF9800);
+      bgColor = Color(0xFFFFF3E0);
+      borderColor = Color(0xFFFFB74D);
+    } else if (totalMistakes > 10) {
+      tipIcon = Icons.lightbulb_outline;
+      iconColor = Color(0xFFFFA726);
+      bgColor = Color(0xFFFFF8E1);
+      borderColor = Color(0xFFFFD54F);
+    }
+
     return Container(
       padding: EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Color(0xFFE3F2FD),
+        color: bgColor,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: Color(0xFF90CAF9),
+          color: borderColor,
           width: 2,
         ),
       ),
@@ -475,13 +550,13 @@ class _HomeScreenState extends State<HomeScreen> {
             width: 50,
             height: 50,
             decoration: BoxDecoration(
-              color: Color(0xFF2196F3).withOpacity(0.2),
+              color: iconColor.withOpacity(0.2),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
-              Icons.tips_and_updates,
+              tipIcon,
               size: 28,
-              color: Color(0xFF1976D2),
+              color: iconColor,
             ),
           ),
           SizedBox(width: 16),
@@ -494,28 +569,112 @@ class _HomeScreenState extends State<HomeScreen> {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF1976D2),
+                    color: iconColor,
                   ),
                 ),
                 SizedBox(height: 8),
                 Text(
-                  'Bạn làm sai :..............!',
+                  learningSuggestion ?? 'Đang tải gợi ý...',
                   style: TextStyle(
                     fontSize: 14,
                     color: Color(0xFF1565C0),
                     height: 1.5,
                   ),
                 ),
+                if (allMistakes.isNotEmpty) ...[
+                  SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.7),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.error_outline,
+                              size: 16,
+                              color: Color(0xFFEF5350),
+                            ),
+                            SizedBox(width: 6),
+                            Text(
+                              '$totalMistakes câu sai',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFFEF5350),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.7),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.topic,
+                              size: 16,
+                              color: Color(0xFF2196F3),
+                            ),
+                            SizedBox(width: 6),
+                            Text(
+                              '${allMistakes.length} chủ đề',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF2196F3),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
                 SizedBox(height: 12),
                 GestureDetector(
                   onTap: () {
-                    Navigator.pushNamed(context, '/chooseLearning');
+                    // 🔥 FIX: Navigate with ALL mistakes
+                    if (allMistakes.isNotEmpty) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ChooseLearningScreen(
+                            mistakes: allMistakes, // ✅ Pass ALL mistakes
+                          ),
+                        ),
+                      );
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Hãy làm thêm bài tập để nhận gợi ý học tập!'),
+                          backgroundColor: Color(0xFF2196F3),
+                        ),
+                      );
+                    }
                   },
                   child: Container(
                     padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     decoration: BoxDecoration(
-                      color: Color(0xFF2196F3),
+                      color: iconColor,
                       borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: iconColor.withOpacity(0.3),
+                          blurRadius: 8,
+                          offset: Offset(0, 2),
+                        ),
+                      ],
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,

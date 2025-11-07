@@ -4,13 +4,13 @@ import 'package:learning_english/screens/grammar/linking_verb/linkingVerbs_scree
 import 'package:learning_english/screens/grammar/pronunciation_screen.dart';
 import 'package:learning_english/screens/grammar/tenses/tenses_screen.dart';
 import 'package:learning_english/widgets/grammar_category.dart';
-import '../widgets/grammar_card.dart';
-import '../services/grammar_service.dart';
-import '../models/topic.dart';
-import 'grammar/articles/articles_screen.dart';
-import 'grammar/modalverbs/modalVerbs_screen.dart';
-import 'grammar/passivevoice/passiveVoice_screen.dart';
-import 'grammar/prepositions/prepositions_screen.dart';
+import '../../widgets/grammar_card.dart';
+import '../../services/grammar_service.dart';
+import '../../models/topic.dart';
+import 'articles/articles_screen.dart';
+import 'modalverbs/modalVerbs_screen.dart';
+import 'passivevoice/passiveVoice_screen.dart';
+import 'prepositions/prepositions_screen.dart';
 
 class GrammarScreen extends StatefulWidget {
   const GrammarScreen({super.key});

@@ -1,10 +1,48 @@
 import 'package:flutter/material.dart';
+import '../ai_practice/ai_practice_check_screen.dart';
+import '../../services/learning_service.dart';
 
 class ChooseLearningScreen extends StatelessWidget {
+  final List<LearningMistake> mistakes; // 🔥 NEW: All mistakes
 
   const ChooseLearningScreen({
     super.key,
+    required this.mistakes, // 🔥 REQUIRED
   });
+
+  // 🔥 Helper: Calculate total mistakes
+  int get totalMistakes {
+    return mistakes.fold<int>(0, (sum, m) => sum + m.mistakeCount);
+  }
+
+  // 🔥 Helper: Get top mistake
+  LearningMistake get topMistake {
+    return mistakes.isNotEmpty ? mistakes.first : LearningMistake(
+      lessonName: 'Unknown',
+      mistakeCount: 0,
+      source: 'combined',
+    );
+  }
+
+  // 🔥 Helper: Format all topics
+  String get formattedTopics {
+    if (mistakes.isEmpty) return 'Unknown';
+    
+    if (mistakes.length == 1) {
+      return mistakes.first.lessonName;
+    }
+    
+    if (mistakes.length == 2) {
+      return '${mistakes[0].lessonName} , ${mistakes[1].lessonName}';
+    }
+    
+    // For 3+ topics: "Topic1, Topic2 và Topic3"
+    final topicsExceptLast = mistakes.take(mistakes.length - 1)
+        .map((m) => m.lessonName)
+        .join(', ');
+    
+    return '$topicsExceptLast , ${mistakes.last.lessonName}';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -14,7 +52,7 @@ class ChooseLearningScreen extends StatelessWidget {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back),
+          icon: Icon(Icons.arrow_back, color: Color(0xFF1A1A1A)),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
@@ -64,7 +102,7 @@ class ChooseLearningScreen extends StatelessWidget {
     );
   }
 
-  // HEADER CARD - Hiển thị lỗi
+  // HEADER CARD - Hiển thị TẤT CẢ lỗi
   Widget _buildErrorCard() {
     return Container(
       width: double.infinity,
@@ -120,19 +158,24 @@ class ChooseLearningScreen extends StatelessWidget {
                     ),
                     SizedBox(height: 4),
                     Text(
-                      'topic',
+                      topMistake.lessonName, // ✅ Top mistake
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                         color: Color(0xFFB71C1C),
                       ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
               ),
             ],
           ),
+          
           SizedBox(height: 16),
+
+          // 🔥 MESSAGE - Tổng số câu sai
           Container(
             padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
@@ -149,7 +192,7 @@ class ChooseLearningScreen extends StatelessWidget {
                 SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'message',
+                    'Bạn đã sai tổng cộng $totalMistakes câu trong ${mistakes.length} chủ đề khác nhau!', // ✅ Dynamic message
                     style: TextStyle(
                       fontSize: 14,
                       color: Color(0xFF424242),
@@ -160,20 +203,80 @@ class ChooseLearningScreen extends StatelessWidget {
               ],
             ),
           ),
-          SizedBox(height: 12),
-          Row(
-            children: [
-              Icon(Icons.trending_down, color: Color(0xFFEF5350), size: 18),
-              SizedBox(width: 8),
-              Text(
-                'Đã sai "mistakeCount" câu trong 7 ngày qua',
+
+          SizedBox(height: 16),
+
+          // 🔥 DANH SÁCH TẤT CẢ LỖI
+          Container(
+            padding: EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.7),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.list, color: Color(0xFFEF5350), size: 18),
+                    SizedBox(width: 8),
+                    Text(
+                      'Chi tiết các lỗi (7 ngày qua):',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFFD32F2F),
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 12),
+                // List all mistakes
+                ...mistakes.map((mistake) => _buildMistakeItem(mistake)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 🔥 Helper: Build mistake item
+  Widget _buildMistakeItem(LearningMistake mistake) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: Color(0xFFEF5350).withOpacity(0.15),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Center(
+              child: Text(
+                '${mistake.mistakeCount}',
                 style: TextStyle(
                   fontSize: 13,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.bold,
                   color: Color(0xFFD32F2F),
                 ),
               ),
-            ],
+            ),
+          ),
+          SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              mistake.lessonName,
+              style: TextStyle(
+                fontSize: 13,
+                color: Color(0xFF424242),
+                height: 1.4,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ],
       ),
@@ -184,10 +287,10 @@ class ChooseLearningScreen extends StatelessWidget {
   Widget _buildOption1Card(BuildContext context) {
     return GestureDetector(
       onTap: () {
-        // TODO: Navigate to exercise review
+        // TODO: Navigate to exercise review with all mistakes
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Chức năng đang phát triển...'),
+            content: Text('Chức năng xem lại $totalMistakes câu sai đang phát triển...'),
             backgroundColor: Color(0xFF2196F3),
           ),
         );
@@ -323,14 +426,25 @@ class ChooseLearningScreen extends StatelessWidget {
   // OPTION 2 - Luyện tập với AI
   Widget _buildOption2Card(BuildContext context) {
     return GestureDetector(
-      onTap: () {
-        // TODO: Navigate to AI practice
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Chức năng đang phát triển...'),
-            backgroundColor: Color(0xFF9C27B0),
+      onTap: () async {
+        final result = await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => AiPracticeCheckScreen(
+              topic: formattedTopics, // ✅ Use formatted topics
+              mistakeCount: totalMistakes,
+            ),
           ),
         );
+
+        if (result == true) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('✅ Hoàn thành bài luyện tập!'),
+              backgroundColor: Color(0xFF4CAF50),
+            ),
+          );
+        }
       },
       child: Container(
         padding: EdgeInsets.all(20),
@@ -505,7 +619,7 @@ class ChooseLearningScreen extends StatelessWidget {
           SizedBox(height: 12),
           _buildTipItem('Học 15-20 phút mỗi ngày tốt hơn học dồn 2 giờ cuối tuần'),
           _buildTipItem('Xem lại lỗi ngay sau khi làm bài để ghi nhớ tốt hơn'),
-          _buildTipItem('Thực hành với AI giúp bạn tự tin hơn khi giao tiếp'),
+          _buildTipItem('Thực hành với AI giúp bạn đa dạng bài làm hơn'),
         ],
       ),
     );
