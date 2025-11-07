@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import 'package:learning_english/screens/learning_hub/review_wrong_questions_screen.dart';
 class ChooseLearningScreen extends StatelessWidget {
 
   const ChooseLearningScreen({
@@ -184,11 +184,10 @@ class ChooseLearningScreen extends StatelessWidget {
   Widget _buildOption1Card(BuildContext context) {
     return GestureDetector(
       onTap: () {
-        // TODO: Navigate to exercise review
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Chức năng đang phát triển...'),
-            backgroundColor: Color(0xFF2196F3),
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ReviewWrongQuestionsScreen(),
           ),
         );
       },
