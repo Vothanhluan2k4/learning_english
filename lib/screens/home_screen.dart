@@ -511,6 +511,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // LEARNING TIP - UPDATED WITH ALL MISTAKES INFO
+  // 🔥 UPDATED: Listen for refresh signal from ChooseLearningScreen
   Widget _buildLearningTipCard() {
     // Calculate total mistakes
     final totalMistakes = allMistakes.fold<int>(0, (sum, m) => sum + m.mistakeCount);
@@ -643,17 +644,23 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
                 SizedBox(height: 12),
                 GestureDetector(
-                  onTap: () {
-                    // 🔥 FIX: Navigate with ALL mistakes
+                  onTap: () async {
                     if (allMistakes.isNotEmpty) {
-                      Navigator.push(
+                      // 🔥 FIX: Await result and refresh if needed
+                      final bool? needsRefresh = await Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (context) => ChooseLearningScreen(
-                            mistakes: allMistakes, // ✅ Pass ALL mistakes
+                            mistakes: allMistakes,
                           ),
                         ),
                       );
+
+                      // 🔥 NEW: Reload learning suggestion if data was updated
+                      if (needsRefresh == true && mounted) {
+                        await _loadLearningSuggestion();
+                        setState(() {}); // ✅ Trigger rebuild
+                      }
                     } else {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(

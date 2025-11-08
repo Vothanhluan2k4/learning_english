@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:learning_english/screens/learning_hub/review_wrong_questions_screen.dart';
 import '../ai_practice/ai_practice_check_screen.dart';
 import '../../services/learning_service.dart';
 
@@ -286,14 +287,17 @@ class ChooseLearningScreen extends StatelessWidget {
   // OPTION 1 - Xem lại bài tập sai
   Widget _buildOption1Card(BuildContext context) {
     return GestureDetector(
-      onTap: () {
+      onTap: () async {
         // TODO: Navigate to exercise review with all mistakes
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Chức năng xem lại $totalMistakes câu sai đang phát triển...'),
-            backgroundColor: Color(0xFF2196F3),
+        final bool? needsRefresh = await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ReviewWrongQuestionsScreen(),
           ),
         );
+        if (needsRefresh == true && context.mounted) {
+        Navigator.pop(context, true); // ✅ Signal home to refresh
+      }
       },
       child: Container(
         padding: EdgeInsets.all(20),
