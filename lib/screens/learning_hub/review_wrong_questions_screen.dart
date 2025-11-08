@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:learning_english/services/learning_service.dart';
 
 // =========================================================================
 // 1. WIDGETS ĐỊNH NGHĨA (LessonDetailScreen, QuizScreen)
@@ -62,7 +62,7 @@ class ReviewWrongQuestionsScreen extends StatefulWidget {
 }
 
 class _ReviewWrongQuestionsScreenState extends State<ReviewWrongQuestionsScreen> {
-  final SupabaseClient _supabase = Supabase.instance.client;
+  final LearningService _service = LearningService();
   List<Map<String, dynamic>> wrongQuestions = [];
   bool isLoading = true;
   String? userId;
@@ -75,44 +75,20 @@ class _ReviewWrongQuestionsScreenState extends State<ReviewWrongQuestionsScreen>
 
   // 🚨 HÀM CẬP NHẬT CSDL: Đánh dấu câu hỏi là đã ôn tập (is_correct = true)
   Future<void> _markAsReviewed(String type, Map<String, dynamic> item) async {
+    if (userId == null || userId!.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Không tìm thấy ID người dùng để cập nhật.')));
+      }
+      return;
+    }
+
     setState(() {
       item['is_updating'] = true;
     });
 
-    final questionId = item['question_id']?.toString();
-    final currentUserId = userId;
-
-    if (questionId == null || questionId.isEmpty || currentUserId == null) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Không tìm thấy ID câu hỏi/người dùng để cập nhật.')));
-      }
-      setState(() {
-        item['is_updating'] = false;
-      });
-      return;
-    }
-
     try {
-      if (type == 'roadmap') {
-        // Cập nhật cho Lộ trình (Courses)
-        final attemptId = item['attempt_id']?.toString();
-        if (attemptId == null) return;
-
-        await _supabase
-            .from('user_attempt_questions')
-            .update({'is_correct': true})
-            .eq('attempt_id', attemptId)
-            .eq('question_id', questionId);
-
-      } else if (type == 'grammar') {
-        // Cập nhật cho Ngữ pháp (Exercises)
-        await _supabase
-            .from('user_exercise_progress')
-            .update({'is_correct': true})
-            .eq('user_id', currentUserId)
-            .eq('exercise_id', questionId);
-      }
+      await _service.markAsReviewed(type, item, userId!);
 
       // Tải lại dữ liệu để câu hỏi biến mất
       await _fetchWrongQuestions();
@@ -137,60 +113,21 @@ class _ReviewWrongQuestionsScreenState extends State<ReviewWrongQuestionsScreen>
   }
 
   Future<void> _fetchUserIdAndData() async {
-    final authUser = _supabase.auth.currentUser;
-    if (authUser == null) {
+    userId = await _service.fetchUserId();
+
+    if (userId == null || userId!.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Vui lòng đăng nhập để xem dữ liệu.')),
+          const SnackBar(
+              content: Text('Lỗi: Không tìm thấy ID người dùng nào.')),
         );
         if (mounted) Navigator.pop(context);
       }
+      setState(() => isLoading = false);
       return;
     }
 
-    try {
-      // LOGIC ƯU TIÊN ID CÓ CÂU SAI ĐỂ TEST
-      final wrongAttemptResponse = await _supabase
-          .from('user_attempt_questions')
-          .select('user_lesson_attempts!inner(user_id)')
-          .eq('is_correct', false)
-          .limit(1)
-          .maybeSingle();
-
-      final String? wrongUserId = wrongAttemptResponse?['user_lesson_attempts']?['user_id'] as String?;
-
-      if (wrongUserId != null && wrongUserId.isNotEmpty) {
-        userId = wrongUserId;
-      } else {
-        final loggedInUserResponse = await _supabase
-            .from('users')
-            .select('id')
-            .eq('auth_id', authUser.id)
-            .maybeSingle();
-
-        userId = loggedInUserResponse?['id'] as String?;
-      }
-
-      if (userId == null || userId!.isEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content: Text('Lỗi: Không tìm thấy ID người dùng nào.')),
-          );
-          if (mounted) Navigator.pop(context);
-        }
-        return;
-      }
-
-      await _fetchWrongQuestions();
-
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lỗi lấy thông tin user: $e')),
-        );
-      }
-    }
+    await _fetchWrongQuestions();
   }
 
   Future<void> _fetchWrongQuestions() async {
@@ -200,15 +137,12 @@ class _ReviewWrongQuestionsScreenState extends State<ReviewWrongQuestionsScreen>
     }
 
     try {
-      final response = await _supabase.rpc(
-        'get_user_wrong_items',
-        params: {'user_uuid': userId!},
-      ) as List<dynamic>;
+      final response = await _service.fetchWrongQuestions(userId!);
 
       if (mounted) {
         setState(() {
           // Khởi tạo trạng thái is_updating cho từng item
-          wrongQuestions = response.cast<Map<String, dynamic>>().map((item) => {
+          wrongQuestions = response.map((item) => {
             ...item,
             'is_updating': false,
           }).toList();
@@ -303,21 +237,25 @@ class _ReviewWrongQuestionsScreenState extends State<ReviewWrongQuestionsScreen>
       )
           : wrongQuestions.isEmpty
           ? _buildEmptyState()
-          : Center(
-        child: Container(
-          constraints: BoxConstraints(maxWidth: isWideScreen ? 1200 : double.infinity),
-          child: SingleChildScrollView(
-            padding: EdgeInsets.all(isWideScreen ? 32 : 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildHeader(),
-                const SizedBox(height: 24),
-                ..._groupByLesson().entries.map((entry) {
-                  return _buildLessonGroup(entry.key, entry.value, isWideScreen);
-                }).toList(),
-              ],
-            ),
+          : Container(
+        constraints: BoxConstraints(maxWidth: isWideScreen ? 1200 : double.infinity),
+        margin: EdgeInsets.symmetric(horizontal: isWideScreen ? 32 : 0),
+        child: SingleChildScrollView(
+          padding: EdgeInsets.only(
+            left: isWideScreen ? 0 : 16,
+            right: isWideScreen ? 0 : 16,
+            top: 20,
+            bottom: 24,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildHeader(),
+              const SizedBox(height: 20),
+              ..._groupByLesson().entries.map((entry) {
+                return _buildLessonGroup(entry.key, entry.value, isWideScreen);
+              }).toList(),
+            ],
           ),
         ),
       ),
