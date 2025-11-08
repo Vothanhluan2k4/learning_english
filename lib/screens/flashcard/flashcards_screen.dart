@@ -95,13 +95,13 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> with SingleTickerPr
 
   SliverAppBar _buildHeader(BuildContext context) {
     return SliverAppBar(
-      title: const Text('Flashcards', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary)),
       backgroundColor: backgroundColor,
       elevation: 0,
       pinned: true,
       floating: true,
       forceElevated: true,
       shadowColor: Colors.black.withOpacity(0.1),
+      toolbarHeight: 0, 
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(kToolbarHeight),
         child: Center(

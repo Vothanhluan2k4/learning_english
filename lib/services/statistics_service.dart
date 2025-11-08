@@ -42,7 +42,7 @@ class StatisticsService {
       var exerciseQuery = _supabase
           .from('user_exercise_progress')
           .select('*')
-          .eq('user_id', authId);
+          .eq('user_id', userId);
 
       // Apply date filter
       exerciseQuery = exerciseQuery
@@ -85,10 +85,10 @@ class StatisticsService {
           .length;
 
       // 5. Số từ vựng đã học với filter ngày
-      final totalLearnedWords = await _loadTotalLearnedWords(authId, start, end);
+      final totalLearnedWords = await _loadTotalLearnedWords(userId, start, end);
 
       // 6. Thống kê bài tập theo tuần
-      final weeklyExercises = await _loadWeeklyExercises(authId, start, end);
+      final weeklyExercises = await _loadWeeklyExercises(userId, start, end);
 
       return StatisticsData(
         totalLearnedWords: totalLearnedWords,
@@ -105,12 +105,12 @@ class StatisticsService {
   }
 
   /// Load tổng số từ vựng đã học từ review_history với filter ngày
-  Future<int> _loadTotalLearnedWords(String authId, DateTime startDate, DateTime endDate) async {
+  Future<int> _loadTotalLearnedWords(String userId, DateTime startDate, DateTime endDate) async {
     try {
       final result = await _supabase
           .from('review_history')
           .select('words_remembered')
-          .eq('user_id', authId)
+          .eq('user_id', userId)
           .gte('review_date', startDate.toIso8601String())
           .lte('review_date', endDate.toIso8601String());
 
@@ -134,12 +134,12 @@ class StatisticsService {
   }
 
   /// Load exercises completed in date range
-  Future<Map<String, int>> _loadWeeklyExercises(String authId, DateTime startDate, DateTime endDate) async {
+  Future<Map<String, int>> _loadWeeklyExercises(String userId, DateTime startDate, DateTime endDate) async {
     try {
       final data = await _supabase
           .from('user_exercise_progress')
           .select('completed_at')
-          .eq('user_id', authId)
+          .eq('user_id', userId)
           .gte('completed_at', startDate.toIso8601String())
           .lte('completed_at', endDate.toIso8601String());
 

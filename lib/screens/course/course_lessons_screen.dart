@@ -167,7 +167,7 @@ class _CourseLessonsScreenState extends State<CourseLessonsScreen> {
     );
   }
 
-  void _handleLessonTap(BuildContext context, LessonCourse lesson) {
+  void _handleLessonTap(BuildContext context, LessonCourse lesson) async {
     if (lesson.isLocked) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -195,11 +195,12 @@ class _CourseLessonsScreenState extends State<CourseLessonsScreen> {
       return;
     }
 
-    // ✅ Nếu là final_test hoặc mid_test, đi tới TestPreviewScreen trước
     if (lesson.lessonType == 'final_test' || lesson.lessonType == 'mid_test') {
       if (lesson.testId != null && lesson.testId!.isNotEmpty) {
         debugPrint('🚀 Navigate to TestPreviewScreen');
-        Navigator.push(
+        
+        // 🔥 UPDATED: Await navigation result
+        await Navigator.push(
           context,
           MaterialPageRoute(
             builder: (context) => TestPreviewScreen(
@@ -208,11 +209,16 @@ class _CourseLessonsScreenState extends State<CourseLessonsScreen> {
               lesson: lesson,
             ),
           ),
-        ).then((_) {
+        );
+        
+        // 🔥 NEW: Reload data after returning
+        if (mounted) {
+          debugPrint('🔄 Returned from test, reloading lessons...');
           setState(() {
             _dataFuture = _loadData();
           });
-        });
+        }
+        
         return;
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -242,15 +248,19 @@ class _CourseLessonsScreenState extends State<CourseLessonsScreen> {
       }
     }
 
-    // ✅ Các bài học khác vào lessonDetail bình thường
-    Navigator.pushNamed(
+    // 🔥 UPDATED: Await navigation result
+    await Navigator.pushNamed(
       context,
       '/lessonDetail',
       arguments: {'lessonId': lesson.id},
-    ).then((_) {
+    );
+    
+    // 🔥 NEW: Reload data after returning
+    if (mounted) {
+      debugPrint('🔄 Returned from lesson detail, reloading lessons...');
       setState(() {
         _dataFuture = _loadData();
       });
-    });
+    }
   }
 }

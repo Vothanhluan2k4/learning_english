@@ -36,7 +36,6 @@ class _CourseModulesScreenState extends State<CourseModulesScreen> {
       final course = await _courseService.getCourseById(widget.courseId);
       debugPrint('🔍 Course loaded: ${course?.courseName}');
 
-      // ✅ Dùng RPC để lấy modules với lock status
       final modules = await _moduleService.fetchModulesByCourse(widget.courseId);
       debugPrint('🔍 Modules loaded: ${modules.length}');
 
@@ -51,6 +50,14 @@ class _CourseModulesScreenState extends State<CourseModulesScreen> {
     }
   }
 
+  // 🔥 NEW: Reload data method
+  Future<void> _reloadData() async {
+    debugPrint('🔄 Reloading course modules data...');
+    setState(() {
+      _dataFuture = _loadData();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<Map<String, dynamic>>(
@@ -58,6 +65,7 @@ class _CourseModulesScreenState extends State<CourseModulesScreen> {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Scaffold(
+            backgroundColor: Color(0xFFF8F9FA),
             appBar: AppBar(
               title: const Text('Đang tải...'),
               backgroundColor: Colors.white,
@@ -71,6 +79,7 @@ class _CourseModulesScreenState extends State<CourseModulesScreen> {
 
         if (snapshot.hasError) {
           return Scaffold(
+            backgroundColor: Color(0xFFF8F9FA),
             appBar: AppBar(
               title: const Text('Lỗi'),
               backgroundColor: Colors.white,
@@ -80,20 +89,12 @@ class _CourseModulesScreenState extends State<CourseModulesScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(
-                    Icons.error_outline,
-                    color: Colors.red,
-                    size: 48,
-                  ),
+                  const Icon(Icons.error_outline, color: Colors.red, size: 48),
                   const SizedBox(height: 16),
                   Text('Lỗi: ${snapshot.error}'),
                   const SizedBox(height: 24),
                   ElevatedButton(
-                    onPressed: () {
-                      setState(() {
-                        _dataFuture = _loadData();
-                      });
-                    },
+                    onPressed: _reloadData,
                     child: const Text('Thử lại'),
                   ),
                 ],
@@ -107,6 +108,7 @@ class _CourseModulesScreenState extends State<CourseModulesScreen> {
         final modules = (data?['modules'] as List<CourseModule>?) ?? [];
 
         return Scaffold(
+          backgroundColor: Color(0xFFF8F9FA),
           appBar: AppBar(
             title: Text(course?.courseName ?? 'Lộ trình học'),
             centerTitle: true,
@@ -117,17 +119,14 @@ class _CourseModulesScreenState extends State<CourseModulesScreen> {
               icon: const Icon(Icons.arrow_back),
               onPressed: () => Navigator.pop(context),
             ),
+            
           ),
           body: modules.isEmpty
               ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(
-                        Icons.inbox,
-                        size: 64,
-                        color: Colors.grey.shade300,
-                      ),
+                      Icon(Icons.inbox, size: 64, color: Colors.grey.shade300),
                       const SizedBox(height: 16),
                       Text(
                         'Không có module nào',
@@ -139,13 +138,17 @@ class _CourseModulesScreenState extends State<CourseModulesScreen> {
                     ],
                   ),
                 )
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: modules.length,
-                  itemBuilder: (context, index) {
-                    final module = modules[index];
-                    return _buildModuleCard(context, module, index + 1);
-                  },
+              : RefreshIndicator(
+                  // 🔥 NEW: Pull-to-refresh
+                  onRefresh: _reloadData,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: modules.length,
+                    itemBuilder: (context, index) {
+                      final module = modules[index];
+                      return _buildModuleCard(context, module, index + 1);
+                    },
+                  ),
                 ),
         );
       },
@@ -172,14 +175,20 @@ class _CourseModulesScreenState extends State<CourseModulesScreen> {
         elevation: 2,
         child: InkWell(
           onTap: isLocked
-              ? null // ✅ Disable tap nếu locked
-              : () {
-                  // Navigate nếu unlocked
-                  Navigator.pushNamed(
+              ? null
+              : () async {
+                  // 🔥 UPDATED: Await result and reload if needed
+                  final result = await Navigator.pushNamed(
                     context,
                     '/courseLessons',
                     arguments: {'moduleId': module.id},
                   );
+
+                  // 🔥 NEW: Reload data when returning
+                  if (mounted) {
+                    debugPrint('🔄 Returned from lessons, reloading modules...');
+                    await _reloadData();
+                  }
                 },
           borderRadius: BorderRadius.circular(12),
           child: Padding(
@@ -213,20 +222,14 @@ class _CourseModulesScreenState extends State<CourseModulesScreen> {
                     ),
                     const SizedBox(width: 8),
                     if (isLocked)
-                      Icon(
-                        Icons.lock,
-                        size: 16,
-                        color: Colors.grey.shade400,
-                      ),
+                      Icon(Icons.lock, size: 16, color: Colors.grey.shade400),
                     const Spacer(),
-                    // ✅ Unlock button cho module đầu tiên nếu bị khóa
                     if (isLocked && moduleNumber == 1)
                       ElevatedButton.icon(
                         onPressed: () async {
                           try {
                             debugPrint('🔓 Unlocking first module...');
 
-                            // Show loading
                             showDialog(
                               context: context,
                               barrierDismissible: false,
@@ -238,7 +241,7 @@ class _CourseModulesScreenState extends State<CourseModulesScreen> {
                             await _moduleService.unlockCourseForUser(widget.courseId);
 
                             if (mounted) {
-                              Navigator.pop(context); // Close loading
+                              Navigator.pop(context);
 
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
@@ -247,15 +250,13 @@ class _CourseModulesScreenState extends State<CourseModulesScreen> {
                                 ),
                               );
 
-                              // Reload data
-                              setState(() {
-                                _dataFuture = _loadData();
-                              });
+                              // 🔥 UPDATED: Use reload method
+                              await _reloadData();
                             }
                           } catch (e) {
                             debugPrint('❌ Error unlocking: $e');
                             if (mounted) {
-                              Navigator.pop(context); // Close loading
+                              Navigator.pop(context);
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: Text('❌ Lỗi: $e'),
@@ -307,32 +308,83 @@ class _CourseModulesScreenState extends State<CourseModulesScreen> {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ],
-                // ✅ Progress bar (chỉ hiện khi unlocked)
+                // ✅ Progress bar (updated with animation)
                 if (!isLocked) ...[
                   const SizedBox(height: 12),
                   Row(
                     children: [
                       Expanded(
-                        child: LinearProgressIndicator(
-                          value: progress,
-                          backgroundColor: Colors.grey.shade200,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            Colors.blue.shade600,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: TweenAnimationBuilder<double>(
+                            // 🔥 NEW: Animated progress bar
+                            tween: Tween(begin: 0.0, end: progress),
+                            duration: const Duration(milliseconds: 800),
+                            curve: Curves.easeOutCubic,
+                            builder: (context, value, child) {
+                              return LinearProgressIndicator(
+                                value: value,
+                                minHeight: 8,
+                                backgroundColor: Colors.grey.shade200,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  value >= 1.0
+                                      ? Colors.green.shade600
+                                      : Colors.blue.shade600,
+                                ),
+                              );
+                            },
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '${module.completedLessonCount}/${module.lessonCount}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade600,
+                      const SizedBox(width: 12),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: progress >= 1.0
+                              ? Colors.green.shade50
+                              : Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: progress >= 1.0
+                                ? Colors.green.shade200
+                                : Colors.blue.shade200,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (progress >= 1.0)
+                              Icon(
+                                Icons.check_circle,
+                                size: 14,
+                                color: Colors.green.shade700,
+                              )
+                            else
+                              Icon(
+                                Icons.timer,
+                                size: 14,
+                                color: Colors.blue.shade700,
+                              ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${module.completedLessonCount}/${module.lessonCount}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: progress >= 1.0
+                                    ? Colors.green.shade700
+                                    : Colors.blue.shade700,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
                 ],
-                // ✅ Hint text cho locked modules
                 if (isLocked && moduleNumber > 1) ...[
                   const SizedBox(height: 12),
                   Row(
@@ -362,5 +414,5 @@ class _CourseModulesScreenState extends State<CourseModulesScreen> {
         ),
       ),
     );
-    }
   }
+}
