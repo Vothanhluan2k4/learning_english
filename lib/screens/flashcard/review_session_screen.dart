@@ -238,13 +238,43 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> with SingleTi
             const Text('Chỉnh sửa bộ thẻ', style: TextStyle(fontWeight: FontWeight.bold)),
           ],
         ),
-        content: SizedBox(
-          width: MediaQuery.of(context).size.width * 0.8,
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            TextField(controller: titleController, decoration: InputDecoration(labelText: 'Tiêu đề', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)), focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: primaryColor, width: 2)))),
-            const SizedBox(height: 16),
-            TextField(controller: descriptionController, decoration: InputDecoration(labelText: 'Mô tả', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)), focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: primaryColor, width: 2))), maxLines: 3),
-          ]),
+        content: SingleChildScrollView(
+          child: SizedBox(
+            width: MediaQuery.of(context).size.width * 0.8,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: titleController,
+                  decoration: InputDecoration(
+                    labelText: 'Tiêu đề',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: primaryColor, width: 2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: descriptionController,
+                  maxLines: 3,
+                  decoration: InputDecoration(
+                    labelText: 'Mô tả',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: primaryColor, width: 2),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
         actions: <Widget>[
           TextButton(onPressed: () { Navigator.of(context).pop(); _handleDeleteList(); }, child: const Text('Xóa List Này', style: TextStyle(color: accentColor))),

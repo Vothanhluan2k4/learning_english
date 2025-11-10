@@ -6,7 +6,6 @@ import 'package:learning_english/models/notification.dart';
 import 'package:learning_english/services/notification_service.dart';
 import 'package:learning_english/services/learning_service.dart'; // 🔥 NEW
 import 'package:learning_english/core/utils/date_formatter.dart';
-import 'package:learning_english/screens/community_notifications_screen.dart';
 import 'package:learning_english/screens/learning_hub/choose_learning_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -511,7 +510,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // LEARNING TIP - UPDATED WITH ALL MISTAKES INFO
-  // 🔥 UPDATED: Listen for refresh signal from ChooseLearningScreen
   Widget _buildLearningTipCard() {
     // Calculate total mistakes
     final totalMistakes = allMistakes.fold<int>(0, (sum, m) => sum + m.mistakeCount);
@@ -795,7 +793,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // COMMUNITY NOTIFICATION
+  // COMMUNITY NOTIFICATION (UPDATED WITH AVATAR)
   Widget _buildCommunityNotificationItem(CommunityNotification notif) {
     return Container(
       padding: EdgeInsets.all(18),
@@ -813,21 +811,62 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF64B5F6), Color(0xFF2196F3)],
-              ),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.person,
-              color: Colors.white,
-              size: 24,
-            ),
-          ),
+          // 🔥 UPDATED: Avatar with fallback
+          notif.userAvatar != null && notif.userAvatar!.isNotEmpty
+              ? ClipOval(
+                  child: Image.network(
+                    notif.userAvatar!,
+                    width: 44,
+                    height: 44,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [Color(0xFF64B5F6), Color(0xFF2196F3)],
+                          ),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Center(
+                          child: Text(
+                            notif.userName.isNotEmpty 
+                                ? notif.userName[0].toUpperCase() 
+                                : '?',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                )
+              : Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Color(0xFF64B5F6), Color(0xFF2196F3)],
+                    ),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Center(
+                    child: Text(
+                      notif.userName.isNotEmpty 
+                          ? notif.userName[0].toUpperCase() 
+                          : '?',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
           SizedBox(width: 16),
           Expanded(
             child: Column(

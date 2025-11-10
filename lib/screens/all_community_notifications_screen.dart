@@ -193,19 +193,36 @@ class _AllCommunityNotificationsScreenState
               SizedBox(width: index < 3 ? 12 : 0),
 
               // Avatar
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xFF64B5F6), Color(0xFF2196F3)],
-                  ),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.person,
-                  color: Colors.white,
-                  size: 24,
+              ClipOval(
+                child: Image.network(
+                  notif.userAvatar!,
+                  width: 44,
+                  height: 44,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Color(0xFF64B5F6), Color(0xFF2196F3)],
+                        ),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: Text(
+                          notif.userName.isNotEmpty 
+                              ? notif.userName[0].toUpperCase() 
+                              : '?',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ),
               SizedBox(width: 12),

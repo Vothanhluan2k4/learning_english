@@ -178,18 +178,31 @@ class CommunityNotification {
   factory CommunityNotification.fromJson(Map<String, dynamic> json) {
     debugPrint('🔍 Parsing community notification: $json');
     
-    // ✅ Handle multiple possible user field names
-    final userData = json['users'] ?? 
-                     json['users!notifications_user_id_fkey'] ??
-                     json['users!fk_user_id'];
+    // 🔥 FIX: Better user data extraction
+    Map<String, dynamic>? userData;
     
-    debugPrint('👤 User data: $userData');
+    // Try different possible field names
+    if (json['users'] != null) {
+      userData = json['users'] is List 
+          ? (json['users'] as List).isNotEmpty 
+              ? json['users'][0] 
+              : null
+          : json['users'];
+    }
+    
+    debugPrint('👤 Extracted user data: $userData');
+    
+    final userName = userData?['full_name'] as String? ?? 'Unknown User';
+    final userAvatar = userData?['avatar_url'] as String?;
+    
+    debugPrint('✅ User name: $userName');
+    debugPrint('✅ User avatar: $userAvatar');
     
     return CommunityNotification(
       id: json['id'] ?? '',
       userId: json['user_id'] ?? '',
-      userName: userData?['full_name'] ?? 'Unknown User',
-      userAvatar: userData?['avatar_url'],
+      userName: userName,
+      userAvatar: userAvatar,
       title: json['title'] ?? 'No title',
       message: json['message'] ?? '',
       createdAt: json['created_at'] != null 

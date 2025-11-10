@@ -30,7 +30,6 @@ class NotificationService {
     }
   }
 
-
   // ✅ Get community notifications (FINAL TEST ONLY)
   Future<List<CommunityNotification>> getCommunityNotifications({
     int limit = 10,
@@ -38,29 +37,37 @@ class NotificationService {
     try {
       debugPrint('📡 Loading community notifications (final tests only, score > 70)...');
 
+      // 🔥 FIX: Improved query with explicit join
       final response = await supabase
           .from('notifications')
-          .select(
-            '''
+          .select('''
             id,
             user_id,
             title,
             message,
             metadata,
             created_at,
-            users!notifications_user_id_fkey(full_name, avatar_url)
-            '''
-          )
+            users!notifications_user_id_fkey (
+              id,
+              full_name,
+              avatar_url,
+              email
+            )
+          ''')
           .eq('type', 'ket_qua_test')
-          .eq('metadata->>test_type', 'final_test') // ✅ FILTER: chỉ final_test
-          .gte('metadata->score', 70)
+          .filter('metadata->>test_type', 'eq', 'final_test')
+          .filter('metadata->>score', 'gte', '70')
           .order('created_at', ascending: false)
           .limit(limit);
 
-      debugPrint('✅ Found ${response.length} community final test notifications');
+      debugPrint('✅ Raw response: $response');
+      debugPrint('✅ Found ${(response as List).length} community final test notifications');
 
       return (response as List)
-          .map((n) => CommunityNotification.fromJson(n))
+          .map((json) {
+            debugPrint('📦 Processing notification: $json');
+            return CommunityNotification.fromJson(json);
+          })
           .toList();
     } catch (e, stackTrace) {
       debugPrint('❌ Error getting community notifications: $e');
@@ -74,28 +81,32 @@ class NotificationService {
     try {
       debugPrint('📡 Loading ALL community final test notifications...');
       
+      // 🔥 FIX: Improved query
       final response = await supabase
           .from('notifications')
-          .select(
-            '''
+          .select('''
             id,
             user_id,
             title,
             message,
             metadata,
             created_at,
-            users!notifications_user_id_fkey(full_name, avatar_url)
-            '''
-          )
+            users!notifications_user_id_fkey (
+              id,
+              full_name,
+              avatar_url,
+              email
+            )
+          ''')
           .eq('type', 'ket_qua_test')
-          .eq('metadata->>test_type', 'final_test') // ✅ FILTER: chỉ final_test
-          .gte('metadata->score', 70)
+          .filter('metadata->>test_type', 'eq', 'final_test')
+          .filter('metadata->>score', 'gte', '70')
           .order('created_at', ascending: false);
 
-      debugPrint('✅ Found ${response.length} total final test notifications');
+      debugPrint('✅ Found ${(response as List).length} total final test notifications');
 
       return (response as List)
-          .map((n) => CommunityNotification.fromJson(n))
+          .map((json) => CommunityNotification.fromJson(json))
           .toList();
     } catch (e, stackTrace) {
       debugPrint('❌ Error getting all community notifications: $e');
@@ -158,5 +169,4 @@ class NotificationService {
       debugPrint('❌ Error marking all notifications as read: $e');
     }
   }
-  
 }

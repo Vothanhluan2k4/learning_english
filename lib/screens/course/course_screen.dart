@@ -127,9 +127,8 @@ class _CourseScreenState extends State<CourseScreen> {
             elevation: 0,
             backgroundColor: Colors.transparent,
             flexibleSpace: Container(
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.05),
-              ),
+              color: Colors.white,
+              
               child: FlexibleSpaceBar(
                 centerTitle: true,
                 title: Text(
@@ -138,19 +137,11 @@ class _CourseScreenState extends State<CourseScreen> {
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
                     color: Colors.blue,
-                    shadows: [
-                      Shadow(
-                        offset: Offset(0, 1),
-                        blurRadius: 2,
-                        color: Colors.blue,
-                      ),
-                    ],
+                    
                   ),
                 ),
                 background: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.05),
-                  ),
+                  color: Colors.white,
                   child: Stack(
                     children: [
                       // Background pattern
