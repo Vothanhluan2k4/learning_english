@@ -3,7 +3,7 @@ class AiConfig {
   // ==================== FREE API KEYS (cho app) ====================
   // ⚠️ LƯU Ý: Đây là free tier API, giới hạn 3 lần/ngày cho mỗi user
   // Production app nên dùng server-side proxy để bảo vệ API key
-  static const String groqApiKey = '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'; // TODO: Replace với key thật
+  static const String groqApiKey = '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'; // TODO: Replace với key thật
   
   // ==================== GROQ ====================
   static const String groqBaseUrl = 'https://api.groq.com/openai/v1/chat/completions';

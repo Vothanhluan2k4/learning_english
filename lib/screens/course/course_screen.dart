@@ -121,54 +121,31 @@ class _CourseScreenState extends State<CourseScreen> {
         slivers: [
           // 🔥 MODERN APP BAR with gradient
           SliverAppBar(
-            expandedHeight: 120,
-            floating: false,
             pinned: true,
+            floating: false,
             elevation: 0,
-            backgroundColor: Colors.transparent,
-            flexibleSpace: Container(
-              color: Colors.white,
-              
-              child: FlexibleSpaceBar(
-                centerTitle: true,
-                title: Text(
-                  _groupName,
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blue,
-                    
-                  ),
-                ),
-                background: Container(
-                  color: Colors.white,
-                  child: Stack(
-                    children: [
-                      // Background pattern
-                      Positioned.fill(
-                        child: Opacity(
-                          opacity: 0.1,
-                          child: Image.asset(
-                            'assets/pattern.png',
-                            repeat: ImageRepeat.repeat,
-                            errorBuilder: (context, error, stackTrace) => SizedBox(),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+            backgroundColor: Colors.white,
+            automaticallyImplyLeading: false,
+            centerTitle: true,
+            title: Text(
+              _groupName,
+              style: const TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Colors.blue,
+                
               ),
             ),
             actions: [
               IconButton(
-                icon: Icon(Icons.info_outline, size: 26,color: Colors.blue),
+                icon: const Icon(Icons.info_outline, size: 26, color: Colors.blue),
                 onPressed: () {
                   _showCourseInfo(context);
                 },
               ),
             ],
           ),
+
 
           // 🔥 PLACEMENT BANNER (if needed)
           if (_showPlacement)

@@ -109,7 +109,7 @@ class StatisticsService {
     try {
       final result = await _supabase
           .from('review_history')
-          .select('words_remembered')
+          .select('words_reviewed')
           .eq('user_id', userId)
           .gte('review_date', startDate.toIso8601String())
           .lte('review_date', endDate.toIso8601String());
@@ -120,7 +120,7 @@ class StatisticsService {
 
       int total = 0;
       for (var item in result) {
-        final wordsRemembered = item['words_remembered'];
+        final wordsRemembered = item['words_reviewed'];
         if (wordsRemembered != null) {
           total += (wordsRemembered as int);
         }

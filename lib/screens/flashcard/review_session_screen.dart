@@ -843,74 +843,78 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> with SingleTi
   }
 
   Widget _buildAddCardDialog(BuildContext context, ListWord list) {
-    final wordController = TextEditingController();
-    final defineController = TextEditingController();
-    final wordTypeController = TextEditingController();
-    final transcriptionController = TextEditingController();
-    final exampleController = TextEditingController();
-    final noteController = TextEditingController();
-    bool _isExpanded = false;
+  final wordController = TextEditingController();
+  final defineController = TextEditingController();
+  final wordTypeController = TextEditingController();
+  final transcriptionController = TextEditingController();
+  final exampleController = TextEditingController();
+  final noteController = TextEditingController();
+  bool _isExpanded = false;
 
-    Future<void> _chooseFileAction(StateSetter setState) async {
-      final result = await FilePicker.platform.pickFiles(type: FileType.image);
-      if (result != null) {
-        setState(() {
-          _imageFileResult = result;
-        });
-      }
+  Future<void> _chooseFileAction(StateSetter setState) async {
+    final result = await FilePicker.platform.pickFiles(type: FileType.image);
+    if (result != null) {
+      setState(() {
+        _imageFileResult = result;
+      });
     }
+  }
 
-    Future<void> saveWord() async {
-      if (wordController.text.isEmpty || defineController.text.isEmpty) return;
-      final newWord = Word(
-        listWordId: list.id!,
-        word: wordController.text.trim(),
-        define: defineController.text.trim(),
-        wordType: wordTypeController.text.isNotEmpty ? wordTypeController.text : null,
-        transcription: transcriptionController.text.isNotEmpty ? transcriptionController.text : null,
-        example: exampleController.text.isNotEmpty ? exampleController.text : null,
-        pictureUrl: null,
-        note: noteController.text.isNotEmpty ? noteController.text : null,
-      );
-      try {
-        await FlashcardService().createWord(newWord, imageFile: _imageFileResult);
-        if (mounted) {
-          Navigator.pop(context, true);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('Thêm thẻ thành công!'),
-              backgroundColor: secondaryColor,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-          );
-          _imageFileResult = null;
-        }
-      } catch (e) {
-        if (mounted) {
-          Navigator.pop(context, false);
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lỗi khi thêm: $e')));
-        }
-      }
-    }
-
-    return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      titlePadding: EdgeInsets.zero,
-      contentPadding: const EdgeInsets.all(24),
-      title: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: primaryColor.withOpacity(0.05),
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(20),
-            topRight: Radius.circular(20),
+  Future<void> saveWord() async {
+    if (wordController.text.isEmpty || defineController.text.isEmpty) return;
+    final newWord = Word(
+      listWordId: list.id!,
+      word: wordController.text.trim(),
+      define: defineController.text.trim(),
+      wordType: wordTypeController.text.isNotEmpty ? wordTypeController.text : null,
+      transcription: transcriptionController.text.isNotEmpty ? transcriptionController.text : null,
+      example: exampleController.text.isNotEmpty ? exampleController.text : null,
+      pictureUrl: null,
+      note: noteController.text.isNotEmpty ? noteController.text : null,
+    );
+    try {
+      await FlashcardService().createWord(newWord, imageFile: _imageFileResult);
+      if (mounted) {
+        Navigator.pop(context, true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Thêm thẻ thành công!'),
+            backgroundColor: secondaryColor,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
+        );
+        _imageFileResult = null;
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context, false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lỗi khi thêm: $e')));
+      }
+    }
+  }
+
+  return Dialog(
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+    child: ConstrainedBox(
+      constraints: BoxConstraints(
+        maxWidth: 600,
+        maxHeight: MediaQuery.of(context).size.height * 0.85,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // ✅ HEADER
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: primaryColor.withOpacity(0.05),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(20),
+                topRight: Radius.circular(20),
+              ),
+            ),
+            child: Row(
               children: [
                 Container(
                   padding: const EdgeInsets.all(8),
@@ -921,123 +925,158 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> with SingleTi
                   child: const Icon(Icons.add_card_rounded, color: primaryColor, size: 24),
                 ),
                 const SizedBox(width: 12),
-                const Text('Tạo flashcard', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                const Expanded(
+                  child: Text(
+                    'Tạo flashcard',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded),
+                  onPressed: () => Navigator.pop(context, false),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
               ],
             ),
-            IconButton(
-              icon: const Icon(Icons.close_rounded),
-              onPressed: () => Navigator.pop(context, false),
-            ),
-          ],
-        ),
-      ),
-      content: StatefulBuilder(
-        builder: (BuildContext context, StateSetter setState) {
-          final fileName = _imageFileResult?.files.single.name ?? 'Chưa chọn file';
-          return SingleChildScrollView(
-            child: SizedBox(
-              width: MediaQuery.of(context).size.width * 0.8,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.folder_rounded, color: Colors.blue.shade700, size: 20),
-                        const SizedBox(width: 8),
-                        Text(
-                          'List: ${list.title}',
-                          style: TextStyle(color: Colors.blue.shade700, fontWeight: FontWeight.w600),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  _buildDialogTextField('Từ mới', wordController),
-                  const SizedBox(height: 16),
-                  _buildDialogTextField('Định nghĩa', defineController, maxLines: 3),
-                  const SizedBox(height: 16),
-                  ExpansionTile(
-                    tilePadding: EdgeInsets.zero,
-                    title: const Text(
-                      'Thêm phiên âm, ví dụ, ảnh, ghi chú...',
-                      style: TextStyle(color: primaryColor, fontSize: 14, fontWeight: FontWeight.w600),
-                    ),
-                    trailing: Icon(
-                      _isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
-                      color: primaryColor,
-                    ),
-                    onExpansionChanged: (bool expanded) => setState(() => _isExpanded = expanded),
+          ),
+
+          // ✅ CONTENT (Scrollable)
+          Flexible(
+            child: StatefulBuilder(
+              builder: (BuildContext context, StateSetter setState) {
+                final fileName = _imageFileResult?.files.single.name ?? 'Chưa chọn file';
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const SizedBox(height: 16),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(child: _buildDialogTextField('Loại từ (N, V, ADJ...)', wordTypeController)),
-                          const SizedBox(width: 16),
-                          Expanded(child: _buildDialogTextField('Phiên âm', transcriptionController)),
-                        ],
+                      // List info badge
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.folder_rounded, color: Colors.blue.shade700, size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'List: ${list.title}',
+                                style: TextStyle(
+                                  color: Colors.blue.shade700,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
+                      const SizedBox(height: 20),
+
+                      // Required fields
+                      _buildDialogTextField('Từ mới *', wordController),
                       const SizedBox(height: 16),
-                      const Text('Ảnh', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          ElevatedButton.icon(
-                            onPressed: () => _chooseFileAction(setState),
-                            icon: const Icon(Icons.upload_file_rounded, size: 18),
-                            label: const Text('Chọn file'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.grey.shade100,
-                              foregroundColor: textPrimary,
-                              elevation: 0,
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      _buildDialogTextField('Định nghĩa *', defineController, maxLines: 3),
+                      const SizedBox(height: 16),
+
+                      // Optional fields (Expandable)
+                      Theme(
+                        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                        child: ExpansionTile(
+                          tilePadding: EdgeInsets.zero,
+                          childrenPadding: const EdgeInsets.only(top: 16),
+                          title: const Text(
+                            'Thêm phiên âm, ví dụ, ảnh, ghi chú...',
+                            style: TextStyle(
+                              color: primaryColor,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              fileName,
-                              style: TextStyle(color: textSecondary, fontSize: 13),
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                          trailing: Icon(
+                            _isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                            color: primaryColor,
                           ),
-                        ],
+                          onExpansionChanged: (bool expanded) => setState(() => _isExpanded = expanded),
+                          children: [
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(child: _buildDialogTextField('Loại từ', wordTypeController)),
+                                const SizedBox(width: 12),
+                                Expanded(child: _buildDialogTextField('Phiên âm', transcriptionController)),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Image picker
+                            const Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text('Ảnh', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                ElevatedButton.icon(
+                                  onPressed: () => _chooseFileAction(setState),
+                                  icon: const Icon(Icons.upload_file_rounded, size: 18),
+                                  label: const Text('Chọn file'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.grey.shade100,
+                                    foregroundColor: textPrimary,
+                                    elevation: 0,
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    fileName,
+                                    style: TextStyle(color: textSecondary, fontSize: 13),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            _buildDialogTextField('Ví dụ', exampleController, maxLines: 3),
+                            const SizedBox(height: 16),
+                            _buildDialogTextField('Ghi chú', noteController, maxLines: 3),
+                          ],
+                        ),
                       ),
-                      const SizedBox(height: 16),
-                      _buildDialogTextField('Ví dụ (tối đa 10 câu)', exampleController, maxLines: 3),
-                      const SizedBox(height: 16),
-                      _buildDialogTextField('Ghi chú', noteController, maxLines: 3),
+                      const SizedBox(height: 24),
+
+                      // Save button
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: saveWord,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: primaryColor,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          child: const Text('Lưu', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                        ),
+                      ),
                     ],
                   ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: saveWord,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: primaryColor,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      child: const Text('Lưu', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                    ),
-                  ),
-                ],
-              ),
+                );
+              },
             ),
-          );
-        },
+          ),
+        ],
       ),
-    );
+    )
+  );
   }
 
   Widget _buildDialogTextField(String label, TextEditingController controller, {int maxLines = 1}) {
@@ -1523,13 +1562,16 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> with SingleTi
                     OutlinedButton.icon(
                       onPressed: () => addNewRow(setState),
                       icon: const Icon(Icons.add_rounded, size: 20),
-                      label: const Text('Thêm hàng', style: TextStyle(fontWeight: FontWeight.w600)),
+                      label: const Text('Thêm từ', style: TextStyle(fontWeight: FontWeight.w600)),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: primaryColor,
                         side: const BorderSide(color: primaryColor, width: 1.5),
                         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ),
+                    ),
+                    SizedBox(
+                      width: 4,
                     ),
                     ElevatedButton.icon(
                       onPressed: saveBulkWords,

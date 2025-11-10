@@ -677,7 +677,7 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
         backgroundColor: Colors.blueAccent,
         foregroundColor: Colors.white,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: _showExitDialog,
         ),
         actions: [
