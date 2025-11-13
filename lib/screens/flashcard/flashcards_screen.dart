@@ -5,6 +5,7 @@ import 'package:learning_english/services/flashcard_service.dart';
 import 'package:learning_english/screens/flashcard/create_deck_screen.dart';
 import 'package:learning_english/screens/flashcard/review_session_screen.dart';
 import 'package:learning_english/screens/flashcard/ReviewLearningScreen.dart';
+import 'package:learning_english/screens/flashcard/explore_screen.dart';
 import 'package:intl/intl.dart';
 import 'dart:math';
 
@@ -422,11 +423,7 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> with SingleTickerPr
   }
 
   Widget _buildExploreTab() {
-    return _buildEmptyState(
-      icon: Icons.explore_outlined,
-      title: 'Tính năng sắp ra mắt',
-      message: 'Khám phá các bộ thẻ từ cộng đồng trong tương lai.',
-    );
+    return const ExploreScreen();
   }
 
   Widget _buildDeckGrid(BuildContext context, List<ListWord> lists) {

@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'dart:io';
 import 'dart:typed_data';
 import '../../services/auth_service.dart';
+import 'package:learning_english/core/supabase_config.dart';
 
 class FlashcardService {
   // Instance variables
@@ -488,5 +489,4 @@ class FlashcardService {
       throw Exception('Lỗi khi đặt lại tiến độ: $e');
     }
   }
-
 }
