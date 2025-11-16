@@ -489,4 +489,35 @@ class FlashcardService {
       throw Exception('Lỗi khi đặt lại tiến độ: $e');
     }
   }
+  // Trong FlashcardService.dart
+
+  Future<void> updateListColor(String listId, String hexColor) async {
+    final supabase = Supabase.instance.client;
+
+    // 1. Lấy ID người dùng nội bộ
+    final internalUserId = await _getUserId();
+
+    if (internalUserId == null) {
+      throw Exception('Người dùng chưa đăng nhập hoặc không tìm thấy hồ sơ liên kết.');
+    }
+
+    try {
+      // 2. CẬP NHẬT: Thêm điều kiện kiểm tra quyền sở hữu (user_id)
+      final response = await supabase
+          .from('list_word')
+          .update({'background_color': hexColor})
+          .eq('id', listId)
+          .eq('user_id', internalUserId) // <-- Đảm bảo chỉ user sở hữu mới được cập nhật
+          .select()
+          .maybeSingle();
+
+      if (response == null) {
+        // Điều này có nghĩa là: List ID sai HOẶC List đó không thuộc về internalUserId.
+        throw Exception('Không tìm thấy bộ thẻ hoặc bộ thẻ không thuộc quyền sở hữu của bạn.');
+      }
+
+    } catch (e) {
+      throw Exception('Lỗi khi cập nhật màu nền: ${e.toString()}');
+    }
+  }
 }

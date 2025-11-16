@@ -7,7 +7,7 @@ class ListWord {
   final String? description;
   final DateTime? createdAt;
   final int? wordCount;
-
+  final String? backgroundColor;
   // ✨ THÊM 2 TRƯỜNG CÒN THIẾU NÀY
   final int? rememberedCount;
   final int? toReviewCount;
@@ -19,6 +19,7 @@ class ListWord {
     this.description,
     this.createdAt,
     this.wordCount,
+    this.backgroundColor,
     // ✨ THÊM 2 TRƯỜNG VÀO CONSTRUCTOR
     this.rememberedCount,
     this.toReviewCount,
@@ -32,7 +33,7 @@ class ListWord {
       description: json['description'],
       createdAt: json['created_at'] != null ? DateTime.parse(json['created_at']) : null,
       wordCount: json['word_count'],
-
+      backgroundColor: json['background_color'],
       // ✨ THÊM 2 DÒNG NÀY ĐỂ ĐỌC DỮ LIỆU TỪ SUPABASE
       rememberedCount: json['remembered_count'],
       toReviewCount: json['to_review_count'],
@@ -45,6 +46,7 @@ class ListWord {
       'user_id': userId,
       'title': title,
       if (description != null) 'description': description,
+      if (backgroundColor != null) 'background_color': backgroundColor,
     };
   }
 }
