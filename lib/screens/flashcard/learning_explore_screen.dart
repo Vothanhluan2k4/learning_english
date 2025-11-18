@@ -43,22 +43,14 @@ class _LearningExploreScreenState extends State<LearningExploreScreen> {
   Map<String, String> _userWordStatuses = {};
   String? _currentAuthId;
 
-  // COLORS
+  // Modern Colors
   static const Color _PRIMARY = Color(0xFF6C5CE7);
   static const Color _ACCENT = Color(0xFF00B894);
+  static const Color _BG_COLOR = Color(0xFFF8F9FE);
   static const Color _EASY_COLOR = Color(0xFF43A047);
   static const Color _MEDIUM_COLOR = Color(0xFFFB8C00);
   static const Color _HARD_COLOR = Color(0xFFE53935);
   static const Color _ERROR_COLOR = Color(0xFFFF7675);
-  static const Color _BLUE_700 = Color(0xFF1976D2);
-  static const Color _AMBER_50 = Color(0xFFFFF8E1);
-  static const Color _AMBER_200 = Color(0xFFFFECB3);
-  static const Color _AMBER_700 = Color(0xFFFFA000);
-
-  Color get _primaryOpacity005 => _PRIMARY.withOpacity(0.05);
-  Color get _primaryOpacity01 => _PRIMARY.withOpacity(0.1);
-  Color get _primaryOpacity02 => _PRIMARY.withOpacity(0.2);
-  Color get _accentOpacity015 => _ACCENT.withOpacity(0.15);
 
   final List<String> _STOP_WORDS_VI = const [
     'là', 'và', 'của', 'cái', 'chiếc', 'này', 'kia', 'ở', 'tại',
@@ -161,10 +153,20 @@ class _LearningExploreScreenState extends State<LearningExploreScreen> {
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        backgroundColor: Colors.white,
         title: Row(
           children: [
-            Icon(Icons.school_rounded, color: _MEDIUM_COLOR, size: 28),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [_MEDIUM_COLOR, _MEDIUM_COLOR.withOpacity(0.7)],
+                ),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.school_rounded, color: Colors.white, size: 24),
+            ),
             const SizedBox(width: 12),
             const Expanded(
               child: Text(
@@ -176,7 +178,7 @@ class _LearningExploreScreenState extends State<LearningExploreScreen> {
         ),
         content: Text(
           'Bộ thẻ có $knownCount từ đã nhớ và $notKnownCount từ cần ôn tập. Bạn muốn ôn tập như thế nào?',
-          style: const TextStyle(fontSize: 15, height: 1.5),
+          style: const TextStyle(fontSize: 15, height: 1.6),
         ),
         actions: [
           TextButton(
@@ -199,7 +201,7 @@ class _LearningExploreScreenState extends State<LearningExploreScreen> {
               backgroundColor: _PRIMARY,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
             child: const Text('Ôn lại tất cả', style: TextStyle(fontSize: 15)),
           ),
@@ -512,16 +514,23 @@ class _LearningExploreScreenState extends State<LearningExploreScreen> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return Scaffold(
-        backgroundColor: Colors.grey[50],
+        backgroundColor: _BG_COLOR,
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const CircularProgressIndicator(color: _PRIMARY),
-              const SizedBox(height: 16),
+              CircularProgressIndicator(
+                strokeWidth: 3,
+                valueColor: const AlwaysStoppedAnimation<Color>(_PRIMARY),
+              ),
+              const SizedBox(height: 24),
               Text(
                 'Đang tải bài học...',
-                style: TextStyle(color: Colors.grey[600], fontSize: 15),
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ],
           ),
@@ -536,32 +545,8 @@ class _LearningExploreScreenState extends State<LearningExploreScreen> {
     return ScaffoldMessenger(
       key: _scaffoldMessengerKey,
       child: Scaffold(
-        backgroundColor: Colors.grey[50],
-        appBar: AppBar(
-          title: Text(
-            'Khám phá: ${widget.list.title}',
-            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 18),
-            overflow: TextOverflow.ellipsis,
-          ),
-          centerTitle: false,
-          leading: IconButton(
-            icon: const Icon(Icons.close_rounded, size: 26),
-            onPressed: _handleStopLearning,
-          ),
-          backgroundColor: Colors.white,
-          foregroundColor: Colors.black87,
-          elevation: 0,
-          actions: [
-            Padding(
-              padding: const EdgeInsets.only(right: 8.0),
-              child: IconButton(
-                onPressed: _showSaveFeaturePlaceholder,
-                icon: const Icon(Icons.bookmark_add_outlined, color: _PRIMARY),
-                tooltip: 'Lưu vào Bộ thẻ của tôi',
-              ),
-            ),
-          ],
-        ),
+        backgroundColor: _BG_COLOR,
+        appBar: _buildAppBar(),
         body: SafeArea(
           child: LayoutBuilder(
             builder: (context, constraints) {
@@ -592,11 +577,121 @@ class _LearningExploreScreenState extends State<LearningExploreScreen> {
     );
   }
 
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      title: Text(
+        'Khám phá: ${widget.list.title}',
+        style: const TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 18,
+          letterSpacing: -0.3,
+        ),
+        overflow: TextOverflow.ellipsis,
+      ),
+      centerTitle: false,
+      leading: IconButton(
+        icon: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.grey[100],
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: const Icon(Icons.close_rounded, size: 20),
+        ),
+        onPressed: _handleStopLearning,
+      ),
+      backgroundColor: Colors.white,
+      foregroundColor: Colors.black87,
+      elevation: 0,
+      actions: [
+        IconButton(
+          onPressed: _showSaveFeaturePlaceholder,
+          icon: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: _PRIMARY.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.bookmark_add_outlined, color: _PRIMARY, size: 20),
+          ),
+          tooltip: 'Lưu vào Bộ thẻ của tôi',
+        ),
+        const SizedBox(width: 8),
+      ],
+    );
+  }
+
+  Widget _buildProgressBar() {
+    final total = _exploreWords.length;
+    final progress = total > 0 ? (_currentIndex + 1) / total : 0.0;
+
+    return Column(
+      children: [
+        Container(
+          height: 10,
+          decoration: BoxDecoration(
+            color: Colors.grey[200],
+            borderRadius: BorderRadius.circular(10),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: LinearProgressIndicator(
+              value: progress,
+              backgroundColor: Colors.transparent,
+              valueColor: AlwaysStoppedAnimation<Color>(_PRIMARY),
+              minHeight: 10,
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Câu ${_currentIndex + 1} / $total',
+              style: const TextStyle(
+                color: Colors.black87,
+                fontWeight: FontWeight.bold,
+                fontSize: 15,
+                letterSpacing: -0.2,
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [_PRIMARY.withOpacity(0.15), _PRIMARY.withOpacity(0.05)],
+                ),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: _PRIMARY.withOpacity(0.2)),
+              ),
+              child: Text(
+                '${(progress * 100).toInt()}%',
+                style: const TextStyle(
+                  color: _PRIMARY,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
   Widget _buildWordCardWithLevels(ExploreWord word) {
     return Column(
       children: [
         _buildWordCard(word, allowFlip: true),
-        const SizedBox(height: 24),
+        const SizedBox(height: 28),
         _buildInitialAssessmentControls(),
       ],
     );
@@ -606,129 +701,8 @@ class _LearningExploreScreenState extends State<LearningExploreScreen> {
     return Column(
       children: [
         _buildReviewExerciseCard(word),
-        const SizedBox(height: 20),
+        const SizedBox(height: 24),
         _buildActiveReviewControls(word),
-      ],
-    );
-  }
-
-  Widget _buildMultipleChoice(ExploreWord word) {
-    List<String> options = [word.define];
-
-    final others = _exploreWords.where((w) => w.word != word.word).toList()..shuffle();
-    options.addAll(others.take(3).map((w) => w.define).where((d) => d.isNotEmpty));
-    options.shuffle();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          'Chọn định nghĩa đúng cho "${word.word}":',
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.black87),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 16),
-        ...options.map((opt) {
-          final isCorrect = opt == word.define;
-
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: _showAnswer ? null : () => _checkAnswerAndAdvance(selectedChoice: opt),
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  decoration: BoxDecoration(
-                    color: _showAnswer && isCorrect ? _EASY_COLOR : Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: _showAnswer && isCorrect ? _EASY_COLOR : Colors.grey.shade300,
-                      width: 1.5,
-                    ),
-                  ),
-                  child: Text(
-                    opt,
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: _showAnswer && isCorrect ? Colors.white : Colors.black87,
-                      height: 1.4,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          );
-        }).toList(),
-      ],
-    );
-  }
-
-  Widget _buildFillInInputs(ExploreWord word) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('Điền từ:', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _answerController,
-          onChanged: (_) => setState(() {}),
-          decoration: InputDecoration(
-            hintText: 'Nhập từ...',
-            hintStyle: TextStyle(color: Colors.grey[400]),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey.shade300),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey.shade300),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: _PRIMARY, width: 2),
-            ),
-            filled: true,
-            fillColor: Colors.white,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            labelText: _showAnswer ? word.word : null,
-            labelStyle: const TextStyle(color: _EASY_COLOR, fontWeight: FontWeight.w600),
-          ),
-          readOnly: _showAnswer,
-        ),
-        if (_currentReviewLevel == Difficulty.hard) ...[
-          const SizedBox(height: 16),
-          const Text('Điền nghĩa:', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _meaningController,
-            onChanged: (_) => setState(() {}),
-            maxLines: 2,
-            decoration: InputDecoration(
-              hintText: 'Nhập nghĩa...',
-              hintStyle: TextStyle(color: Colors.grey[400]),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.grey.shade300),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.grey.shade300),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: _PRIMARY, width: 2),
-              ),
-              filled: true,
-              fillColor: Colors.white,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              labelText: _showAnswer ? word.define : null,
-              labelStyle: const TextStyle(color: _EASY_COLOR, fontWeight: FontWeight.w600),
-            ),
-            readOnly: _showAnswer,
-          ),
-        ],
       ],
     );
   }
@@ -738,72 +712,63 @@ class _LearningExploreScreenState extends State<LearningExploreScreen> {
       child: Container(
         constraints: const BoxConstraints(maxWidth: 600),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
+          gradient: LinearGradient(
+            colors: [Colors.white, Colors.blue[50]!.withOpacity(0.3)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.06),
-              blurRadius: 16,
-              offset: const Offset(0, 4),
+              color: _PRIMARY.withOpacity(0.15),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
             ),
           ],
         ),
         child: Padding(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(28),
           child: Column(
             children: [
               ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: 240, maxHeight: 280),
+                constraints: const BoxConstraints(minHeight: 260, maxHeight: 300),
                 child: Center(
                   child: AnimatedSwitcher(
                     duration: const Duration(milliseconds: 400),
-                    transitionBuilder: (child, animation) {
-                      final rotate = Tween(begin: pi, end: 0.0).animate(animation);
-                      return AnimatedBuilder(
-                        animation: rotate,
-                        child: child,
-                        builder: (context, child) {
-                          final isUnder = (ValueKey(_isFlipped) != child!.key);
-                          final value = isUnder ? min(rotate.value, pi / 2) : rotate.value;
-                          return Transform(
-                            transform: Matrix4.rotationY(value),
-                            alignment: Alignment.center,
-                            child: child,
-                          );
-                        },
-                      );
-                    },
                     child: _isFlipped
                         ? _buildBackSide(word)
                         : _buildFrontSide(word),
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
               Material(
-                color: _primaryOpacity005,
-                borderRadius: BorderRadius.circular(12),
+                color: Colors.transparent,
                 child: InkWell(
                   onTap: allowFlip ? _toggleCardFlip : null,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(14),
                   child: Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: _primaryOpacity02, width: 1),
+                      gradient: LinearGradient(
+                        colors: [_PRIMARY.withOpacity(0.1), _PRIMARY.withOpacity(0.05)],
+                      ),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: _PRIMARY.withOpacity(0.3), width: 1.5),
                     ),
                     child: const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(Icons.sync_alt_rounded, color: _PRIMARY, size: 24),
-                        SizedBox(width: 8),
+                        SizedBox(width: 10),
                         Text(
                           'Xem nghĩa',
                           style: TextStyle(
                             color: _PRIMARY,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            letterSpacing: 0.2,
                           ),
                         ),
                       ],
@@ -814,6 +779,88 @@ class _LearningExploreScreenState extends State<LearningExploreScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildFrontSide(ExploreWord word) {
+    return Column(
+      key: const ValueKey('front'),
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text(
+          word.word,
+          style: const TextStyle(
+            fontSize: 52,
+            fontWeight: FontWeight.bold,
+            color: _PRIMARY,
+            letterSpacing: -1,
+            height: 1.1,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        if (word.transcription?.isNotEmpty == true) ...[
+          const SizedBox(height: 12),
+          Text(
+            '/${word.transcription!}/',
+            style: TextStyle(
+              fontSize: 22,
+              color: Colors.grey[600],
+              fontStyle: FontStyle.italic,
+              letterSpacing: 0.3,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+        const SizedBox(height: 24),
+        Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [_ACCENT, _ACCENT.withOpacity(0.7)],
+            ),
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: _ACCENT.withOpacity(0.4),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => _playAudio(word.word),
+              borderRadius: BorderRadius.circular(100),
+              child: const Padding(
+                padding: EdgeInsets.all(20),
+                child: Icon(Icons.volume_up_rounded, color: Colors.white, size: 40),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBackSide(ExploreWord word) {
+    return Container(
+      key: const ValueKey('back'),
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            'Định nghĩa',
+            style: TextStyle(fontSize: 14, color: Colors.grey.shade600, fontWeight: FontWeight.w500, letterSpacing: 1),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            word.define ?? 'Không có định nghĩa',
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.black87, height: 1.3),
+          ),
+        ],
       ),
     );
   }
@@ -835,11 +882,22 @@ class _LearningExploreScreenState extends State<LearningExploreScreen> {
 
     return Container(
       constraints: const BoxConstraints(maxWidth: 600),
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: exerciseColor.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: exerciseColor.withOpacity(0.2), width: 1.5),
+        gradient: LinearGradient(
+          colors: [exerciseColor.withOpacity(0.08), Colors.white],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: exerciseColor.withOpacity(0.3), width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: exerciseColor.withOpacity(0.15),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -847,33 +905,203 @@ class _LearningExploreScreenState extends State<LearningExploreScreen> {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: exerciseColor.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(8),
+                  gradient: LinearGradient(
+                    colors: [exerciseColor, exerciseColor.withOpacity(0.7)],
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: exerciseColor.withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
                 ),
-                child: Icon(Icons.edit_note_rounded, color: exerciseColor, size: 22),
+                child: Icon(Icons.edit_note_rounded, color: Colors.white, size: 22),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 14),
               Expanded(
                 child: Text(
                   label,
                   style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
                     color: exerciseColor,
+                    letterSpacing: -0.2,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           if (_currentReviewLevel == Difficulty.easy)
             _buildMultipleChoice(word)
           else
             _buildFillInInputs(word),
         ],
       ),
+    );
+  }
+
+  Widget _buildMultipleChoice(ExploreWord word) {
+    List<String> options = [word.define];
+
+    final others = _exploreWords.where((w) => w.word != word.word).toList()..shuffle();
+    options.addAll(others.take(3).map((w) => w.define).where((d) => d.isNotEmpty));
+    options.shuffle();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Chọn định nghĩa đúng cho "${word.word}":',
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 18),
+        ...options.map((opt) {
+          final isCorrect = opt == word.define;
+
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: _showAnswer ? null : () => _checkAnswerAndAdvance(selectedChoice: opt),
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+                  decoration: BoxDecoration(
+                    gradient: _showAnswer && isCorrect
+                        ? LinearGradient(colors: [_EASY_COLOR, _EASY_COLOR.withOpacity(0.8)])
+                        : LinearGradient(colors: [Colors.white, Colors.grey[50]!]),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: _showAnswer && isCorrect ? _EASY_COLOR : Colors.grey.shade300,
+                      width: 2,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: _showAnswer && isCorrect
+                            ? _EASY_COLOR.withOpacity(0.3)
+                            : Colors.black.withOpacity(0.03),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Text(
+                    opt,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                      color: _showAnswer && isCorrect ? Colors.white : Colors.black87,
+                      height: 1.5,
+                      letterSpacing: 0.1,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ],
+    );
+  }
+
+  Widget _buildFillInInputs(ExploreWord word) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Điền từ:',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            letterSpacing: -0.2,
+          ),
+        ),
+        const SizedBox(height: 10),
+        TextField(
+          controller: _answerController,
+          onChanged: (_) => setState(() {}),
+          decoration: InputDecoration(
+            hintText: 'Nhập từ...',
+            hintStyle: TextStyle(color: Colors.grey[400]),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: Colors.grey.shade300, width: 2),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: Colors.grey.shade300, width: 2),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: _PRIMARY, width: 2),
+            ),
+            filled: true,
+            fillColor: Colors.white,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+            labelText: _showAnswer ? word.word : null,
+            labelStyle: const TextStyle(
+              color: _EASY_COLOR,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          readOnly: _showAnswer,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+        ),
+        if (_currentReviewLevel == Difficulty.hard) ...[
+          const SizedBox(height: 18),
+          const Text(
+            'Điền nghĩa:',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              letterSpacing: -0.2,
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _meaningController,
+            onChanged: (_) => setState(() {}),
+            maxLines: 3,
+            decoration: InputDecoration(
+              hintText: 'Nhập nghĩa...',
+              hintStyle: TextStyle(color: Colors.grey[400]),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(color: Colors.grey.shade300, width: 2),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(color: Colors.grey.shade300, width: 2),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: _PRIMARY, width: 2),
+              ),
+              filled: true,
+              fillColor: Colors.white,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+              labelText: _showAnswer ? word.define : null,
+              labelStyle: const TextStyle(
+                color: _EASY_COLOR,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            readOnly: _showAnswer,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+          ),
+        ],
+      ],
     );
   }
 
@@ -885,10 +1113,15 @@ class _LearningExploreScreenState extends State<LearningExploreScreen> {
           children: [
             const Text(
               'Bạn nhớ từ này ở mức độ nào?',
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: _PRIMARY),
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: _PRIMARY,
+                letterSpacing: -0.3,
+              ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
             LayoutBuilder(
               builder: (context, constraints) {
                 final isNarrow = constraints.maxWidth < 400;
@@ -897,9 +1130,9 @@ class _LearningExploreScreenState extends State<LearningExploreScreen> {
                   return Column(
                     children: [
                       _buildLevelButton('Dễ', _EASY_COLOR, Icons.sentiment_satisfied_alt, () => _startReviewLevel(Difficulty.easy)),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 16),
                       _buildLevelButton('Trung bình', _MEDIUM_COLOR, Icons.sentiment_neutral, () => _startReviewLevel(Difficulty.medium)),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 16),
                       _buildLevelButton('Khó', _HARD_COLOR, Icons.sentiment_dissatisfied, () => _startReviewLevel(Difficulty.hard)),
                     ],
                   );
@@ -915,13 +1148,20 @@ class _LearningExploreScreenState extends State<LearningExploreScreen> {
                 );
               },
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 28),
             TextButton.icon(
               onPressed: _moveToNextWord,
-              icon: const Icon(Icons.skip_next, color: _BLUE_700, size: 22),
-              label: const Text('Bỏ qua', style: TextStyle(color: _BLUE_700, fontSize: 15)),
+              icon: Icon(Icons.skip_next_rounded, color: Colors.blue[700], size: 24),
+              label: Text(
+                'Bỏ qua',
+                style: TextStyle(
+                  color: Colors.blue[700],
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
               style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               ),
             ),
           ],
@@ -938,28 +1178,43 @@ class _LearningExploreScreenState extends State<LearningExploreScreen> {
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: color.withOpacity(0.3),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
+                color: color.withOpacity(0.4),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
               ),
             ],
           ),
-          child: ElevatedButton(
-            onPressed: onPressed,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: color,
-              foregroundColor: Colors.white,
-              shape: const CircleBorder(),
-              padding: const EdgeInsets.all(18),
-              elevation: 0,
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [color, color.withOpacity(0.8)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              shape: BoxShape.circle,
             ),
-            child: Icon(icon, size: 32),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: onPressed,
+                borderRadius: BorderRadius.circular(100),
+                child: Padding(
+                  padding: const EdgeInsets.all(22),
+                  child: Icon(icon, size: 36, color: Colors.white),
+                ),
+              ),
+            ),
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         Text(
           text,
-          style: TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 14),
+          style: TextStyle(
+            color: color,
+            fontWeight: FontWeight.bold,
+            fontSize: 15,
+            letterSpacing: 0.2,
+          ),
           textAlign: TextAlign.center,
         ),
       ],
@@ -1007,26 +1262,61 @@ class _LearningExploreScreenState extends State<LearningExploreScreen> {
                       _playAudio(word.word);
                       setState(() {});
                     },
-                    icon: const Icon(Icons.remove_red_eye_outlined, size: 18),
-                    label: const Text('Xem Đáp án', style: TextStyle(fontSize: 15)),
+                    icon: const Icon(Icons.remove_red_eye_outlined, size: 20),
+                    label: const Text('Xem Đáp án', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: _PRIMARY,
-                      side: BorderSide(color: _showAnswer ? Colors.grey.shade300 : _PRIMARY, width: 1.5),
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      side: BorderSide(color: _showAnswer ? Colors.grey.shade300 : _PRIMARY, width: 2),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  ElevatedButton.icon(
-                    onPressed: mainButtonAction,
-                    icon: Icon(isContinueButton ? Icons.arrow_forward_rounded : Icons.check_circle_outline_rounded, size: 20),
-                    label: Text(mainButtonLabel, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: isContinueButton ? _PRIMARY : _ACCENT,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      elevation: 0,
+                  const SizedBox(height: 14),
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: isContinueButton
+                            ? [_PRIMARY, _PRIMARY.withOpacity(0.8)]
+                            : [_ACCENT, _ACCENT.withOpacity(0.8)],
+                      ),
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color: (isContinueButton ? _PRIMARY : _ACCENT).withOpacity(0.3),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: mainButtonAction,
+                        borderRadius: BorderRadius.circular(14),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                isContinueButton ? Icons.arrow_forward_rounded : Icons.check_circle_outline_rounded,
+                                size: 22,
+                                color: Colors.white,
+                              ),
+                              const SizedBox(width: 10),
+                              Text(
+                                mainButtonLabel,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                  letterSpacing: 0.3,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -1035,33 +1325,71 @@ class _LearningExploreScreenState extends State<LearningExploreScreen> {
 
             return Row(
               children: [
-                OutlinedButton.icon(
-                  onPressed: _showAnswer ? null : () {
-                    _showCorrectAnswer();
-                    _playAudio(word.word);
-                    setState(() {});
-                  },
-                  icon: const Icon(Icons.remove_red_eye_outlined, size: 18),
-                  label: const Text('Xem Đáp án', style: TextStyle(fontSize: 15)),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: _PRIMARY,
-                    side: BorderSide(color: _showAnswer ? Colors.grey.shade300 : _PRIMARY, width: 1.5),
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _showAnswer ? null : () {
+                      _showCorrectAnswer();
+                      _playAudio(word.word);
+                      setState(() {});
+                    },
+                    icon: const Icon(Icons.remove_red_eye_outlined, size: 20),
+                    label: const Text('Xem Đáp án', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: _PRIMARY,
+                      side: BorderSide(color: _showAnswer ? Colors.grey.shade300 : _PRIMARY, width: 2),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 14),
                 Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: mainButtonAction,
-                    icon: Icon(isContinueButton ? Icons.arrow_forward_rounded : Icons.check_circle_outline_rounded, size: 20),
-                    label: Text(mainButtonLabel, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: isContinueButton ? _PRIMARY : _ACCENT,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      elevation: 0,
+                  flex: 2,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: isContinueButton
+                            ? [_PRIMARY, _PRIMARY.withOpacity(0.8)]
+                            : [_ACCENT, _ACCENT.withOpacity(0.8)],
+                      ),
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color: (isContinueButton ? _PRIMARY : _ACCENT).withOpacity(0.3),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: mainButtonAction,
+                        borderRadius: BorderRadius.circular(14),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                isContinueButton ? Icons.arrow_forward_rounded : Icons.check_circle_outline_rounded,
+                                size: 22,
+                                color: Colors.white,
+                              ),
+                              const SizedBox(width: 10),
+                              Text(
+                                mainButtonLabel,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                  letterSpacing: 0.3,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -1073,300 +1401,168 @@ class _LearningExploreScreenState extends State<LearningExploreScreen> {
     );
   }
 
-  Widget _buildProgressBar() {
-    final total = _exploreWords.length;
-    final progress = total > 0 ? (_currentIndex + 1) / total : 0.0;
-
-    return Column(
-      children: [
-        Container(
-          height: 8,
-          decoration: BoxDecoration(
-            color: Colors.grey.shade200,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: LinearProgressIndicator(
-              value: progress,
-              backgroundColor: Colors.transparent,
-              valueColor: const AlwaysStoppedAnimation<Color>(_PRIMARY),
-              minHeight: 8,
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              "Câu ${_currentIndex + 1} / $total",
-              style: const TextStyle(
-                color: Colors.black87,
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-              decoration: BoxDecoration(
-                color: _primaryOpacity01,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Text(
-                "${(progress * 100).toInt()}%",
-                style: const TextStyle(
-                  color: _PRIMARY,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildFrontSide(ExploreWord word) {
-    return SingleChildScrollView(
-      child: Column(
-        key: const ValueKey('front'),
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            word.word,
-            style: const TextStyle(
-              fontSize: 48,
-              fontWeight: FontWeight.bold,
-              color: _PRIMARY,
-              letterSpacing: -0.5,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          if (word.transcription?.isNotEmpty == true) ...[
-            const SizedBox(height: 10),
-            Text(
-              '/${word.transcription!}/',
-              style: TextStyle(
-                fontSize: 20,
-                color: Colors.grey.shade600,
-                fontStyle: FontStyle.italic,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-          const SizedBox(height: 20),
-          Container(
-            decoration: BoxDecoration(
-              color: _accentOpacity015,
-              shape: BoxShape.circle,
-            ),
-            child: IconButton(
-              onPressed: () => _playAudio(word.word),
-              icon: const Icon(Icons.volume_up_rounded, color: _ACCENT, size: 36),
-              iconSize: 56,
-              padding: const EdgeInsets.all(18),
-              tooltip: 'Phát âm',
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBackSide(ExploreWord word) {
-    return SingleChildScrollView(
-      child: Column(
-        key: const ValueKey('back'),
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: _BLUE_700,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: const Text(
-              'Định nghĩa',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Text(
-              word.define,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.w600,
-                color: Colors.black87,
-                height: 1.4,
-              ),
-            ),
-          ),
-          if (word.example?.isNotEmpty == true) ...[
-            const SizedBox(height: 20),
-            Container(
-              padding: const EdgeInsets.all(14),
-              margin: const EdgeInsets.symmetric(horizontal: 12),
-              decoration: BoxDecoration(
-                color: _AMBER_50,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: _AMBER_200, width: 1),
-              ),
-              child: Column(
-                children: [
-                  const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.lightbulb_outline, size: 16, color: _AMBER_700),
-                      SizedBox(width: 6),
-                      Text(
-                        'Ví dụ',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: _AMBER_700,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    word.example!,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey.shade700,
-                      fontStyle: FontStyle.italic,
-                      height: 1.5,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
   Widget _buildCompletionView() {
     return Center(
       child: Container(
         constraints: const BoxConstraints(maxWidth: 600),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(24),
+          gradient: LinearGradient(
+            colors: [Colors.white, Colors.green[50]!.withOpacity(0.3)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(28),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.06),
-              blurRadius: 16,
-              offset: const Offset(0, 4),
+              color: _ACCENT.withOpacity(0.2),
+              blurRadius: 24,
+              offset: const Offset(0, 8),
             ),
           ],
         ),
         child: Padding(
-          padding: const EdgeInsets.all(32),
+          padding: const EdgeInsets.all(36),
           child: Column(
             children: [
               Container(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  color: _accentOpacity015,
+                  gradient: LinearGradient(
+                    colors: [_ACCENT, _ACCENT.withOpacity(0.7)],
+                  ),
                   shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: _ACCENT.withOpacity(0.4),
+                      blurRadius: 20,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
                 ),
                 child: const Icon(
                   Icons.celebration_rounded,
                   size: 72,
-                  color: _ACCENT,
+                  color: Colors.white,
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
               const Text(
                 'Xuất sắc!',
                 style: TextStyle(
-                  fontSize: 28,
+                  fontSize: 32,
                   fontWeight: FontWeight.bold,
                   color: Colors.black87,
-                  letterSpacing: -0.5,
+                  letterSpacing: -0.8,
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               Text(
                 'Bạn đã hoàn thành ${_exploreWords.length} từ trong bộ thẻ',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 15,
+                  fontSize: 16,
                   color: Colors.grey[700],
-                  height: 1.5,
+                  height: 1.6,
+                  letterSpacing: 0.1,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 decoration: BoxDecoration(
-                  color: _primaryOpacity01,
-                  borderRadius: BorderRadius.circular(16),
+                  gradient: LinearGradient(
+                    colors: [_PRIMARY.withOpacity(0.15), _PRIMARY.withOpacity(0.05)],
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: _PRIMARY.withOpacity(0.2)),
                 ),
                 child: Text(
                   '"${widget.list.title}"',
                   style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
                     color: _PRIMARY,
+                    letterSpacing: 0.2,
                   ),
                   textAlign: TextAlign.center,
                   overflow: TextOverflow.ellipsis,
                   maxLines: 2,
                 ),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 36),
               SizedBox(
                 width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: _isMarkingAsKnown ? null : _markAllAsKnown,
-                  icon: _isMarkingAsKnown
-                      ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                  )
-                      : const Icon(Icons.check_circle_rounded, size: 22),
-                  label: Text(
-                    _isMarkingAsKnown ? 'Đang đánh dấu...' : 'Đánh dấu tất cả là Đã nhớ',
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [_EASY_COLOR, _EASY_COLOR.withOpacity(0.8)],
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: [
+                      BoxShadow(
+                        color: _EASY_COLOR.withOpacity(0.3),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _EASY_COLOR,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    elevation: 0,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: _isMarkingAsKnown ? null : _markAllAsKnown,
+                      borderRadius: BorderRadius.circular(14),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            if (_isMarkingAsKnown)
+                              const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.5,
+                                  color: Colors.white,
+                                ),
+                              )
+                            else
+                              const Icon(Icons.check_circle_rounded, size: 24, color: Colors.white),
+                            const SizedBox(width: 12),
+                            Text(
+                              _isMarkingAsKnown ? 'Đang đánh dấu...' : 'Đánh dấu tất cả là Đã nhớ',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
                   onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.explore_rounded, size: 22),
+                  icon: const Icon(Icons.explore_rounded, size: 24),
                   label: const Text(
                     'Tiếp tục khám phá',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.3,
+                    ),
                   ),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: _PRIMARY,
-                    side: const BorderSide(color: _PRIMARY, width: 1.5),
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    side: const BorderSide(color: _PRIMARY, width: 2),
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
                 ),
               ),
