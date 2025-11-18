@@ -202,7 +202,7 @@ class _DrawerScreenState extends State<DrawerScreen> {
       case 2:
         return 'Ngữ pháp';
       case 3:
-        return 'FashCard';
+        return 'FlashCard';
       case 4:
         return 'Thống kê';
       case 5:
