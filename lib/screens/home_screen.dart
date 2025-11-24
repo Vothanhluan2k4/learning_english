@@ -4,7 +4,7 @@ import 'package:learning_english/screens/drawer_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:learning_english/models/notification.dart';
 import 'package:learning_english/services/notification_service.dart';
-import 'package:learning_english/services/learning_service.dart'; // 🔥 NEW
+import 'package:learning_english/services/learning_service.dart'; 
 import 'package:learning_english/core/utils/date_formatter.dart';
 import 'package:learning_english/screens/learning_hub/choose_learning_screen.dart';
 
@@ -519,18 +519,6 @@ class _HomeScreenState extends State<HomeScreen> {
     Color iconColor = Color(0xFF1976D2);
     Color bgColor = Color(0xFFE3F2FD);
     Color borderColor = Color(0xFF90CAF9);
-    
-    if (totalMistakes > 20) {
-      tipIcon = Icons.warning_amber_rounded;
-      iconColor = Color(0xFFFF9800);
-      bgColor = Color(0xFFFFF3E0);
-      borderColor = Color(0xFFFFB74D);
-    } else if (totalMistakes > 10) {
-      tipIcon = Icons.lightbulb_outline;
-      iconColor = Color(0xFFFFA726);
-      bgColor = Color(0xFFFFF8E1);
-      borderColor = Color(0xFFFFD54F);
-    }
 
     return Container(
       padding: EdgeInsets.all(20),

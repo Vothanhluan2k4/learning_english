@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:collection/collection.dart';
 import '../../models/lesson_question.dart';
 import '../../models/question_option.dart';
+import '../../models/lesson_section.dart';
 import '../../services/auth_service.dart';
 import '../../services/lesson_section_service.dart';
 import '../../services/user_attempt_service.dart';
@@ -30,7 +32,7 @@ class CourseQuizContent extends StatefulWidget {
 
 class _CourseQuizContentState extends State<CourseQuizContent> {
   late String? _attemptId;
-  late Map<String, String?> _selectedAnswers;
+  late Map<String, dynamic> _selectedAnswers; 
   late Map<String, bool> _submittedQuestions;
   late Map<String, int> _questionStartTime;
   bool _isSubmitting = false;
@@ -38,9 +40,12 @@ class _CourseQuizContentState extends State<CourseQuizContent> {
   bool _isSubmittedAll = false;
   String? _initError;
   late int _correctCount = 0;
-  late bool? _attemptIsPassed; // ✅ Thêm state is_passed
+  late bool? _attemptIsPassed;
   final _supabase = Supabase.instance.client;
   final _authService = AuthService();
+
+  // ✅ NEW: Store sections data
+  Map<String, LessonSection> _sectionsMap = {};
 
   @override
   void initState() {
@@ -50,18 +55,43 @@ class _CourseQuizContentState extends State<CourseQuizContent> {
     _submittedQuestions = {};
     _questionStartTime = {};
     _isSubmittedAll = false;
-    _attemptIsPassed = null; // ✅ Initialize is_passed
-     _correctCount = 0;
+    _attemptIsPassed = null;
+    _correctCount = 0;
 
-
+    // ✅ Initialize selected answers
     for (var q in widget.questions) {
       final question = q['question'] as LessonQuestion;
-      _selectedAnswers[question.id] = null;
+      
+      // ✅ For multiple_choice: store as List, for single_choice: store as String
+      if (question.questionType == 'multiple_choice') {
+        _selectedAnswers[question.id] = <String>[]; // Empty list
+      } else {
+        _selectedAnswers[question.id] = null; 
+      }
+      
       _submittedQuestions[question.id] = false;
       _questionStartTime[question.id] = DateTime.now().millisecondsSinceEpoch;
     }
 
     _initializeAttempt();
+    _loadSections();
+  }
+
+  /// ✅ NEW: Load sections data
+  Future<void> _loadSections() async {
+    try {
+      final sections = await widget.sectionService.fetchSectionsByLesson(widget.lessonId);
+      
+      setState(() {
+        _sectionsMap = {
+          for (var section in sections) section.id: section
+        };
+      });
+      
+      debugPrint('✅ Loaded ${sections.length} sections');
+    } catch (e) {
+      debugPrint('❌ Error loading sections: $e');
+    }
   }
 
   Future<void> _initializeAttempt() async {
@@ -72,53 +102,90 @@ class _CourseQuizContentState extends State<CourseQuizContent> {
       final authId = authUser.id;
       final userId = await _authService.getUserIdFromAuthId(authId);
       if (userId == null) throw Exception('User not found');
+      
       debugPrint('📝 Checking for existing attempt for lesson: ${widget.lessonId}');
 
-      // ✅ Step 1: Kiểm tra attempt đã hoàn thành trước
-      final completedAttempt =
-          await widget.attemptService.getCompletedAttempt(
+      // ✅ Step 1: Check completed attempt
+      final completedAttempt = await widget.attemptService.getCompletedAttempt(
         lessonId: widget.lessonId,
       );
 
       if (completedAttempt != null) {
         debugPrint('✅ Found COMPLETED attempt: ${completedAttempt.id}');
-        debugPrint('   Score: ${completedAttempt.score}');
-        debugPrint('   Passed: ${completedAttempt.isPassed}');
 
         final savedAnswers = await widget.attemptService.getSavedAnswers(
           completedAttempt.id,
         );
 
-        // ✅ Load số câu đúng từ user_attempt_questions
+        // ✅ DEBUG: Log saved answers vs current questions
+        debugPrint('📊 Saved answers: ${savedAnswers.keys.toList()}');
+        debugPrint('📊 Current questions: ${widget.questions.map((q) => (q["question"] as LessonQuestion).id).toList()}');
+
         final correctCount = await _loadCorrectCount(completedAttempt.id);
 
         setState(() {
           _attemptId = completedAttempt.id;
           _attemptIsPassed = completedAttempt.isPassed;
-          _correctCount = correctCount; // ✅ Load số câu đúng
+          _correctCount = correctCount;
+
+          int restoredCount = 0;
+          int skippedCount = 0;
 
           for (var entry in savedAnswers.entries) {
             final questionId = entry.key;
             final data = entry.value;
-            _selectedAnswers[questionId] =
-                data['selected_option_id'] as String?;
+
+            // ✅ Get selected option IDs (support both single and multiple)
+            List<String>? selectedIds = data['selected_option_ids_parsed'] as List<String>?;
+            
+            // ✅ Fallback to single option if no array
+            if (selectedIds == null || selectedIds.isEmpty) {
+              final singleId = data['selected_option_id'] as String?;
+              if (singleId != null) {
+                selectedIds = [singleId];
+              }
+            }
+
+            if (selectedIds == null || selectedIds.isEmpty) {
+              debugPrint('⚠️ No selected options for question $questionId');
+              skippedCount++;
+              continue;
+            }
+
+            final question = widget.questions
+                .map((q) => q['question'] as LessonQuestion)
+                .firstWhereOrNull((q) => q.id == questionId);
+            
+            if (question == null) {
+              debugPrint('⚠️ Question $questionId not found in widget.questions');
+              skippedCount++;
+              continue;
+            }
+            
+            // ✅ Restore based on question type
+            if (question.questionType == 'multiple_choice') {
+              _selectedAnswers[questionId] = selectedIds; // ✅ List
+            } else {
+              _selectedAnswers[questionId] = selectedIds.first; // ✅ Single value
+            }
+            
             _submittedQuestions[questionId] = true;
+            restoredCount++;
           }
+
+          debugPrint('✅ Restored $restoredCount answers, skipped $skippedCount');
 
           _attemptInitialized = true;
           _initError = null;
           _isSubmittedAll = true;
         });
 
-        debugPrint(
-          '✅ Completed attempt restored with ${savedAnswers.length} saved answers, correct: $_correctCount',
-        );
+        debugPrint('✅ Completed attempt restored');
         return;
       }
 
-      // ✅ Step 2: Kiểm tra attempt hiện tại (chưa nộp bài)
-      final existingAttempt =
-          await widget.attemptService.getCurrentAttempt(
+      // ✅ Step 2: Check incomplete attempt
+      final existingAttempt = await widget.attemptService.getCurrentAttempt(
         lessonId: widget.lessonId,
       );
 
@@ -129,36 +196,78 @@ class _CourseQuizContentState extends State<CourseQuizContent> {
           existingAttempt.id,
         );
 
+        // ✅ DEBUG: Log saved answers vs current questions
+        debugPrint('📊 Saved answers: ${savedAnswers.keys.toList()}');
+        debugPrint('📊 Current questions: ${widget.questions.map((q) => (q["question"] as LessonQuestion).id).toList()}');
+
         setState(() {
           _attemptId = existingAttempt.id;
+
+          int restoredCount = 0;
+          int skippedCount = 0;
 
           for (var entry in savedAnswers.entries) {
             final questionId = entry.key;
             final data = entry.value;
-            _selectedAnswers[questionId] =
-                data['selected_option_id'] as String?;
+
+            // ✅ Get selected option IDs (support both single and multiple)
+            List<String>? selectedIds = data['selected_option_ids_parsed'] as List<String>?;
+            
+            // ✅ Fallback to single option if no array
+            if (selectedIds == null || selectedIds.isEmpty) {
+              final singleId = data['selected_option_id'] as String?;
+              if (singleId != null) {
+                selectedIds = [singleId];
+              }
+            }
+
+            if (selectedIds == null || selectedIds.isEmpty) {
+              debugPrint('⚠️ No selected options for question $questionId');
+              skippedCount++;
+              continue;
+            }
+
+            final question = widget.questions
+                .map((q) => q['question'] as LessonQuestion)
+                .firstWhereOrNull((q) => q.id == questionId);
+            
+            if (question == null) {
+              debugPrint('⚠️ Question $questionId not found in widget.questions');
+              skippedCount++;
+              continue;
+            }
+            
+            // ✅ Restore based on question type
+            if (question.questionType == 'multiple_choice') {
+              _selectedAnswers[questionId] = selectedIds; // ✅ Full list
+              debugPrint('✅ Restored multiple choice: $questionId → $selectedIds');
+            } else {
+              _selectedAnswers[questionId] = selectedIds.first; // ✅ Single value
+              debugPrint('✅ Restored single choice: $questionId → ${selectedIds.first}');
+            }
+            
             _submittedQuestions[questionId] = true;
+            restoredCount++;
           }
+
+          debugPrint('✅ Restored $restoredCount answers, skipped $skippedCount');
 
           _attemptInitialized = true;
           _initError = null;
           _isSubmittedAll = false;
         });
 
-        debugPrint(
-          '✅ Incomplete attempt restored with ${savedAnswers.length} saved answers',
-        );
+        debugPrint('✅ Incomplete attempt restored');
         return;
       }
 
-      // ✅ Step 3: Không có attempt nào, tạo attempt mới
+      // ✅ Step 3: Create new attempt
       debugPrint('📝 No existing attempt, creating new one');
 
       try {
         await widget.attemptService.updateLessonProgress(
           lessonId: widget.lessonId,
         );
-        debugPrint('✅ Progress status updated to in_progress');
       } catch (e) {
         debugPrint('⚠️ Warning updating progress: $e');
       }
@@ -176,7 +285,7 @@ class _CourseQuizContentState extends State<CourseQuizContent> {
         });
         debugPrint('✅ New attempt created: ${attempt.id}');
       } else {
-        throw Exception('❌ Failed to create attempt - returned null');
+        throw Exception('❌ Failed to create attempt');
       }
     } catch (e) {
       debugPrint('❌ Error initializing attempt: $e');
@@ -197,7 +306,6 @@ class _CourseQuizContentState extends State<CourseQuizContent> {
     }
   }
 
-  /// ✅ Helper: Load số câu đúng từ user_attempt_questions
   Future<int> _loadCorrectCount(String attemptId) async {
     try {
       final responses = await _supabase
@@ -218,9 +326,10 @@ class _CourseQuizContentState extends State<CourseQuizContent> {
     }
   }
 
+  /// ✅ FIXED: Submit answer (pass full selectedAnswer)
   Future<void> _submitAnswer({
     required String questionId,
-    required String selectedOptionId,
+    required dynamic selectedAnswer, // Can be String or List<String>
   }) async {
     if (_isSubmitting || !_attemptInitialized || _attemptId == null) return;
 
@@ -235,14 +344,31 @@ class _CourseQuizContentState extends State<CourseQuizContent> {
         (q) => (q['question'] as LessonQuestion).id == questionId,
       );
       final options = question['options'] as List<QuestionOption>;
-      final selectedOption =
-          options.firstWhere((o) => o.id == selectedOptionId);
+      final questionData = question['question'] as LessonQuestion;
 
+      bool isCorrect = false;
+
+      // ✅ Check correctness based on question type
+      if (questionData.questionType == 'multiple_choice') {
+        final selectedList = selectedAnswer as List<String>;
+        final correctOptions = options.where((o) => o.isCorrect).map((o) => o.id).toSet();
+        final selectedSet = selectedList.toSet();
+        
+        isCorrect = selectedSet.length == correctOptions.length &&
+                    selectedSet.containsAll(correctOptions);
+                    
+        debugPrint('Multiple choice: selected=$selectedSet, correct=$correctOptions, isCorrect=$isCorrect');
+      } else {
+        final selectedOption = options.firstWhere((o) => o.id == selectedAnswer);
+        isCorrect = selectedOption.isCorrect;
+      }
+
+      // ✅ FIXED: Pass full selectedAnswer (not just first element)
       final saved = await widget.attemptService.saveQuestionAnswer(
         attemptId: _attemptId!,
         questionId: questionId,
-        selectedOptionId: selectedOptionId,
-        isCorrect: selectedOption.isCorrect,
+        selectedAnswer: selectedAnswer, // ✅ Pass as-is (String or List<String>)
+        isCorrect: isCorrect,
         timeSpent: timeSpent,
       );
 
@@ -254,7 +380,11 @@ class _CourseQuizContentState extends State<CourseQuizContent> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: const Text('Đã lưu câu trả lời'),
+              content: Text(
+                selectedAnswer is List 
+                    ? 'Đã lưu ${selectedAnswer.length} đáp án' // ✅ Show count
+                    : 'Đã lưu câu trả lời'
+              ),
               backgroundColor: Colors.green.shade700,
               duration: const Duration(milliseconds: 800),
             ),
@@ -273,48 +403,34 @@ class _CourseQuizContentState extends State<CourseQuizContent> {
     }
   }
 
-  /// ✅ Tính số câu đúng cần thiết
   int _calculateRequiredCorrect() {
     if (widget.totalQuestions == 0) return 0;
-
-    final required = (widget.totalQuestions * (widget.targetScore / 100)).ceil();
-
-    debugPrint('📊 Required calculation:');
-    debugPrint('   Total questions: ${widget.totalQuestions}');
-    debugPrint('   Target score: ${widget.targetScore}%');
-    debugPrint('   Required correct: $required');
-
-    return required;
+    return (widget.totalQuestions * (widget.targetScore / 100)).ceil();
   }
 
-  /// ✅ Helper: Lấy màu theo trạng thái
   MaterialColor _getStatusColor() {
-    if (!_isSubmittedAll) return Colors.orange; // Chưa nộp
-    if (_attemptIsPassed == true) return Colors.green; // Đã pass
-    return Colors.red; // Fail
+    if (!_isSubmittedAll) return Colors.orange;
+    if (_attemptIsPassed == true) return Colors.green;
+    return Colors.red;
   }
 
-  /// ✅ Helper: Lấy icon theo trạng thái
   IconData _getStatusIcon() {
     if (!_isSubmittedAll) return Icons.timer;
     if (_attemptIsPassed == true) return Icons.check_circle;
     return Icons.cancel;
   }
 
-  /// ✅ Helper: Lấy tiêu đề theo trạng thái
   String _getStatusTitle() {
     if (!_isSubmittedAll) return 'Đang làm bài';
-    if (_attemptIsPassed == true) return 'Hoàn thành - PASS ✅';
+    if (_attemptIsPassed == true) return 'Hoàn thành - PASS ';
     return 'Hoàn thành - FAIL ❌';
   }
   
-  /// ✅ Helper: Lấy mô tả theo trạng thái
   String _getStatusDescription() {
     if (!_isSubmittedAll) {
       final answered = _submittedQuestions.values.where((v) => v).length;
       return '$answered/${widget.questions.length} câu đã trả lời';
     }
-    // ✅ Luôn hiển thị số câu đúng khi đã nộp bài
     if (_attemptIsPassed == true) {
       return '$_correctCount/${widget.questions.length} câu đúng - Đạt yêu cầu ✅';
     }
@@ -339,12 +455,11 @@ class _CourseQuizContentState extends State<CourseQuizContent> {
         return;
       }
 
-      final answers =
-          await widget.attemptService.getAttemptAnswers(_attemptId!);
+      final answers = await widget.attemptService.getAttemptAnswers(_attemptId!);
       final score = widget.attemptService.calculateScore(answers);
 
       final isPassed = score >= widget.targetScore;
-      final correctCount = answers.where((a) => a.isCorrect ?? false).length; // ✅ Tính số câu đúng
+      final correctCount = answers.where((a) => a.isCorrect ?? false).length;
 
       final finished = await widget.attemptService.finishAttempt(
         attemptId: _attemptId!,
@@ -357,7 +472,7 @@ class _CourseQuizContentState extends State<CourseQuizContent> {
         setState(() {
           _isSubmittedAll = true;
           _attemptIsPassed = isPassed;
-          _correctCount = correctCount; // ✅ Lưu số câu đúng
+          _correctCount = correctCount;
         });
         _showResultDialog(
           score: score,
@@ -378,15 +493,13 @@ class _CourseQuizContentState extends State<CourseQuizContent> {
     }
   }
 
- Future<void> _resetAllAnswers() async {
+  Future<void> _resetAllAnswers() async {
     try {
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('Reset bài tập?'),
-          content: const Text(
-            'Bạn có chắc muốn xoá tất cả câu trả lời và làm lại?',
-          ),
+          content: const Text('Bạn có chắc muốn xoá tất cả câu trả lời và làm lại?'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
@@ -394,9 +507,7 @@ class _CourseQuizContentState extends State<CourseQuizContent> {
             ),
             TextButton(
               onPressed: () => Navigator.pop(context, true),
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.red,
-              ),
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
               child: const Text('Xoá'),
             ),
           ],
@@ -408,12 +519,9 @@ class _CourseQuizContentState extends State<CourseQuizContent> {
       setState(() => _isSubmitting = true);
 
       if (_attemptId != null) {
-        debugPrint('🗑️ Deleting attempt: $_attemptId');
         final deleted = await widget.attemptService.deleteAttempt(_attemptId!);
 
         if (deleted) {
-          debugPrint('✅ Attempt deleted, resetting state...');
-
           setState(() {
             _attemptId = null;
             _selectedAnswers.clear();
@@ -422,40 +530,47 @@ class _CourseQuizContentState extends State<CourseQuizContent> {
             _attemptInitialized = false;
             _initError = null;
             _attemptIsPassed = null;
-            _correctCount = 0; // ✅ Reset số câu đúng
+            _correctCount = 0;
 
             for (var q in widget.questions) {
               final question = q['question'] as LessonQuestion;
-              _selectedAnswers[question.id] = null;
+              
+              if (question.questionType == 'multiple_choice') {
+                _selectedAnswers[question.id] = <String>[];
+              } else {
+                _selectedAnswers[question.id] = null;
+              }
+              
               _submittedQuestions[question.id] = false;
-              _questionStartTime[question.id] =
-                  DateTime.now().millisecondsSinceEpoch;
+              _questionStartTime[question.id] = DateTime.now().millisecondsSinceEpoch;
             }
           });
 
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: const Text('✅ Đã reset bài tập'),
+                content: Row(
+                    children: const [
+                      Icon(Icons.check, size: 20),
+                      SizedBox(width: 8),
+                      Text('Đã xoá câu trả lời, bắt đầu lại bài tập'),
+                    ]
+                ),
                 backgroundColor: Colors.green.shade700,
                 duration: const Duration(milliseconds: 800),
+                
               ),
             );
           }
 
           await _initializeAttempt();
-        } else {
-          throw Exception('Failed to delete attempt');
         }
       }
     } catch (e) {
       debugPrint('❌ Error resetting: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Lỗi: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Lỗi: $e'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -474,10 +589,7 @@ class _CourseQuizContentState extends State<CourseQuizContent> {
             const SizedBox(height: 16),
             Text(
               'Đang chuẩn bị bài tập...',
-              style: TextStyle(
-                color: Colors.grey.shade600,
-                fontSize: 14,
-              ),
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
             ),
           ],
         ),
@@ -489,11 +601,7 @@ class _CourseQuizContentState extends State<CourseQuizContent> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.error_outline,
-              size: 48,
-              color: Colors.red.shade700,
-            ),
+            Icon(Icons.error_outline, size: 48, color: Colors.red.shade700),
             const SizedBox(height: 16),
             Text(
               'Lỗi khởi tạo bài tập',
@@ -508,10 +616,7 @@ class _CourseQuizContentState extends State<CourseQuizContent> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Text(
                 _initError!,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.red.shade600,
-                ),
+                style: TextStyle(fontSize: 12, color: Colors.red.shade600),
                 textAlign: TextAlign.center,
               ),
             ),
@@ -524,13 +629,8 @@ class _CourseQuizContentState extends State<CourseQuizContent> {
                 });
                 _initializeAttempt();
               },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red.shade700,
-              ),
-              child: const Text(
-                'Thử lại',
-                style: TextStyle(color: Colors.white),
-              ),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade700),
+              child: const Text('Thử lại', style: TextStyle(color: Colors.white)),
             ),
           ],
         ),
@@ -539,12 +639,30 @@ class _CourseQuizContentState extends State<CourseQuizContent> {
 
     final requiredCorrect = _calculateRequiredCorrect();
 
+    // ✅ Group questions by section
+    final Map<String, List<Map<String, dynamic>>> questionsBySection = {};
+    int globalQuestionNumber = 1;
+    
+    for (var q in widget.questions) {
+      final question = q['question'] as LessonQuestion;
+      final sectionId = question.sectionId;
+      
+      if (!questionsBySection.containsKey(sectionId)) {
+        questionsBySection[sectionId] = [];
+      }
+      
+      questionsBySection[sectionId]!.add({
+        ...q,
+        'globalNumber': globalQuestionNumber++,
+      });
+    }
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ✅ Target score info
+          // Target score info
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -552,48 +670,40 @@ class _CourseQuizContentState extends State<CourseQuizContent> {
               borderRadius: BorderRadius.circular(8),
               border: Border.all(color: Colors.blue.shade200),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
               children: [
-                Row(
-                  children: [
-                    Icon(
-                      Icons.info_outline,
-                      color: Colors.blue.shade700,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Yêu cầu đạt:',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.blue.shade700,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '${widget.targetScore.toStringAsFixed(0)}% ($requiredCorrect/${widget.totalQuestions} câu)',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.blue.shade900,
-                            ),
-                          ),
-                        ],
+                Icon(Icons.info_outline, color: Colors.blue.shade700),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Yêu cầu đạt:',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.blue.shade700,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 4),
+                      Text(
+                        '${widget.targetScore.toStringAsFixed(0)}% ($requiredCorrect/${widget.totalQuestions} câu)',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue.shade900,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 12),
 
-          // ✅ Status/Progress info - UPDATED
+          // Status/Progress info
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -603,10 +713,7 @@ class _CourseQuizContentState extends State<CourseQuizContent> {
             ),
             child: Row(
               children: [
-                Icon(
-                  _getStatusIcon(),
-                  color: _getStatusColor().shade700,
-                ),
+                Icon(_getStatusIcon(), color: _getStatusColor().shade700),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -637,20 +744,122 @@ class _CourseQuizContentState extends State<CourseQuizContent> {
           ),
           const SizedBox(height: 20),
 
-          ...widget.questions.asMap().entries.map((entry) {
-            final index = entry.key;
-            final data = entry.value;
-            final question = data['question'] as LessonQuestion;
-            final options = data['options'] as List<QuestionOption>;
-            final isSubmitted = _submittedQuestions[question.id] ?? false;
-            final selectedAnswer = _selectedAnswers[question.id];
+          // ✅ Questions grouped by section with text content
+          ...questionsBySection.entries.map((entry) {
+            final sectionId = entry.key;
+            final questionsInSection = entry.value;
+            final section = _sectionsMap[sectionId];
 
-            return _buildQuestionCard(
-              index + 1,
-              question,
-              options,
-              isSubmitted,
-              selectedAnswer,
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ✅ Show section text content (if section_type == 'text')
+                if (section != null && section.sectionType == 'text' && section.content != null) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.amber.shade200, width: 2),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.article_outlined, color: Colors.amber.shade700, size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                section.sectionTitle,
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.amber.shade900,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.amber.shade100),
+                          ),
+                          child: Text(
+                            section.content!,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              height: 1.6,
+                              color: Colors.black87,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
+                // ✅ Section quiz header (if section_type == 'quiz')
+                if (section != null && section.sectionType == 'quiz') ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.purple.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.purple.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.quiz, color: Colors.purple.shade700, size: 18),
+                        const SizedBox(width: 8),
+                        Text(
+                          section.sectionTitle,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.purple.shade700,
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          '${questionsInSection.length} câu',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.purple.shade600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
+                // ✅ Questions in this section
+                ...questionsInSection.map((questionData) {
+                  final question = questionData['question'] as LessonQuestion;
+                  final options = questionData['options'] as List<QuestionOption>;
+                  final globalNumber = questionData['globalNumber'] as int;
+                  final isSubmitted = _submittedQuestions[question.id] ?? false;
+                  final selectedAnswer = _selectedAnswers[question.id];
+
+                  return _buildQuestionCard(
+                    globalNumber,
+                    question,
+                    options,
+                    isSubmitted,
+                    selectedAnswer,
+                  );
+                }).toList(),
+
+                const SizedBox(height: 16),
+              ],
             );
           }).toList(),
 
@@ -678,17 +887,14 @@ class _CourseQuizContentState extends State<CourseQuizContent> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: (_submittedQuestions.values.every((v) => v) &&
-                            !_isSubmitting)
+                    onPressed: (_submittedQuestions.values.every((v) => v) && !_isSubmitting)
                         ? _submitAllAnswers
                         : null,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green.shade700,
                       disabledBackgroundColor: Colors.grey.shade300,
                       padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
                     child: _isSubmitting
                         ? const SizedBox(
@@ -696,8 +902,7 @@ class _CourseQuizContentState extends State<CourseQuizContent> {
                             width: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor:
-                                  AlwaysStoppedAnimation<Color>(Colors.white),
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                             ),
                           )
                         : const Text(
@@ -722,10 +927,7 @@ class _CourseQuizContentState extends State<CourseQuizContent> {
                 ),
                 child: const Text(
                   'Làm lại từ đầu',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                 ),
               ),
             ),
@@ -767,20 +969,11 @@ class _CourseQuizContentState extends State<CourseQuizContent> {
               ),
               child: Column(
                 children: [
-                  Text(
-                    'Điểm số',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
+                  Text('Điểm số', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
                   const SizedBox(height: 4),
                   Text(
                     '${score.toStringAsFixed(1)}/100',
-                    style: const TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
                   ),
                 ],
               ),
@@ -808,13 +1001,7 @@ class _CourseQuizContentState extends State<CourseQuizContent> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'Câu đúng:',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade700,
-                        ),
-                      ),
+                      Text('Câu đúng:', style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
                       Text(
                         '$correctCount/$totalCount',
                         style: TextStyle(
@@ -829,13 +1016,7 @@ class _CourseQuizContentState extends State<CourseQuizContent> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'Yêu cầu:',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade700,
-                        ),
-                      ),
+                      Text('Yêu cầu:', style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
                       Text(
                         '$requiredCorrect/$totalCount (${widget.targetScore.toStringAsFixed(0)}%)',
                         style: TextStyle(
@@ -856,19 +1037,15 @@ class _CourseQuizContentState extends State<CourseQuizContent> {
                 color: isPassed ? Colors.green.shade50 : Colors.red.shade50,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: isPassed
-                      ? Colors.green.shade200
-                      : Colors.red.shade200,
+                  color: isPassed ? Colors.green.shade200 : Colors.red.shade200,
                 ),
               ),
               child: Text(
                 isPassed
-                    ? '✅ Bạn đã đạt yêu cầu (${widget.targetScore.toStringAsFixed(0)}%)!'
-                    : '❌ Bạn cần $remainingCorrect câu nữa để đạt yêu cầu',
+                    ? ' Bạn đã đạt yêu cầu (${widget.targetScore.toStringAsFixed(0)}%)!'
+                    : ' Bạn cần $remainingCorrect câu nữa để đạt yêu cầu',
                 style: TextStyle(
-                  color: isPassed
-                      ? Colors.green.shade700
-                      : Colors.red.shade700,
+                  color: isPassed ? Colors.green.shade700 : Colors.red.shade700,
                   fontWeight: FontWeight.w600,
                   fontSize: 13,
                 ),
@@ -887,18 +1064,19 @@ class _CourseQuizContentState extends State<CourseQuizContent> {
     );
   }
 
+  /// ✅ UPDATED: Build question card (support multiple_choice)
   Widget _buildQuestionCard(
     int number,
     LessonQuestion question,
     List<QuestionOption> options,
     bool isSubmitted,
-    String? selectedAnswer,
+    dynamic selectedAnswer,
   ) {
+    final isMultipleChoice = question.questionType == 'multiple_choice';
+    
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       elevation: 1,
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -916,19 +1094,45 @@ class _CourseQuizContentState extends State<CourseQuizContent> {
                 Expanded(
                   child: Text(
                     'Câu $number: ${question.questionText}',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                   ),
                 ),
               ],
             ),
+            
+            // ✅ Show hint for multiple choice
+            if (isMultipleChoice) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.purple.shade50,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: Colors.purple.shade200),
+                ),
+                child: Text(
+                  'Chọn nhiều đáp án đúng',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.purple.shade700,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+            
             const SizedBox(height: 16),
 
             ...options.map((option) {
-              final isSelected = selectedAnswer == option.id;
               final isCorrect = option.isCorrect;
+              bool isSelected = false;
+              
+              if (isMultipleChoice) {
+                final selectedList = selectedAnswer as List<String>?;
+                isSelected = selectedList?.contains(option.id) ?? false;
+              } else {
+                isSelected = selectedAnswer == option.id;
+              }
 
               Color? backgroundColor;
               Color? borderColor;
@@ -977,7 +1181,18 @@ class _CourseQuizContentState extends State<CourseQuizContent> {
                       ? null
                       : () {
                           setState(() {
-                            _selectedAnswers[question.id] = option.id;
+                            if (isMultipleChoice) {
+                              // Toggle selection for multiple choice
+                              final selectedList = _selectedAnswers[question.id] as List<String>;
+                              if (selectedList.contains(option.id)) {
+                                selectedList.remove(option.id);
+                              } else {
+                                selectedList.add(option.id);
+                              }
+                            } else {
+                              // Single choice
+                              _selectedAnswers[question.id] = option.id;
+                            }
                           });
                         },
                   child: Container(
@@ -985,10 +1200,7 @@ class _CourseQuizContentState extends State<CourseQuizContent> {
                     decoration: BoxDecoration(
                       color: backgroundColor,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: borderColor ?? Colors.grey.shade300,
-                        width: 2,
-                      ),
+                      border: Border.all(color: borderColor ?? Colors.grey.shade300, width: 2),
                     ),
                     child: Row(
                       children: [
@@ -996,23 +1208,17 @@ class _CourseQuizContentState extends State<CourseQuizContent> {
                           width: 20,
                           height: 20,
                           decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: borderColor ?? Colors.grey.shade400,
-                              width: 2,
-                            ),
-                            color:
-                                isSelected ? borderColor : Colors.transparent,
+                            shape: isMultipleChoice ? BoxShape.rectangle : BoxShape.circle,
+                            borderRadius: isMultipleChoice ? BorderRadius.circular(4) : null,
+                            border: Border.all(color: borderColor ?? Colors.grey.shade400, width: 2),
+                            color: isSelected ? borderColor : Colors.transparent,
                           ),
                           child: isSelected
                               ? Center(
-                                  child: Container(
-                                    width: 8,
-                                    height: 8,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: borderColor,
-                                    ),
+                                  child: Icon(
+                                    isMultipleChoice ? Icons.check : Icons.circle,
+                                    size: isMultipleChoice ? 14 : 8,
+                                    color: isMultipleChoice ? Colors.white : borderColor,
                                   ),
                                 )
                               : null,
@@ -1024,9 +1230,7 @@ class _CourseQuizContentState extends State<CourseQuizContent> {
                             style: TextStyle(
                               fontSize: 13,
                               color: textColor,
-                              fontWeight: (isSubmitted &&
-                                      _isSubmittedAll &&
-                                      isCorrect)
+                              fontWeight: (isSubmitted && _isSubmittedAll && isCorrect)
                                   ? FontWeight.w600
                                   : FontWeight.normal,
                             ),
@@ -1035,17 +1239,9 @@ class _CourseQuizContentState extends State<CourseQuizContent> {
                         if (isSubmitted && _isSubmittedAll) ...[
                           const SizedBox(width: 8),
                           if (isCorrect)
-                            Icon(
-                              Icons.check_circle,
-                              color: Colors.green.shade700,
-                              size: 20,
-                            )
+                            Icon(Icons.check_circle, color: Colors.green.shade700, size: 20)
                           else if (isSelected && !isCorrect)
-                            Icon(
-                              Icons.cancel,
-                              color: Colors.red.shade700,
-                              size: 20,
-                            ),
+                            Icon(Icons.cancel, color: Colors.red.shade700, size: 20),
                         ],
                       ],
                     ),
@@ -1059,12 +1255,23 @@ class _CourseQuizContentState extends State<CourseQuizContent> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: (selectedAnswer == null || _isSubmitting)
-                      ? null
-                      : () => _submitAnswer(
-                            questionId: question.id,
-                            selectedOptionId: selectedAnswer,
-                          ),
+                  onPressed: (() {
+                    bool hasAnswer = false;
+                    
+                    if (isMultipleChoice) {
+                      final selectedList = selectedAnswer as List<String>?;
+                      hasAnswer = selectedList != null && selectedList.isNotEmpty;
+                    } else {
+                      hasAnswer = selectedAnswer != null;
+                    }
+                    
+                    return (hasAnswer && !_isSubmitting)
+                        ? () => _submitAnswer(
+                              questionId: question.id,
+                              selectedAnswer: selectedAnswer,
+                            )
+                        : null;
+                  })(),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue.shade700,
                     disabledBackgroundColor: Colors.grey.shade300,
@@ -1072,10 +1279,7 @@ class _CourseQuizContentState extends State<CourseQuizContent> {
                   ),
                   child: const Text(
                     'Lưu câu trả lời',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
                   ),
                 ),
               ),
@@ -1093,14 +1297,10 @@ class _CourseQuizContentState extends State<CourseQuizContent> {
                   children: [
                     Row(
                       children: [
-                        Icon(
-                          Icons.check_circle,
-                          color: Colors.green.shade700,
-                          size: 18,
-                        ),
+                        Icon(Icons.check_circle, color: Colors.green.shade700, size: 18),
                         const SizedBox(width: 8),
                         Text(
-                          'Đáp án đúng',
+                          isMultipleChoice ? 'Đáp án đúng:' : 'Đáp án đúng',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
@@ -1110,13 +1310,13 @@ class _CourseQuizContentState extends State<CourseQuizContent> {
                       ],
                     ),
                     const SizedBox(height: 8),
-                    Text(
-                      options.firstWhere((o) => o.isCorrect).optionText,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.green.shade700,
+                    ...options.where((o) => o.isCorrect).map((correctOption) => Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text(
+                        '• ${correctOption.optionText}',
+                        style: TextStyle(fontSize: 13, color: Colors.green.shade700),
                       ),
-                    ),
+                    )).toList(),
                   ],
                 ),
               ),
@@ -1132,11 +1332,7 @@ class _CourseQuizContentState extends State<CourseQuizContent> {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(
-                        Icons.info_outline,
-                        size: 16,
-                        color: Colors.blue.shade700,
-                      ),
+                      Icon(Icons.info_outline, size: 16, color: Colors.blue.shade700),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(

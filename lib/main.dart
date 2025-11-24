@@ -7,6 +7,7 @@ import 'package:learning_english/screens/course/course_lessons_screen.dart';
 import 'package:learning_english/screens/course/course_modules_screen.dart';
 import 'package:learning_english/screens/course/final_test_screen.dart';
 import 'package:learning_english/screens/course/placement_test_screen.dart';
+import 'package:learning_english/screens/course/reading_lesson_screen.dart';
 import 'package:learning_english/screens/drawer_screen.dart';
 import 'package:learning_english/screens/auth/forgot_password_screen.dart';
 import 'package:learning_english/screens/home_screen.dart';
@@ -182,6 +183,13 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           targetScore: args?['targetScore'] as double?,
         );
       },
+      '/readingLesson': (context) {
+        final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
+        final lessonId = args['lessonId'] as String;
+        
+        return ReadingLessonScreen(lessonId: lessonId);
+      },
+      
       },
     );
   }

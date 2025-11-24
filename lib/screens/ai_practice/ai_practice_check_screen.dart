@@ -55,7 +55,7 @@ class _AiPracticeCheckScreenState extends State<AiPracticeCheckScreen> {
         setState(() {
           _remainingUses = usage['remaining_uses'] as int;
           _hasOwnApi = usage['has_own_api'] as bool;
-          _availableKeys = keys.where((k) => k['is_active'] == true).toList();
+          _availableKeys = keys.where((k) => k['is_active'] == true ).toList();
           _isLoading = false;
           
           // Auto select mode based on availability
@@ -83,13 +83,19 @@ class _AiPracticeCheckScreenState extends State<AiPracticeCheckScreen> {
   void _startPractice() {
     final useFreeApi = _selectedMode == 'free';
     
+    // ✅ ADD DEBUG
+    debugPrint('🎯 Starting practice:');
+    debugPrint('   Mode: $_selectedMode');
+    debugPrint('   API Key ID: ${useFreeApi ? 'FREE' : _selectedApiKeyId}');
+    debugPrint('   Question count: $_questionCount');
+    
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => AiPracticeLoadingScreen(
           topic: widget.topic,
-          apiKeyId: useFreeApi ? null : _selectedApiKeyId,
-          questionCount: _questionCount, // 🔥 Pass question count
+          apiKeyId: useFreeApi ? null : _selectedApiKeyId, // ✅ Pass correct ID
+          questionCount: _questionCount,
         ),
       ),
     );
@@ -383,7 +389,6 @@ class _AiPracticeCheckScreenState extends State<AiPracticeCheckScreen> {
                       ),
                     ),
                     SizedBox(height: 4),
-                    // 🔥 UPDATED: Tách topic string - KHÔNG tách nếu comma trong ngoặc
                     _buildTopicLines(widget.topic),
                   ],
                 ),
@@ -421,7 +426,6 @@ class _AiPracticeCheckScreenState extends State<AiPracticeCheckScreen> {
 
   // 🔥 UPDATED: Tách topic string - KHÔNG tách nếu comma trong ngoặc
   Widget _buildTopicLines(String topicString) {
-    // 🔥 NEW: Smart split - ignore commas inside parentheses
     final topics = _smartSplitTopics(topicString);
 
     if (topics.isEmpty) {

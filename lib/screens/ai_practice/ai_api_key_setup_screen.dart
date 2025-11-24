@@ -53,7 +53,7 @@ class _AiApiKeySetupScreenState extends State<AiApiKeySetupScreen> {
         
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('✅ Lưu API key thành công!'),
+            content: Text('Lưu API key thành công!'),
             backgroundColor: Color(0xFF4CAF50),
             behavior: SnackBarBehavior.floating,
           ),
@@ -113,7 +113,7 @@ class _AiApiKeySetupScreenState extends State<AiApiKeySetupScreen> {
         
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('✅ Đã xóa API key'),
+            content: Text(' Đã xóa API key'),
             backgroundColor: Color(0xFF4CAF50),
             behavior: SnackBarBehavior.floating,
           ),

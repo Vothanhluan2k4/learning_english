@@ -132,14 +132,22 @@ class _AiPracticeLoadingScreenState extends State<AiPracticeLoadingScreen>
       String provider;
 
       if (widget.apiKeyId != null) {
-        // Use user's API key
-        final keyData = await _apiKeyService.getUserApiKey(userId);
-        if (keyData == null) throw Exception('Không tìm thấy API key');
+        // ✅ FIX: Use user's selected API key BY ID
+        debugPrint('🔑 Using user API key ID: ${widget.apiKeyId}');
+        
+        final keyData = await _apiKeyService.getApiKeyById(widget.apiKeyId!);
+        if (keyData == null) {
+          throw Exception('Không tìm thấy API key đã chọn');
+        }
         
         apiKey = keyData['api_key'];
         provider = keyData['provider'];
+        
+        debugPrint('✅ Using provider: $provider');
       } else {
         // Use free API key from config
+        debugPrint('🆓 Using free API key');
+        
         apiKey = AiConfig.groqApiKey;
         provider = 'groq';
         
@@ -150,6 +158,8 @@ class _AiPracticeLoadingScreenState extends State<AiPracticeLoadingScreen>
             'Vui lòng thêm API key của bạn hoặc liên hệ admin.'
           );
         }
+        
+        debugPrint('✅ Using free provider: $provider');
       }
 
       // STEP 4: Generate questions

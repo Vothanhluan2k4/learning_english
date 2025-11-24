@@ -387,10 +387,40 @@ class _TestPreviewScreenState extends State<TestPreviewScreen> {
     final targetScore = widget.lesson.targetScore ?? 50.0;
     final isPassed = score >= targetScore;
 
+    // ✅ FIX: Validate totalQuestions trước khi tính toán
+    if (totalQuestions == 0) {
+      debugPrint('⚠️ totalQuestions is 0, cannot calculate progress');
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.orange.shade50,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.orange.shade200),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.error_outline, color: Colors.orange.shade700),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Bài kiểm tra chưa hoàn thành. Vui lòng làm lại!',
+                style: TextStyle(color: Colors.orange.shade900),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     // ✅ Tính số câu cần đúng để vượt qua
     final targetCorrectAnswers = (totalQuestions * targetScore / 100).ceil();
-    final moreCorrectNeeded = targetCorrectAnswers - correctAnswers;
-    final percentNeedMore = targetScore - score;
+    final moreCorrectNeeded = (targetCorrectAnswers - correctAnswers).clamp(0, totalQuestions);
+    final percentNeedMore = (targetScore - score).clamp(0.0, 100.0);
+
+    // ✅ Safe progress calculation
+    final progressValue = targetCorrectAnswers > 0
+        ? (correctAnswers / targetCorrectAnswers).clamp(0.0, 1.0)
+        : 0.0;
 
     debugPrint('📊 Score calculation:');
     debugPrint('   totalQuestions: $totalQuestions');
@@ -398,6 +428,7 @@ class _TestPreviewScreenState extends State<TestPreviewScreen> {
     debugPrint('   targetScore: $targetScore%');
     debugPrint('   targetCorrectAnswers: $targetCorrectAnswers');
     debugPrint('   moreCorrectNeeded: $moreCorrectNeeded');
+    debugPrint('   progressValue: $progressValue');
 
     return Column(
       children: [
@@ -435,8 +466,8 @@ class _TestPreviewScreenState extends State<TestPreviewScreen> {
 
         // ✅ Score circle
         Container(
-          width: 120,
-          height: 120,
+          width: 130,
+          height: 130,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             gradient: LinearGradient(
@@ -447,8 +478,7 @@ class _TestPreviewScreenState extends State<TestPreviewScreen> {
             ),
             boxShadow: [
               BoxShadow(
-                color: (isPassed ? Colors.green : Colors.orange)
-                    .withOpacity(0.3),
+                color: (isPassed ? Colors.green : Colors.orange).withOpacity(0.3),
                 blurRadius: 10,
                 offset: const Offset(0, 5),
               ),
@@ -458,7 +488,7 @@ class _TestPreviewScreenState extends State<TestPreviewScreen> {
             child: Text(
               '${score.toStringAsFixed(1)}%',
               style: const TextStyle(
-                fontSize: 36,
+                fontSize: 34,
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
               ),
@@ -502,8 +532,8 @@ class _TestPreviewScreenState extends State<TestPreviewScreen> {
         ),
         const SizedBox(height: 20),
 
-        // ✅ Warning if not passed - FIX: Hiển thị số câu cần thêm
-        if (!isPassed)
+        // ✅ Warning if not passed
+        if (!isPassed && moreCorrectNeeded > 0)
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -516,8 +546,7 @@ class _TestPreviewScreenState extends State<TestPreviewScreen> {
               children: [
                 Row(
                   children: [
-                    Icon(Icons.warning_outlined,
-                        color: Colors.orange.shade700, size: 24),
+                    Icon(Icons.warning_outlined, color: Colors.orange.shade700, size: 24),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
@@ -532,7 +561,6 @@ class _TestPreviewScreenState extends State<TestPreviewScreen> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                // ✅ Hiển thị câu và %
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -569,10 +597,7 @@ class _TestPreviewScreenState extends State<TestPreviewScreen> {
                             ],
                           ),
                           Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                             decoration: BoxDecoration(
                               color: Colors.orange.shade100,
                               borderRadius: BorderRadius.circular(6),
@@ -589,16 +614,14 @@ class _TestPreviewScreenState extends State<TestPreviewScreen> {
                         ],
                       ),
                       const SizedBox(height: 8),
-                      // ✅ Progress bar
+                      // ✅ FIX: Safe progress bar
                       ClipRRect(
                         borderRadius: BorderRadius.circular(4),
                         child: LinearProgressIndicator(
-                          value: correctAnswers / targetCorrectAnswers,
+                          value: progressValue, // ✅ Safe value (0.0 - 1.0)
                           minHeight: 6,
                           backgroundColor: Colors.orange.shade100,
-                          valueColor: AlwaysStoppedAnimation(
-                            Colors.orange.shade600,
-                          ),
+                          valueColor: AlwaysStoppedAnimation(Colors.orange.shade600),
                         ),
                       ),
                       const SizedBox(height: 8),

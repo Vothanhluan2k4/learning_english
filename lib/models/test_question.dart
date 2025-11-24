@@ -5,15 +5,25 @@ class TestQuestion {
   final String testId;
   final String? groupId;
   final String? questionText;
-  final String questionType; // multiple_choice, true_false, fill_blank...
+  final String questionType; // multiple_choice, true_false, fill_blank, essay, speaking ✅ ADD
   final String mediaType; // image, audio, text, none
   final String? mediaUrl;
-  final dynamic options; // Có thể là List, Map hoặc null
-  final String correctAnswer; // Dạng text hoặc JSON (cho fill_blank)
+  final dynamic options;
+  final String correctAnswer;
   final String? explanation;
   final int? orderInTest;
   final String? instruction;
   final String difficulty;
+  final int? minWords;
+  final int? maxWords;
+  final String? guideline;
+  
+  // ✅ NEW: Speaking-specific fields
+  final String? speakingMode; // read_aloud, answer_prompt, free_speaking
+  final String? referenceText; // For read_aloud mode
+  final String? expectedAnswer; // For answer_prompt/free_speaking
+  final int? timeLimit; // Time limit in seconds
+  final Map<String, dynamic>? rubric; // Grading rubric
 
   TestQuestion({
     required this.id,
@@ -29,6 +39,14 @@ class TestQuestion {
     this.orderInTest,
     this.instruction,
     this.difficulty = 'medium',
+    this.minWords,
+    this.maxWords,
+    this.guideline,
+    this.speakingMode,
+    this.referenceText,
+    this.expectedAnswer,
+    this.timeLimit,
+    this.rubric,
   });
 
   factory TestQuestion.fromJson(Map<String, dynamic> json) {
@@ -45,6 +63,18 @@ class TestQuestion {
       parsedOptions = raw;
     }
 
+    // ✅ Parse rubric
+    Map<String, dynamic>? parsedRubric;
+    if (json['rubric'] != null) {
+      if (json['rubric'] is Map) {
+        parsedRubric = Map<String, dynamic>.from(json['rubric']);
+      } else if (json['rubric'] is String) {
+        try {
+          parsedRubric = jsonDecode(json['rubric']);
+        } catch (_) {}
+      }
+    }
+
     return TestQuestion(
       id: json['id'] ?? '',
       testId: json['test_id'] ?? '',
@@ -59,6 +89,14 @@ class TestQuestion {
       orderInTest: json['order_in_test'],
       instruction: json['instruction'],
       difficulty: json['difficulty'] ?? 'medium',
+      minWords: json['min_words'] as int?,
+      maxWords: json['max_words'] as int?,
+      guideline: json['guideline'] as String?,
+      speakingMode: json['speaking_mode'] as String?,
+      referenceText: json['reference_text'] as String?,
+      expectedAnswer: json['expected_answer'] as String?,
+      timeLimit: json['time_limit'] as int?,
+      rubric: parsedRubric,
     );
   }
 
@@ -77,13 +115,38 @@ class TestQuestion {
       'order_in_test': orderInTest,
       'instruction': instruction,
       'difficulty': difficulty,
+      'min_words': minWords,
+      'max_words': maxWords,
+      'guideline': guideline,
+      'speaking_mode': speakingMode,
+      'reference_text': referenceText,
+      'expected_answer': expectedAnswer,
+      'time_limit': timeLimit,
+      'rubric': rubric,
     };
+  }
+
+  // ✅ Helper: Check if this is a speaking question
+  bool get isSpeaking => questionType == 'speaking';
+
+  // ✅ Helper: Get speaking mode display text
+  String get speakingModeDisplay {
+    switch (speakingMode) {
+      case 'read_aloud':
+        return 'Đọc đoạn văn';
+      case 'answer_prompt':
+        return 'Trả lời câu hỏi';
+      case 'free_speaking':
+        return 'Nói tự do';
+      default:
+        return 'Speaking';
+    }
   }
 
   /// ✅ Chuẩn hóa đáp án hiển thị cho UI
   List<String> getDisplayOptions() {
-    if (questionType == 'fill_blank') {
-      // Câu điền khuyết không có danh sách lựa chọn
+    if (questionType == 'fill_blank' || questionType == 'speaking') {
+      // Câu điền khuyết và câu hỏi nói không có danh sách lựa chọn
       return [];
     }
 

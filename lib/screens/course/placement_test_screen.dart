@@ -22,13 +22,16 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
   bool _isLoading = true;
   int _currentQuestionIndex = 0;
 
-  List<dynamic> _items = []; // Có thể là TestQuestion hoặc QuestionGroup
-  Map<String, String> _userAnswers = {}; // key = questionId
-
+  List<dynamic> _items = [];
+  Map<String, String> _userAnswers = {};
   bool _isPanelOpen = false;
 
+  // ✅ UPDATED: Track audio plays per GROUP ID (not URL)
+  final Map<String, int> _audioPlayCounts = {}; // groupId -> playCount
+  final Map<String, bool> _isAudioPlaying = {}; // groupId -> isPlaying
+
   Timer? _timer;
-  int _timeRemaining = 0; // in seconds
+  int _timeRemaining = 0;
   bool _isTimeUp = false;
 
   @override
@@ -76,14 +79,12 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
     }
   }
 
-  // Add method to format time
   String _formatTime(int seconds) {
     int minutes = seconds ~/ 60;
     int remainingSeconds = seconds % 60;
     return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
   }
 
-  // Add method to start timer
   void _startTimer(int minutes) {
     _timeRemaining = minutes * 60;
     _timer?.cancel();
@@ -91,7 +92,6 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
       setState(() {
         if (_timeRemaining > 0) {
           _timeRemaining--;
-          // Update last activity every minute
           if (_timeRemaining % 60 == 0) {
             _updateLastActivity();
           }
@@ -104,7 +104,6 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
     });
   }
 
-  // Add method to update last activity
   Future<void> _updateLastActivity() async {
     if (_resultId == null) return;
     
@@ -112,13 +111,12 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
       await supabase.from('user_test_results').update({
         'time_remaining': _timeRemaining ~/ 60,
         'last_activity': DateTime.now().toIso8601String(),
-      }).eq('id', _resultId as String); // Cast to non-null String
+      }).eq('id', _resultId as String);
     } catch (e) {
       debugPrint('❌ Error updating last activity: $e');
     }
   }
 
-  // Add method to handle timeout
   Future<void> _handleTimeout() async {
     if (_resultId == null) return;
 
@@ -127,7 +125,7 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
         'status': 'timeout',
         'completed_at': DateTime.now().toIso8601String(),
         'time_remaining': 0,
-      }).eq('id', _resultId as String); // Cast to non-null String
+      }).eq('id', _resultId as String);
       
       _showTimeoutDialog();
     } catch (e) {
@@ -135,7 +133,6 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
     }
   }
 
-  // Add timeout dialog
   void _showTimeoutDialog() {
     showDialog(
       context: context,
@@ -173,7 +170,6 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
     try {
       setState(() => _isLoading = true);
 
-      // Fetch test info first including time limit
       final testInfo = await supabase
           .from('tests')
           .select('time_limit, test_type')
@@ -182,19 +178,17 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
 
       final allItems = <dynamic>[];
 
-      // 1. Lấy câu hỏi đơn (không thuộc group) và sắp xếp theo order_in_test
       final directRes = await supabase
           .from('test_questions')
           .select()
           .eq('test_id', testId)
           .isFilter('group_id', null)
-          .order('order_in_test', ascending: true); // Đảm bảo sắp xếp đúng thứ tự
+          .order('order_in_test', ascending: true);
 
       final directQuestions = 
           (directRes as List).map((q) => TestQuestion.fromJson(q)).toList();
       allItems.addAll(directQuestions);
 
-      // 2. Lấy question groups và sắp xếp theo order_in_test
       final groupRes = await supabase
           .from('question_groups')
           .select('''
@@ -204,27 +198,21 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
           .eq('test_id', testId)
           .order('order_in_test', ascending: true);
 
-      // Sắp xếp câu hỏi trong mỗi group theo order_in_test
       for (final g in groupRes) {
         final group = QuestionGroup.fromJson(g);
-        // Sắp xếp câu hỏi trong group
         group.testQuestions.sort((a, b) => 
             (a.orderInTest ?? 0).compareTo(b.orderInTest ?? 0));
         allItems.add(group);
       }
 
-      // Sort theo order_in_test
       allItems.sort((a, b) {
         final orderA = a is TestQuestion ? a.orderInTest : (a as QuestionGroup).orderInTest;
         final orderB = b is TestQuestion ? b.orderInTest : (b as QuestionGroup).orderInTest;
         return (orderA ?? 0).compareTo(orderB ?? 0);
       });
 
-
-      // ✅ FIX: Thêm await để đảm bảo _resultId được gán trước khi user trả lời
       await _createUserTestResult();
 
-      // Start timer if time limit exists
       if (testInfo['time_limit'] != null) {
         _startTimer(testInfo['time_limit']);
       }
@@ -239,7 +227,25 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
     }
   }
 
+  // ✅ UPDATE: _nextQuestion to track audio plays
   void _nextQuestion() {
+    // Track audio play when leaving current question
+    final currentItem = _items[_currentQuestionIndex];
+    if (currentItem is QuestionGroup && currentItem.mediaType == 'audio') {
+      final isPlaying = _isAudioPlaying[currentItem.id] ?? false;
+      if (isPlaying) {
+        setState(() {
+          final currentCount = _audioPlayCounts[currentItem.id] ?? 0;
+          if (currentCount == 0) {
+            _audioPlayCounts[currentItem.id] = 1;
+            debugPrint('⚠️ Audio interrupted: ${currentItem.id}, counted as 1 play');
+          }
+          _isAudioPlaying[currentItem.id] = false;
+        });
+      }
+    }
+
+    // Original navigation logic
     if (_currentQuestionIndex < _items.length - 1) {
       setState(() {
         _currentQuestionIndex++;
@@ -250,7 +256,25 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
     }
   }
 
+  // ✅ UPDATE: _previousQuestion to track audio plays
   void _previousQuestion() {
+    // Track audio play when leaving current question
+    final currentItem = _items[_currentQuestionIndex];
+    if (currentItem is QuestionGroup && currentItem.mediaType == 'audio') {
+      final isPlaying = _isAudioPlaying[currentItem.id] ?? false;
+      if (isPlaying) {
+        setState(() {
+          final currentCount = _audioPlayCounts[currentItem.id] ?? 0;
+          if (currentCount == 0) {
+            _audioPlayCounts[currentItem.id] = 1;
+            debugPrint('⚠️ Audio interrupted (back): ${currentItem.id}, counted as 1 play');
+          }
+          _isAudioPlaying[currentItem.id] = false;
+        });
+      }
+    }
+
+    // Original navigation logic
     if (_currentQuestionIndex > 0) {
       setState(() {
         _currentQuestionIndex--;
@@ -272,7 +296,6 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
     if (currentItem is TestQuestion) {
       return _userAnswers[currentItem.id]?.trim().isNotEmpty ?? false;
     } else if (currentItem is QuestionGroup) {
-      // Check tất cả câu hỏi trong group đã trả lời chưa
       return currentItem.testQuestions.every(
               (q) => _userAnswers[q.id]?.trim().isNotEmpty ?? false
       );
@@ -281,7 +304,6 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
     return false;
   }
 
-  //User test
   Future<void> _createUserTestResult() async {
     final authId = supabase.auth.currentUser?.id;
 
@@ -293,9 +315,7 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
       return;
     }
 
-
     try {
-      // ✅ LẤY users.id DỰA TRÊN auth_id
       final userRecord = await supabase
           .from('users')
           .select('id')
@@ -305,13 +325,11 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
       if (userRecord == null) {
         debugPrint('❌ Không tìm thấy user với auth_id: $authId');
         debugPrint('💡 Cần tạo user trong bảng users trước khi làm bài test');
-
       } else {
         _userId = userRecord['id'];
         debugPrint('✅ Tìm thấy user id: $_userId');
       }
 
-      // Kiểm tra kết quả test đã tồn tại chưa
       final existing = await supabase
           .from('user_test_results')
           .select('id, status')
@@ -322,7 +340,6 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
       if (existing != null) {
         _resultId = existing['id'];
         
-        // Resume timer if test was in progress
         if (existing['status'] == 'in_progress' && 
             existing['time_remaining'] != null) {
           _startTimer(existing['time_remaining']);
@@ -342,11 +359,9 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
       debugPrint('❌ Lỗi tạo user_test_results: $e');
     }
   }
-  
-
 
   Future<void> _submitTest() async {
-    _timer?.cancel(); // Stop the timer
+    _timer?.cancel();
     
     int total = 0;
     int correct = 0;
@@ -367,7 +382,6 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
 
     final score = total > 0 ? (correct / total * 100) : 0.0;
 
-    // 🔹 Cập nhật user_test_results
     if (_resultId != null) {
       await supabase.from('user_test_results').update({
         'score': score,
@@ -379,7 +393,6 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
       }).eq('id', _resultId as String);
     }
 
-    // 🔹 Nếu là bài placement test → cập nhật user_placement_summary
     final testInfo = await supabase
         .from('tests')
         .select('test_type, recommended_course_id')
@@ -396,13 +409,12 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
         'updated_at': DateTime.now().toIso8601String(),
       });
     }
-    // 🔹 Hiển thị kết quả
+
     _showResultDialog(score, correct, total, testInfo['recommended_course_id']);
   }
 
   Future<void> _showResultDialog(double score, int correct, int total, String? recommendedCourseId) async {
     try {
-      // Fetch course info from user_placement_summary and courses
       final placementData = await supabase
           .from('user_placement_summary')
           .select('''
@@ -435,7 +447,6 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Trophy icon
                 Stack(
                   clipBehavior: Clip.none,
                   alignment: Alignment.center,
@@ -463,7 +474,6 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
                 ),
                 SizedBox(height: 20),
                 
-                // Score circle
                 Container(
                   width: 120,
                   height: 120,
@@ -486,7 +496,6 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
                 ),
                 SizedBox(height: 20),
 
-                // Details section
                 Container(
                   padding: EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -514,7 +523,6 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
                 ),
                 SizedBox(height: 24),
 
-                // Action buttons
                 Row(
                   children: [
                     Expanded(
@@ -532,7 +540,7 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
                             MaterialPageRoute(
                               builder: (context) => DrawerScreen(initialIndex: 1),
                             ),
-                            (route) => false, // This will remove all previous routes
+                            (route) => false,
                           );
                         },
                         child: Text(
@@ -567,7 +575,6 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
       );
     } catch (e) {
       debugPrint('❌ Lỗi khi lấy thông tin khóa học: $e');
-      // Hiển thị dialog đơn giản khi có lỗi
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -621,7 +628,6 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
     );
   }
 
-  // Add this method to get the flattened question index
   int _getFlattenedQuestionNumber() {
     int currentNumber = 1;
     
@@ -633,7 +639,6 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
       }
     }
 
-    // Add offset for current group questions
     if (_items[_currentQuestionIndex] is QuestionGroup) {
       return currentNumber;
     }
@@ -641,7 +646,6 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
     return currentNumber;
   }
 
-  // Add this method to get total questions count
   int _getTotalQuestions() {
     int total = 0;
     for (var item in _items) {
@@ -662,7 +666,13 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
 
     if (_items.isEmpty) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Kiểm tra đầu vào')),
+        appBar: AppBar(
+          title: const Text('Kiểm tra đầu vào'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ),
         body: const Center(child: Text('Không tìm thấy câu hỏi nào.')),
       );
     }
@@ -671,8 +681,7 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Kiểm tra đầu vào', 
-        ),
+        title: const Text('Kiểm tra đầu vào'),
         centerTitle: true,
         backgroundColor: Colors.blueAccent,
         foregroundColor: Colors.white,
@@ -711,11 +720,10 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
         children: [
           Column(
             children: [
-              // Progress bar
               LinearProgressIndicator(
                 value: (_currentQuestionIndex + 1) / _items.length,
                 backgroundColor: Colors.grey[200],
-                valueColor: AlwaysStoppedAnimation(Colors.blueAccent),
+                valueColor: AlwaysStoppedAnimation(Colors.lightGreenAccent),
                 minHeight: 6,
               ),
 
@@ -728,19 +736,16 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
                 ),
               ),
 
-              // Navigation buttons
               _buildNavigationButtons(),
             ],
           ),
 
-          // Sidebar Panel
           _buildSidebarPanel(),
         ],
       ),
     );
   }
 
-  // ✅ Thêm method hiển thị dialog xác nhận thoát
   Future<void> _showExitDialog() async {
     showDialog(
       context: context,
@@ -825,23 +830,16 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
     );
   }
 
-  // Thoát khỏi bài test và lưu tiến độ
   Future<void> _exitTest() async {
-    // Lưu tiến độ trước khi thoát
     await _saveTestProgress();
-
-    // Dừng timer
     _timer?.cancel();
 
     if (mounted) {
-      // Quay lại màn hình trước
       Navigator.pop(context);
     }
   }
 
-
   Widget _buildSingleQuestion(TestQuestion question) {
-    // Parse options - FIX: Xử lý cả Map và List
     List<MapEntry<String, String>> options = [];
 
     if (question.options != null) {
@@ -853,7 +851,6 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
       } else if (question.options is List) {
         final list = question.options as List;
         if (list.isNotEmpty && list.first is Map) {
-          // ✅ Sửa lại để lấy đúng label & text
           options = list
               .map((e) => MapEntry(
             e['label']?.toString() ?? '',
@@ -863,7 +860,7 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
         } else {
           options = list.asMap().entries
               .map((e) => MapEntry(
-            String.fromCharCode(65 + e.key), // A, B, C...
+            String.fromCharCode(65 + e.key),
             e.value.toString(),
           ))
               .toList();
@@ -871,11 +868,9 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
       }
     }
 
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Question header
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -906,7 +901,6 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
         ),
         const SizedBox(height: 20),
 
-        // Question text
         Container(
           padding: EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -925,7 +919,6 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
         ),
         const SizedBox(height: 24),
 
-        // Options
         if (question.questionType == 'fill_blank') ...[
           TextField(
             decoration: InputDecoration(
@@ -948,7 +941,6 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
 
               if (_resultId != null) {
                 try {
-                  // Thêm delay nhỏ để tránh gọi API quá nhiều lần
                   await Future.delayed(Duration(milliseconds: 300));
                   
                   await supabase.from('user_test_answers').upsert({
@@ -962,7 +954,6 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
                   debugPrint('✅ Đã lưu câu trả lời: $value cho câu ${question.id}');
                 } catch (e) {
                   debugPrint('❌ Lỗi lưu user_test_answers: $e');
-                  // Có thể thêm thông báo cho người dùng nếu cần
                 }
               }
             },
@@ -979,7 +970,6 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
                 onTap: () async {
                   setState(() {
                     _userAnswers[question.id] = optionKey;
-
                   });
                   if (_resultId != null) {
                     try {
@@ -1072,11 +1062,18 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
     );
   }
 
+  // ✅ FIXED: _buildGroupQuestions with proper audio tracking
   Widget _buildGroupQuestions(QuestionGroup group) {
+    // ✅ Initialize play count for this specific group
+    if (!_audioPlayCounts.containsKey(group.id)) {
+      _audioPlayCounts[group.id] = 0;
+    }
+    
+    final remainingPlays = 2 - (_audioPlayCounts[group.id] ?? 0);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // === HEADER ===
         Container(
           padding: EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -1113,9 +1110,30 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
         ),
         SizedBox(height: 16),
 
-        // === MEDIA ===
+        // ✅ FIXED: Use group.id as unique key, not URL
         if (group.mediaType == 'audio' && group.mediaUrl != null)
-          AudioPlayerWidget(audioUrl: group.mediaUrl!)
+          AudioPlayerWidget(
+            key: ValueKey(group.id), // ✅ Unique key per group
+            audioUrl: group.mediaUrl!,
+            remainingPlays: remainingPlays,
+            onPlayStart: () {
+              // ✅ Increment play count when audio starts
+              setState(() {
+                _audioPlayCounts[group.id] = (_audioPlayCounts[group.id] ?? 0) + 1;
+                _isAudioPlaying[group.id] = true;
+              });
+              debugPrint('🎧 Audio started: ${group.id}, count: ${_audioPlayCounts[group.id]}');
+            },
+            onPlayComplete: () {
+              // ✅ Mark as not playing when completed
+              if (mounted) {
+                setState(() {
+                  _isAudioPlaying[group.id] = false;
+                });
+              }
+              debugPrint('✅ Audio completed: ${group.id}');
+            },
+          )
         else if (group.mediaType == 'text' && group.content != null)
           Container(
             padding: EdgeInsets.all(16),
@@ -1141,13 +1159,11 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
         ),
         SizedBox(height: 12),
 
-        // === CÂU HỎI TRONG GROUP ===
         ...group.testQuestions.asMap().entries.map((entry) {
           final qIndex = entry.key;
           final question = entry.value;
           final questionNumber = qIndex + 1;
 
-          // Xử lý options (có thể là Map, List hoặc List<Object>)
           List<MapEntry<String, String>> options = [];
           if (question.options != null) {
             if (question.options is Map) {
@@ -1167,7 +1183,7 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
               } else {
                 options = list.asMap().entries
                     .map((e) => MapEntry(
-                  String.fromCharCode(65 + e.key), // A, B, C...
+                  String.fromCharCode(65 + e.key),
                   e.value.toString(),
                 ))
                     .toList();
@@ -1192,7 +1208,6 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
                 ),
                 SizedBox(height: 12),
 
-                // Câu điền khuyết
                 if (question.questionType == 'fill_blank')
                   TextFormField(
                     initialValue: _userAnswers[question.id] ?? '',
@@ -1207,7 +1222,6 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
 
                       if (_resultId != null) {
                         try {
-                          // Thêm delay nhỏ để tránh gọi API quá nhiều lần
                           await Future.delayed(Duration(milliseconds: 300));
                           
                           await supabase.from('user_test_answers').upsert({
@@ -1226,8 +1240,6 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
                     },
                   ),
 
-
-                // Câu chọn đáp án
                 if (question.questionType != 'fill_blank' && options.isNotEmpty)
                   ...options.map((opt) {
                     final isSelected = _userAnswers[question.id] == opt.key;
@@ -1237,7 +1249,6 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
                         onTap: () async {
                           setState(() {
                             _userAnswers[question.id] = opt.key;
-
                           });
                           if (_resultId != null) {
                             await supabase.from('user_test_answers').upsert({
@@ -1313,7 +1324,6 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
     );
   }
 
-
   Widget _buildNavigationButtons() {
     return Container(
       padding: EdgeInsets.all(20),
@@ -1371,7 +1381,6 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
   }
 
   Widget _buildSidebarPanel() {
-    // Create a flattened list of all questions
     List<TestQuestion> allQuestions = [];
     for (var item in _items) {
       if (item is TestQuestion) {
@@ -1412,7 +1421,7 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
                     final isCurrent = _getCurrentQuestionIndex(index);
 
                     return _buildQuestionCircle(
-                      index: index + 1, // Start from 1 instead of 0
+                      index: index + 1,
                       isCurrent: isCurrent,
                       isAnswered: isAnswered,
                       isGroup: false,
@@ -1449,7 +1458,6 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
     );
   }
 
-  // Helper method to determine if question is current
   bool _getCurrentQuestionIndex(int flatIndex) {
     int currentFlatIndex = 0;
     
@@ -1474,7 +1482,6 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
     return false;
   }
 
-  // Modified question circle
   Widget _buildQuestionCircle({
     required int index,
     required bool isCurrent,
@@ -1482,7 +1489,7 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
     required bool isGroup,
   }) {
     return GestureDetector(
-      onTap: () => _jumpToFlattenedQuestion(index - 1), // Subtract 1 because index starts at 1
+      onTap: () => _jumpToFlattenedQuestion(index - 1),
       child: Container(
         width: 40,
         height: 40,
@@ -1510,10 +1517,24 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
     );
   }
 
-  // Add this method to handle jumping to flattened question index
+  // ✅ UPDATE: _jumpToFlattenedQuestion to track audio plays
   void _jumpToFlattenedQuestion(int flatIndex) {
+    // Track audio play when jumping to another question
+    final currentItem = _items[_currentQuestionIndex];
+    if (currentItem is QuestionGroup && currentItem.mediaType == 'audio') {
+      final isPlaying = _isAudioPlaying[currentItem.id] ?? false;
+      if (isPlaying) {
+        final currentCount = _audioPlayCounts[currentItem.id] ?? 0;
+        if (currentCount == 0) {
+          _audioPlayCounts[currentItem.id] = 1;
+          debugPrint('⚠️ Audio interrupted (jump): ${currentItem.id}, counted as 1 play');
+        }
+        _isAudioPlaying[currentItem.id] = false;
+      }
+    }
+
+    // Original jump logic
     int currentIndex = 0;
-    int targetGroupIndex = 0;
     
     for (int i = 0; i < _items.length; i++) {
       if (_items[i] is TestQuestion) {
