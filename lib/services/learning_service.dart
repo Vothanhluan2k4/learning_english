@@ -30,8 +30,6 @@ class LearningService {
     }
   }
 
-  /// 🔥 Fetch user ID with priority for testing (users with wrong answers)
-  /// This is useful for testing/debugging purposes
   Future<String?> fetchUserId() async {
     final authUser = _supabase.auth.currentUser;
     if (authUser == null) {

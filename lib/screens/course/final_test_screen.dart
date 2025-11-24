@@ -1,17 +1,26 @@
 import 'package:flutter/material.dart';
+import 'package:learning_english/services/test/final_test_speaking_service.dart';
 import 'package:learning_english/screens/drawer_screen.dart';
+import 'package:learning_english/services/ai/ai_grading_service.dart';
 import 'package:learning_english/services/auth_service.dart';
+import 'package:learning_english/services/test/test_final_service.dart';
+import 'package:learning_english/widgets/markdown_content_widget.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:async';
 import '../../models/question_group.dart';
 import '../../models/test_question.dart';
 import '../../widgets/audio_player.dart';
+import 'package:flutter_markdown/flutter_markdown.dart'; 
+import 'package:highlight/highlight.dart' as highlight; 
+import '../../widgets/test/test_speaking_question_card.dart';
+import 'package:provider/provider.dart'; 
+
 
 class FinalTestScreen extends StatefulWidget {
   final String testId;
-  final String? lessonId; // Null = placement test, not null = lesson final test
-  final bool isPlacementTest; // true = placement, false = lesson final test
-  final double? targetScore; // Điểm cần đạt để pass (chỉ dùng cho lesson test)
+  final String? lessonId; 
+  final bool isPlacementTest; 
+  final double? targetScore; 
 
   const FinalTestScreen({
     required this.testId,
@@ -24,83 +33,121 @@ class FinalTestScreen extends StatefulWidget {
   @override
   State<FinalTestScreen> createState() => _FinalTestScreenState();
 }
-
-class _FinalTestScreenState extends State<FinalTestScreen> with WidgetsBindingObserver {
+class _FinalTestScreenState extends State<FinalTestScreen>
+    with WidgetsBindingObserver {
   final supabase = Supabase.instance.client;
+  final _testService = TestFinalService();
+  final _authService = AuthService();
+  late FinalTestSpeakingService _speakingService;
 
   String? _resultId;
   String? _userId;
   bool _isLoading = true;
   int _currentQuestionIndex = 0;
-  final _authService = AuthService();
-
   List<dynamic> _items = [];
   Map<String, String> _userAnswers = {};
-
   bool _isPanelOpen = false;
-
   Timer? _timer;
   int _timeRemaining = 0;
   bool _isTimeUp = false;
 
-   @override
+  final Map<String, int> _audioPlayCounts = {}; 
+  final Map<String, bool> _isAudioPlaying = {}; 
+  final Map<String, TextEditingController> _essayControllers = {};
+
+
+  @override
   bool get wantKeepAlive => true;
 
   @override
   void initState() {
     super.initState();
-    debugPrint('🚀 FinalTestScreen initState called');
-    debugPrint('   testId: ${widget.testId}');
-    debugPrint('   lessonId: ${widget.lessonId}');
-    debugPrint('   isPlacementTest: ${widget.isPlacementTest}');
-
     WidgetsBinding.instance.addObserver(this);
-    _fetchQuestions();
+
+    _speakingService = FinalTestSpeakingService();
+    _speakingService.initializeRecording();
+    _initializeTest();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
+    _speakingService.dispose();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused) {
-      _saveTestProgress();
+    if (state == AppLifecycleState.paused && _resultId != null) {
+      _testService.updateTestProgress(
+        resultId: _resultId!,
+        timeRemaining: _timeRemaining,
+      );
     }
   }
 
-  Future<void> _saveTestProgress() async {
-    if (_resultId != null) {
-      try {
-        await supabase.from('user_test_results').update({
-          'status': 'in_progress',
-          'time_remaining': _timeRemaining ~/ 60,
-          'last_activity': DateTime.now().toIso8601String(),
-        }).eq('id', _resultId!);
-      } catch (e) {
-        debugPrint('Error saving test progress: $e');
-      }
+  Future<void> _initializeTest() async {
+    setState(() => _isLoading = true);
+
+    if (widget.testId.isEmpty || widget.testId == 'null') {
+      setState(() => _isLoading = false);
+      return;
     }
+
+    final testInfo = await _testService.fetchTestInfo(widget.testId);
+    if (testInfo == null) {
+      setState(() => _isLoading = false);
+      return;
+    }
+
+    final items = await _testService.fetchTestItems(widget.testId);
+
+    final authUser = supabase.auth.currentUser;
+    if (authUser == null) {
+      setState(() => _isLoading = false);
+      return;
+    }
+
+    _userId = await _authService.getUserIdFromAuthId(authUser.id);
+    if (_userId == null) {
+      setState(() => _isLoading = false);
+      return;
+    }
+
+    _resultId = await _testService.createOrGetUserTestResult(
+      userId: _userId!,
+      testId: widget.testId,
+    );
+
+    if (testInfo['time_limit'] != null) {
+      _startTimer(testInfo['time_limit']);
+    }
+
+    setState(() {
+      _items = items;
+      _isLoading = false;
+    });
   }
 
   String _formatTime(int seconds) {
-    int minutes = seconds ~/ 60;
-    int remainingSeconds = seconds % 60;
-    return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
+    final minutes = seconds ~/ 60;
+    final secs = seconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
   }
 
   void _startTimer(int minutes) {
     _timeRemaining = minutes * 60;
     _timer?.cancel();
-    _timer = Timer.periodic(Duration(seconds: 1), (timer) {
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       setState(() {
         if (_timeRemaining > 0) {
           _timeRemaining--;
-          if (_timeRemaining % 60 == 0) {
-            _updateLastActivity();
+          if (_timeRemaining % 60 == 0 && _resultId != null) {
+            _testService.updateTestProgress(
+              resultId: _resultId!,
+              timeRemaining: _timeRemaining,
+            );
           }
         } else {
           _isTimeUp = true;
@@ -111,29 +158,10 @@ class _FinalTestScreenState extends State<FinalTestScreen> with WidgetsBindingOb
     });
   }
 
-  Future<void> _updateLastActivity() async {
-    if (_resultId == null) return;
-    try {
-      await supabase.from('user_test_results').update({
-        'time_remaining': _timeRemaining ~/ 60,
-        'last_activity': DateTime.now().toIso8601String(),
-      }).eq('id', _resultId!);
-    } catch (e) {
-      debugPrint('❌ Error updating last activity: $e');
-    }
-  }
-
   Future<void> _handleTimeout() async {
-    if (_resultId == null) return;
-    try {
-      await supabase.from('user_test_results').update({
-        'status': 'timeout',
-        'completed_at': DateTime.now().toIso8601String(),
-        'time_remaining': 0,
-      }).eq('id', _resultId!);
+    if (_resultId != null) {
+      await _testService.handleTimeout(_resultId!);
       _showTimeoutDialog();
-    } catch (e) {
-      debugPrint('❌ Error handling timeout: $e');
     }
   }
 
@@ -142,148 +170,50 @@ class _FinalTestScreenState extends State<FinalTestScreen> with WidgetsBindingOb
       context: context,
       barrierDismissible: false,
       builder: (_) => AlertDialog(
-        title: Row(
+        title: const Row(
           children: [
             Icon(Icons.timer_off, color: Colors.red),
             SizedBox(width: 8),
             Text('Hết thời gian'),
           ],
         ),
-        content: Text('Thời gian làm bài đã hết. Hệ thống sẽ tự động nộp bài của bạn.'),
+        content: const Text('Thời gian làm bài đã hết. Hệ thống sẽ tự động nộp bài.'),
         actions: [
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
               _submitTest();
             },
-            child: Text('Đồng ý', style: TextStyle(color: Colors.white)),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Đồng ý', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
     );
   }
 
-  Future<void> _fetchQuestions() async {
-  try {
-    setState(() => _isLoading = true);
-
-    debugPrint('═══════════════════════════════════════');
-    debugPrint('🔍 FINAL TEST SCREEN DEBUG');
-    debugPrint('═══════════════════════════════════════');
-    debugPrint('   testId: ${widget.testId}');
-    debugPrint('   lessonId: ${widget.lessonId}');
-    debugPrint('   isPlacementTest: ${widget.isPlacementTest}');
-    debugPrint('═══════════════════════════════════════');
-
-    // ✅ Kiểm tra testId valid
-    if (widget.testId.isEmpty || widget.testId == 'null') {
-      debugPrint('❌ TEST ID INVALID: ${widget.testId}');
-      setState(() => _isLoading = false);
-      return;
-    }
-
-    // ✅ Fetch test info
-    final testInfoRes = await supabase
-        .from('tests')
-        .select('id, test_name, time_limit, test_type, total_questions')
-        .eq('id', widget.testId)
-        .maybeSingle();
-
-    debugPrint('📋 Test Info Response: $testInfoRes');
-
-    if (testInfoRes == null) {
-      debugPrint('❌ ⚠️ TEST NOT FOUND IN DATABASE');
-      debugPrint('   Looking for test_id: ${widget.testId}');
-      
-      // Debug: Fetch all tests để xem có test nào không
-      final allTests = await supabase
-          .from('tests')
-          .select('id, test_name, test_type')
-          .limit(5);
-      debugPrint('📊 Available tests (first 5): $allTests');
-
-      setState(() => _isLoading = false);
-      return;
-    }
-
-    debugPrint('✅ Test found: ${testInfoRes['test_name']}');
-
-    final allItems = <dynamic>[];
-
-    // ✅ Fetch direct questions
-    debugPrint('🔎 Fetching direct questions for test: ${widget.testId}');
-    final directRes = await supabase
-        .from('test_questions')
-        .select()
-        .eq('test_id', widget.testId)
-        .isFilter('group_id', null)
-        .order('order_in_test', ascending: true);
-
-    debugPrint('✅ Direct questions found: ${directRes.length}');
-
-    final directQuestions =
-        (directRes as List).map((q) => TestQuestion.fromJson(q)).toList();
-    allItems.addAll(directQuestions);
-
-    // ✅ Fetch question groups
-    debugPrint('🔎 Fetching question groups for test: ${widget.testId}');
-    final groupRes = await supabase
-        .from('question_groups')
-        .select('''
-          id, test_id, title, instruction, media_type, media_url, content, order_in_test,
-          test_questions!inner(*)
-        ''')
-        .eq('test_id', widget.testId)
-        .order('order_in_test', ascending: true);
-
-    debugPrint('✅ Question groups found: ${groupRes.length}');
-
-    for (final g in groupRes) {
-      final group = QuestionGroup.fromJson(g);
-      group.testQuestions.sort((a, b) =>
-          (a.orderInTest ?? 0).compareTo(b.orderInTest ?? 0));
-      allItems.add(group);
-    }
-
-    allItems.sort((a, b) {
-      final orderA =
-          a is TestQuestion ? a.orderInTest : (a as QuestionGroup).orderInTest;
-      final orderB =
-          b is TestQuestion ? b.orderInTest : (b as QuestionGroup).orderInTest;
-      return (orderA ?? 0).compareTo(orderB ?? 0);
-    });
-
-    debugPrint('═══════════════════════════════════════');
-    debugPrint('✅ TOTAL ITEMS LOADED: ${allItems.length}');
-    debugPrint('   - Direct questions: ${directQuestions.length}');
-    debugPrint('   - Question groups: ${groupRes.length}');
-    debugPrint('═══════════════════════════════════════');
-
-    if (allItems.isEmpty) {
-      debugPrint('⚠️ NO QUESTIONS FOUND!');
-      debugPrint('   Check if test_questions table has data for this test');
-    }
-
-    // ✅ Create result record
-    await _createUserTestResult();
-
-    if (testInfoRes['time_limit'] != null) {
-      _startTimer(testInfoRes['time_limit']);
-    }
-
-    setState(() {
-      _items = allItems;
-      _isLoading = false;
-    });
-  } catch (e, stackTrace) {
-    debugPrint('❌ ERROR in _fetchQuestions: $e');
-    debugPrint('📍 Stack trace: $stackTrace');
-    setState(() => _isLoading = false);
-  }
-}
-
+  // MARK: - Navigation
   void _nextQuestion() {
+    // Track audio play when leaving current question
+    final currentItem = _items[_currentQuestionIndex];
+    if (currentItem is QuestionGroup && currentItem.mediaType == 'audio') {
+      final isPlaying = _isAudioPlaying[currentItem.id] ?? false;
+      if (isPlaying) {
+        setState(() {
+          final currentCount = _audioPlayCounts[currentItem.id] ?? 0;
+          if (currentCount == 0) {
+            // First time playing but interrupted = count as 1
+            _audioPlayCounts[currentItem.id] = 1;
+            debugPrint('⚠️ Audio interrupted: ${currentItem.id}, counted as 1 play');
+          }
+          _isAudioPlaying[currentItem.id] = false;
+        });
+      }
+    }
+
+    _resetSpeakingStateForNewQuestion();
+
+    // Original navigation logic
     if (_currentQuestionIndex < _items.length - 1) {
       setState(() {
         _currentQuestionIndex++;
@@ -295,6 +225,25 @@ class _FinalTestScreenState extends State<FinalTestScreen> with WidgetsBindingOb
   }
 
   void _previousQuestion() {
+    // Track audio play when leaving current question
+    final currentItem = _items[_currentQuestionIndex];
+    if (currentItem is QuestionGroup && currentItem.mediaType == 'audio') {
+      final isPlaying = _isAudioPlaying[currentItem.id] ?? false;
+      if (isPlaying) {
+        setState(() {
+          final currentCount = _audioPlayCounts[currentItem.id] ?? 0;
+          if (currentCount == 0) {
+            _audioPlayCounts[currentItem.id] = 1;
+            debugPrint('⚠️ Audio interrupted (back): ${currentItem.id}, counted as 1 play');
+          }
+          _isAudioPlaying[currentItem.id] = false;
+        });
+      }
+    }
+
+    _resetSpeakingStateForNewQuestion();
+
+    // Original navigation logic
     if (_currentQuestionIndex > 0) {
       setState(() {
         _currentQuestionIndex--;
@@ -303,331 +252,284 @@ class _FinalTestScreenState extends State<FinalTestScreen> with WidgetsBindingOb
     }
   }
 
-  void _jumpToQuestion(int index) {
-    setState(() {
-      _currentQuestionIndex = index;
-      _isPanelOpen = false;
+bool _canMoveNext() {
+  final item = _items[_currentQuestionIndex];
+  
+  if (item is TestQuestion) {
+    final answer = _userAnswers[item.id] ?? '';
+    
+    // ✅ ADD: Speaking validation
+    if (item.isSpeaking) {
+      return answer.trim().isNotEmpty && !_speakingService.isRecording;
+    }
+    
+    // Essay validation
+    if (item.questionType == 'essay') {
+      final wordCount = answer.trim().isEmpty
+          ? 0
+          : answer.trim().split(RegExp(r'\s+')).length;
+      
+      return wordCount >= (item.minWords ?? 0) && wordCount <= (item.maxWords ?? 9999);
+    }
+    
+    return answer.trim().isNotEmpty;
+  } else if (item is QuestionGroup) {
+    return item.testQuestions.every((q) {
+      final answer = _userAnswers[q.id] ?? '';
+      
+      // ✅ ADD: Speaking validation
+      if (q.isSpeaking) {
+        return answer.trim().isNotEmpty && !_speakingService.isRecording;
+      }
+      
+      if (q.questionType == 'essay') {
+        final wordCount = answer.trim().isEmpty
+            ? 0
+            : answer.trim().split(RegExp(r'\s+')).length;
+        
+        return wordCount >= (q.minWords ?? 0) && wordCount <= (q.maxWords ?? 9999);
+      }
+      
+      return answer.trim().isNotEmpty;
     });
   }
-
-  bool _canMoveNext() {
-    final currentItem = _items[_currentQuestionIndex];
-
-    if (currentItem is TestQuestion) {
-      return _userAnswers[currentItem.id]?.trim().isNotEmpty ?? false;
-    } else if (currentItem is QuestionGroup) {
-      return currentItem.testQuestions.every(
-          (q) => _userAnswers[q.id]?.trim().isNotEmpty ?? false);
-    }
-
-    return false;
-  }
-
-  // ✅ Create result record - hỗ trợ cả placement và lesson test
-  Future<void> _createUserTestResult() async {
-  try {
-    debugPrint('📝 Creating user test result...');
-    
-    final authUser = supabase.auth.currentUser;
-    if (authUser == null) {
-      debugPrint('❌ User not authenticated');
-      throw Exception('User not authenticated');
-    }
-
-    final authId = authUser.id;
-    debugPrint('🔑 Auth ID: $authId');
-    
-    _userId = await _authService.getUserIdFromAuthId(authId);
-    if (_userId == null) {
-      debugPrint('❌ User ID not found from auth_id');
-      throw Exception('User not found');
-    }
-    
-    debugPrint('✅ User ID: $_userId');
-    debugPrint('📝 Checking for existing attempt for test: ${widget.testId}');
-
-    // Check existing result
-    final existing = await supabase
-        .from('user_test_results')
-        .select('id, status, time_remaining')
-        .eq('user_id', _userId!)
-        .eq('test_id', widget.testId)
-        .maybeSingle();
-
-    if (existing != null) {
-      _resultId = existing['id'];
-      debugPrint('♻️ Found existing result: $_resultId');
-      debugPrint('   Status: ${existing['status']}');
-      debugPrint('   Time remaining: ${existing['time_remaining']}');
-
-      if (existing['status'] == 'in_progress' &&
-          existing['time_remaining'] != null) {
-        _startTimer(existing['time_remaining']);
-      }
-    } else {
-      debugPrint('🆕 Creating new result...');
-      
-      final newResult = await supabase
-          .from('user_test_results')
-          .insert({
-            'user_id': _userId,
-            'test_id': widget.testId,
-            'status': 'in_progress',
-            'started_at': DateTime.now().toIso8601String(),
-            'last_activity': DateTime.now().toIso8601String(),
-          })
-          .select('id')
-          .single();
-
-      _resultId = newResult['id'];
-      debugPrint('✅ New result created: $_resultId');
-    }
-  } catch (e, stackTrace) {
-    debugPrint('❌ Lỗi tạo user_test_results: $e');
-    debugPrint('📍 Stack trace: $stackTrace');
-  }
+  
+  return false;
 }
 
-  Future<void> _submitTest() async {
-    _timer?.cancel();
+Future<void> _submitTest() async {
+  _timer?.cancel();
 
-    int total = 0;
-    int correct = 0;
-
-    for (final item in _items) {
-      if (item is TestQuestion) {
+  // Collect essay and speaking questions
+  List<Map<String, dynamic>> essayQuestions = [];
+  List<Map<String, dynamic>> speakingQuestions = [];
+  
+  int total = 0, correct = 0;
+  
+  for (final item in _items) {
+    if (item is TestQuestion) {
+      total++;
+      
+      if (item.questionType == 'essay') {
+        final userAnswer = _userAnswers[item.id] ?? '';
+        if (userAnswer.trim().isNotEmpty) {
+          essayQuestions.add({
+            'question_id': item.id,
+            'question_text': item.questionText,
+            'user_answer': userAnswer,
+            'min_words': item.minWords,
+            'max_words': item.maxWords,
+            'guideline': item.guideline,
+          });
+        }
+      } else if (item.isSpeaking) {
+        final userAnswer = _userAnswers[item.id] ?? '';
+        if (userAnswer.trim().isNotEmpty) {
+          speakingQuestions.add({
+            'question_id': item.id,
+            'question': item,
+            'transcript': userAnswer,
+          });
+        }
+      } else {
+        // Regular questions
+        if (_userAnswers[item.id] == item.correctAnswer) correct++;
+      }
+    } else if (item is QuestionGroup) {
+      for (final q in item.testQuestions) {
         total++;
-        final userAnswer = _userAnswers[item.id];
-        if (userAnswer == item.correctAnswer) correct++;
-      } else if (item is QuestionGroup) {
-        for (final q in item.testQuestions) {
-          total++;
-          final userAnswer = _userAnswers[q.id];
-          if (userAnswer == q.correctAnswer) correct++;
+        
+        if (q.questionType == 'essay') {
+          final userAnswer = _userAnswers[q.id] ?? '';
+          if (userAnswer.trim().isNotEmpty) {
+            essayQuestions.add({
+              'question_id': q.id,
+              'question_text': q.questionText,
+              'user_answer': userAnswer,
+              'min_words': q.minWords,
+              'max_words': q.maxWords,
+              'guideline': q.guideline,
+            });
+          }
+        } else if (q.isSpeaking) {
+          final userAnswer = _userAnswers[q.id] ?? '';
+          if (userAnswer.trim().isNotEmpty) {
+            speakingQuestions.add({
+              'question_id': q.id,
+              'question': q,
+              'transcript': userAnswer,
+            });
+          }
+        } else {
+          if (_userAnswers[q.id] == q.correctAnswer) correct++;
         }
       }
     }
-
-    final score = total > 0 ? (correct / total * 100) : 0.0;
-
-    // ✅ Update result
-    if (_resultId != null) {
-      await supabase.from('user_test_results').update({
-        'score': score,
-        'total_questions': total,
-        'correct_answers': correct,
-        'status': _isTimeUp ? 'timeout' : 'completed',
-        'completed_at': DateTime.now().toIso8601String(),
-        'time_remaining': 0,
-      }).eq('id', _resultId!);
-    }
-
-    // ✅ Xử lý theo test type
-    if (widget.isPlacementTest) {
-      // Placement test - cập nhật user_placement_summary
-      await _handlePlacementTestCompletion(score);
-    } else {
-      // Lesson final test - cập nhật user_lesson_attempts
-      await _handleLessonTestCompletion(score);
-    }
-
-    _showResultDialog(score, correct, total);
   }
 
-  /// ✅ Xử lý placement test hoàn thành
-  Future<void> _handlePlacementTestCompletion(double score) async {
+  // ✅ Grade essays first
+  if (essayQuestions.isNotEmpty) {
+    await _gradeEssaysWithAI(essayQuestions);
+  }
+
+  // ✅ Grade speaking next
+  if (speakingQuestions.isNotEmpty) {
+    await _gradeSpeakingWithAI(speakingQuestions);
+  }
+
+  // ✅ NEW: Calculate weighted score
+  double totalScore = 0.0;
+  int regularQuestions = 0;
+  
+  regularQuestions = total - essayQuestions.length - speakingQuestions.length;
+  totalScore += correct * 100.0; 
+  
+  debugPrint('📊 Score Calculation:');
+  debugPrint('   Regular questions: $regularQuestions');
+  debugPrint('   Regular correct: $correct');
+  debugPrint('   Regular score: ${correct * 100.0}');
+
+  // 2. Essay questions - use AI score (0-100)
+  int essayCount = 0;
+  double essayTotalScore = 0.0;
+  
+  for (final essay in essayQuestions) {
     try {
-      final testInfo = await supabase
-          .from('tests')
-          .select('recommended_course_id')
-          .eq('id', widget.testId)
-          .single();
-
-      await supabase.from('user_placement_summary').upsert({
-        'user_id': _userId,
-        'placement_test_id': widget.testId,
-        'latest_result_id': _resultId,
-        'score': score,
-        'recommended_course_id': testInfo['recommended_course_id'],
-        'updated_at': DateTime.now().toIso8601String(),
-      });
-
-      debugPrint('✅ Cập nhật placement summary thành công');
-    } catch (e) {
-      debugPrint('❌ Lỗi cập nhật placement summary: $e');
-    }
-  }
-
-  /// ✅ Xử lý lesson final test hoàn thành
-    Future<void> _handleLessonTestCompletion(double score) async {
-  if (widget.lessonId == null) return;
-
-  try {
-    final targetScore = widget.targetScore ?? 50.0;
-    final isPassed = score >= targetScore;
-
-    debugPrint('═══════════════════════════════════════');
-    debugPrint('📊 UPDATING LESSON PROGRESS');
-    debugPrint('   lesson_id: ${widget.lessonId}');
-    debugPrint('   user_id: $_userId');
-    debugPrint('   score: $score');
-    debugPrint('   isPassed: $isPassed');
-    debugPrint('═══════════════════════════════════════');
-
-    final attemptNum = await _getNextAttemptNumber();
-
-    // ✅ Step 1: Create attempt record
-    await supabase.from('user_lesson_attempts').insert({
-      'user_id': _userId,
-      'lesson_id': widget.lessonId,
-      'attempt_number': attemptNum,
-      'score': score,
-      'is_passed': isPassed,
-      'finished_at': DateTime.now().toIso8601String(),
-    });
-    debugPrint('✅ Attempt created');
-
-    // ✅ Step 2: Check existing progress
-    debugPrint('📝 Checking existing progress...');
-    
-    final existingData = await supabase
-        .from('user_progress_lessons_course')
-        .select()
-        .eq('user_id', _userId!)
-        .eq('lesson_id', widget.lessonId!)
-        .maybeSingle();
-
-    debugPrint('📋 Existing data: $existingData');
-
-    if (existingData == null) {
-      // ✅ INSERT mới
-      debugPrint('📝 Creating new progress record...');
-      
-      await supabase.from('user_progress_lessons_course').insert({
-        'user_id': _userId,
-        'lesson_id': widget.lessonId, // ✅ UUID
-        'status': 'in_progress',
-        'score': 0,
-        'is_passed': false,
-        'attempts': 0,
-      });
-      
-      debugPrint('✅ Progress record created');
-    }
-
-    // ✅ Step 3: UPDATE to completed
-    debugPrint('📝 Updating progress to completed...');
-    
-    // ✅ DEBUG: Print update data trước khi gửi
-    final updateData = {
-      'status': 'completed',
-      'score': score,
-      'is_passed': isPassed,
-      'attempts': attemptNum,
-      'completed_at': DateTime.now().toIso8601String(),
-      'updated_at': DateTime.now().toIso8601String(),
-    };
-    
-    debugPrint('📦 Update data: $updateData');
-    debugPrint('🔑 Where clause: user_id=$_userId, lesson_id=${widget.lessonId}');
-
-    // ✅ FIX: Kiểm tra lessonId không phải là lesson_type
-    if (widget.lessonId == null || widget.lessonId == 'final_test' || widget.lessonId == 'mid_test') {
-      debugPrint('❌ INVALID LESSON_ID: ${widget.lessonId}');
-      throw Exception('Invalid lesson_id: ${widget.lessonId}');
-    }
-
-    await supabase
-        .from('user_progress_lessons_course')
-        .update(updateData)
-        .eq('user_id', _userId!)
-        .eq('lesson_id', widget.lessonId!); // ✅ Phải là UUID, không phải "final_test"
-    
-    debugPrint('✅ Progress updated - TRIGGER SHOULD FIRE');
-
-    // ✅ Wait for trigger
-    await Future.delayed(Duration(milliseconds: 1000));
-
-    // ✅ Verify notification
-    final notification = await supabase
-        .from('notifications')
-        .select()
-        .eq('user_id', _userId!)
-        .eq('type', 'ket_qua_test')
-        .order('created_at', ascending: false)
-        .limit(1)
-        .maybeSingle();
-
-    if (notification != null) {
-      debugPrint('✅ Notification: ${notification['title']}');
-    } else {
-      debugPrint('⚠️ Notification not found!');
-    }
-
-    if (isPassed) {
-      await _unlockNextLesson();
-    }
-
-    debugPrint('═══════════════════════════════════════');
-  } catch (e, stackTrace) {
-    debugPrint('❌ Error: $e');
-    debugPrint('📍 Stack trace: $stackTrace');
-  }
-}
-  /// ✅ Lấy attempt number tiếp theo
-  Future<int> _getNextAttemptNumber() async {
-    if (widget.lessonId == null) return 1;
-
-    try {
-      final result = await supabase
-          .from('user_lesson_attempts')
-          .select('attempt_number')
-          .eq('user_id', _userId!)
-          .eq('lesson_id', widget.lessonId!)
-          .order('attempt_number', ascending: false)
-          .limit(1)
+      final answer = await supabase
+          .from('user_test_answers')
+          .select('ai_score, is_correct')
+          .eq('result_id', _resultId!)
+          .eq('question_id', essay['question_id'])
           .maybeSingle();
-
-      return (result?['attempt_number'] as int? ?? 0) + 1;
-    } catch (e) {
-      debugPrint('Error getting next attempt number: $e');
-      return 1;
-    }
-  }
-
-  /// ✅ Unlock bài học tiếp theo
-  Future<void> _unlockNextLesson() async {
-    if (widget.lessonId == null) return;
-
-    try {
-      // Get current lesson
-      final currentLesson = await supabase
-          .from('lessons_course')
-          .select('module_id, order_index')
-          .eq('id', widget.lessonId!)
-          .single();
-
-      // Get next lesson
-      final nextLesson = await supabase
-          .from('lessons_course')
-          .select('id')
-          .eq('module_id', currentLesson['module_id'])
-          .gt('order_index', currentLesson['order_index'])
-          .order('order_index', ascending: true)
-          .limit(1)
-          .maybeSingle();
-
-      if (nextLesson != null) {
-        await supabase
-            .from('lessons_course')
-            .update({'is_locked': false}).eq('id', nextLesson['id']);
-
-        debugPrint('✅ Unlock next lesson: ${nextLesson['id']}');
+    
+      if (answer != null && answer['ai_score'] != null) {
+        final aiScore = (answer['ai_score'] as num).toDouble();
+        essayTotalScore += aiScore;
+        essayCount++;
+        debugPrint('   Essay ${essay['question_id']}: $aiScore points');
       }
     } catch (e) {
-      debugPrint('❌ Lỗi unlock next lesson: $e');
+      debugPrint('❌ Error fetching essay AI score: $e');
     }
   }
+  
+  totalScore += essayTotalScore;
+  debugPrint('   Essay count: $essayCount');
+  debugPrint('   Essay total score: $essayTotalScore');
+
+  // 3. Speaking questions - use AI score (0-100)
+  int speakingCount = 0;
+  double speakingTotalScore = 0.0;
+  
+  for (final speaking in speakingQuestions) {
+    try {
+      final answer = await supabase
+          .from('user_test_answers')
+          .select('ai_score, is_correct')
+          .eq('result_id', _resultId!)
+          .eq('question_id', speaking['question_id'])
+          .maybeSingle();
+    
+      if (answer != null && answer['ai_score'] != null) {
+        final aiScore = (answer['ai_score'] as num).toDouble();
+        speakingTotalScore += aiScore;
+        speakingCount++;
+        debugPrint('   Speaking ${speaking['question_id']}: $aiScore points');
+      }
+    } catch (e) {
+      debugPrint('❌ Error fetching speaking AI score: $e');
+    }
+  }
+  
+  totalScore += speakingTotalScore;
+  debugPrint('   Speaking count: $speakingCount');
+  debugPrint('   Speaking total score: $speakingTotalScore');
+
+  // ✅ Calculate average score (0-100 scale)
+  final finalScore = total > 0 ? (totalScore / total) : 0.0;
+  
+  // ✅ Calculate correct_answers (questions with score >= 60)
+  int totalCorrect = correct; // Regular correct answers
+  
+  // Add essay correct (score >= 60)
+  for (final essay in essayQuestions) {
+    try {
+      final answer = await supabase
+          .from('user_test_answers')
+          .select('is_correct')
+          .eq('result_id', _resultId!)
+          .eq('question_id', essay['question_id'])
+          .maybeSingle();
+    
+      if (answer != null && answer['is_correct'] == true) {
+        totalCorrect++;
+      }
+    } catch (e) {
+      debugPrint('❌ Error fetching essay result: $e');
+    }
+  }
+  
+  // Add speaking correct (score >= 60)
+  for (final speaking in speakingQuestions) {
+    try {
+      final answer = await supabase
+          .from('user_test_answers')
+          .select('is_correct')
+          .eq('result_id', _resultId!)
+          .eq('question_id', speaking['question_id'])
+          .maybeSingle();
+    
+      if (answer != null && answer['is_correct'] == true) {
+        totalCorrect++;
+      }
+    } catch (e) {
+      debugPrint('❌ Error fetching speaking result: $e');
+    }
+  }
+
+  // ✅ Submit with averaged score
+  if (_resultId != null) {
+    await _testService.submitTest(
+      resultId: _resultId!,
+      score: finalScore, 
+      totalQuestions: total,
+      correctAnswers: totalCorrect, 
+      isTimeout: _isTimeUp,
+    );
+
+    // Update placement or lesson progress
+    if (widget.isPlacementTest) {
+      final testInfo = await _testService.fetchTestInfo(widget.testId);
+      await _testService.updatePlacementSummary(
+        userId: _userId!,
+        testId: widget.testId,
+        resultId: _resultId!,
+        score: finalScore,
+        recommendedCourseId: testInfo!['recommended_course_id'],
+      );
+    } else if (widget.lessonId != null) {
+      final targetScore = widget.targetScore ?? 50.0;
+      final isPassed = finalScore >= targetScore; 
+      final attemptNum = await _testService.getNextAttemptNumber(_userId!, widget.lessonId!);
+
+      await _testService.updateLessonProgress(
+        userId: _userId!,
+        lessonId: widget.lessonId!,
+        score: finalScore,
+        isPassed: isPassed,
+        attemptNumber: attemptNum,
+        resultId: _resultId!,
+      );
+
+      if (isPassed) {
+        await _testService.checkAndUnlockNextCourse(_userId!, widget.lessonId!);
+      }
+    }
+  }
+
+  _showResultDialog(finalScore, totalCorrect, total);
+}
+
 
   Future<void> _showResultDialog(double score, int correct, int total) async {
     try {
@@ -1024,8 +926,6 @@ class _FinalTestScreenState extends State<FinalTestScreen> with WidgetsBindingOb
     }
   }
 
-  
-
   Widget _buildDetailRow(
       IconData icon, String title, String value, Color iconColor) {
     return Row(
@@ -1084,6 +984,86 @@ class _FinalTestScreenState extends State<FinalTestScreen> with WidgetsBindingOb
     return total;
   }
 
+  Future<void> _saveTestProgress() async {
+    if (_resultId != null) {
+      try {
+        await supabase.from('user_test_results').update({
+          'status': 'in_progress',
+          'time_remaining': _timeRemaining ~/ 60,
+          'last_activity': DateTime.now().toIso8601String(),
+        }).eq('id', _resultId!);
+      } catch (e) {
+        debugPrint('Error saving test progress: $e');
+      }
+    }
+  }
+
+
+  Future<void> _updateLastActivity() async {
+    if (_resultId == null) return;
+    try {
+      await supabase.from('user_test_results').update({
+        'time_remaining': _timeRemaining ~/ 60,
+        'last_activity': DateTime.now().toIso8601String(),
+      }).eq('id', _resultId!);
+    } catch (e) {
+      debugPrint('❌ Error updating last activity: $e');
+    }
+  }
+  Future<void> _gradeEssaysWithAI(List<Map<String, dynamic>> essays) async {
+  try {
+    debugPrint('📝 Grading ${essays.length} essays with AI...');
+    
+    // Import AI service
+    final aiService = AiGradingService();
+    
+    for (final essay in essays) {
+      try {
+        debugPrint('   Grading question: ${essay['question_id']}');
+        
+        // ✅ Call AI grading
+        final result = await aiService.gradeWriting(
+          questionText: essay['question_text'] ?? '',
+          userAnswer: essay['user_answer'] ?? '',
+          minWords: essay['min_words'],
+          maxWords: essay['max_words'],
+          guideline: essay['guideline'],
+          provider: 'groq', // or 'gemini'
+        );
+
+        // ✅ Save AI score and feedback
+        await supabase.from('user_test_answers').update({
+          'ai_score': result['total_score'],
+          'ai_feedback': result,
+          'graded_at': DateTime.now().toIso8601String(),
+          'is_correct': result['total_score'] >= 60, 
+        }).match({
+          'result_id': _resultId!,
+          'question_id': essay['question_id'],
+        });
+
+        debugPrint('✅ Graded: ${essay['question_id']} - Score: ${result['total_score']}');
+      } catch (e) {
+        debugPrint('❌ Error grading essay ${essay['question_id']}: $e');
+        
+        // ✅ Save error status
+        await supabase.from('user_test_answers').update({
+          'ai_feedback': {'error': e.toString()},
+          'graded_at': DateTime.now().toIso8601String(),
+        }).match({
+          'result_id': _resultId!,
+          'question_id': essay['question_id'],
+        });
+      }
+    }
+    
+    debugPrint('✅ All essays graded');
+  } catch (e) {
+    debugPrint('❌ Error in _gradeEssaysWithAI: $e');
+  }
+}
+
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -1103,7 +1083,11 @@ class _FinalTestScreenState extends State<FinalTestScreen> with WidgetsBindingOb
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.isPlacementTest ? 'Kiểm tra đầu vào' : 'Kiểm tra cuối bài'),
+        title: Text(widget.isPlacementTest ? 'Kiểm tra đầu vào' : 'Kiểm tra cuối bài',
+          style: TextStyle(
+            fontSize: 20
+          ),
+        ),
         centerTitle: true,
         backgroundColor: Colors.blueAccent,
         foregroundColor: Colors.white,
@@ -1145,7 +1129,7 @@ class _FinalTestScreenState extends State<FinalTestScreen> with WidgetsBindingOb
               LinearProgressIndicator(
                 value: (_currentQuestionIndex + 1) / _items.length,
                 backgroundColor: Colors.grey[200],
-                valueColor: AlwaysStoppedAnimation(Colors.blueAccent),
+                valueColor: AlwaysStoppedAnimation(Colors.lightGreenAccent),
                 minHeight: 6,
               ),
               Expanded(
@@ -1272,10 +1256,39 @@ class _FinalTestScreenState extends State<FinalTestScreen> with WidgetsBindingOb
         }
       }
     }
+    if (question.isSpeaking) {
+      final savedTranscript = _userAnswers[question.id] ?? '';
+    
+    // ✅ Restore transcript to service if navigating back
+      if (savedTranscript.isNotEmpty && _speakingService.currentTranscript.isEmpty) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _speakingService.restoreTranscript(savedTranscript);
+          debugPrint('🔄 Restored transcript for ${question.id}');
+        });
+      }
+    return TestSpeakingQuestionCard(
+      question: question,
+      questionNumber: _getFlattenedQuestionNumber(),
+      totalQuestions: _getTotalQuestions(),
+      recordingEnabled: _speakingService.recordingEnabled,
+      isRecording: _speakingService.isRecording,
+      isPaused: _speakingService.isPaused,
+      secondsRecorded: _speakingService.secondsRecorded,
+      transcript: savedTranscript.isNotEmpty 
+          ? savedTranscript 
+          : _speakingService.currentTranscript,
+      onStartRecording: () => _handleStartSpeaking(question),
+      onPauseRecording: _speakingService.pauseRecording,
+      onResumeRecording: _speakingService.resumeRecording,
+      onStopRecording: () => _handleStopSpeaking(question),
+      onReset: () => _handleResetSpeaking(question),
+    );
+  }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Question number and difficulty
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -1305,6 +1318,8 @@ class _FinalTestScreenState extends State<FinalTestScreen> with WidgetsBindingOb
           ],
         ),
         const SizedBox(height: 20),
+
+        // ✅ REPLACE Text with MarkdownBody
         Container(
           padding: EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -1312,17 +1327,33 @@ class _FinalTestScreenState extends State<FinalTestScreen> with WidgetsBindingOb
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: Colors.grey[300]!),
           ),
-          child: Text(
-            question.questionText ?? '',
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              height: 1.5,
+          child: MarkdownBody(
+            data: question.questionText ?? '',
+            styleSheet: MarkdownStyleSheet(
+              p: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, height: 1.5, color: Colors.black87),
+              strong: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+              em: TextStyle(fontStyle: FontStyle.italic),
+              code: TextStyle(
+                backgroundColor: Colors.blue.shade100,
+                color: Colors.blue.shade900,
+                fontFamily: 'monospace',
+                fontSize: 16,
+              ),
+              h1: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              h2: TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
+              h3: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
+            selectable: true,
           ),
         ),
         const SizedBox(height: 24),
-        if (question.questionType == 'fill_blank') ...[
+
+        // ✅ ADD: Essay (multi-line) text editor
+        if (question.questionType == 'essay') ...[
+          _buildEssayEditor(question),
+        ]
+        // Fill in the blank (single line)
+        else if (question.questionType == 'fill_blank') ...[
           TextField(
             decoration: InputDecoration(
               labelText: 'Nhập đáp án của bạn...',
@@ -1331,8 +1362,7 @@ class _FinalTestScreenState extends State<FinalTestScreen> with WidgetsBindingOb
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide:
-                    BorderSide(color: Colors.blueAccent, width: 2),
+                borderSide: BorderSide(color: Colors.blueAccent, width: 2),
               ),
             ),
             controller: TextEditingController(
@@ -1345,7 +1375,6 @@ class _FinalTestScreenState extends State<FinalTestScreen> with WidgetsBindingOb
 
               if (_resultId != null) {
                 try {
-                  await Future.delayed(Duration(milliseconds: 300));
                   await supabase.from('user_test_answers').upsert({
                     'result_id': _resultId,
                     'question_id': question.id,
@@ -1354,15 +1383,15 @@ class _FinalTestScreenState extends State<FinalTestScreen> with WidgetsBindingOb
                         question.correctAnswer?.trim().toLowerCase(),
                     'answered_at': DateTime.now().toIso8601String(),
                   }, onConflict: 'result_id,question_id');
-
-                  debugPrint('✅ Đã lưu câu trả lời: $value');
                 } catch (e) {
-                  debugPrint('❌ Lỗi lưu user_test_answers: $e');
+                  debugPrint('❌ Error saving fill_blank: $e');
                 }
               }
             },
           ),
-        ] else if (options.isNotEmpty) ...[
+        ]
+        // Multiple choice options
+        else if (options.isNotEmpty) ...[
           ...options.map((entry) {
             final optionKey = entry.key;
             final optionValue = entry.value;
@@ -1375,6 +1404,7 @@ class _FinalTestScreenState extends State<FinalTestScreen> with WidgetsBindingOb
                   setState(() {
                     _userAnswers[question.id] = optionKey;
                   });
+
                   if (_resultId != null) {
                     try {
                       await supabase.from('user_test_answers').upsert({
@@ -1384,10 +1414,8 @@ class _FinalTestScreenState extends State<FinalTestScreen> with WidgetsBindingOb
                         'is_correct': optionKey == question.correctAnswer,
                         'answered_at': DateTime.now().toIso8601String(),
                       }, onConflict: 'result_id,question_id');
-
-                      debugPrint('✅ Đã lưu câu trả lời: ${question.id}');
                     } catch (e) {
-                      debugPrint('❌ Lỗi lưu user_test_answers: $e');
+                      debugPrint('❌ Error saving multiple choice: $e');
                     }
                   }
                 },
@@ -1409,8 +1437,8 @@ class _FinalTestScreenState extends State<FinalTestScreen> with WidgetsBindingOb
                   child: Row(
                     children: [
                       Container(
-                        width: 32,
-                        height: 32,
+                        width: 28,
+                        height: 28,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: isSelected
@@ -1424,17 +1452,26 @@ class _FinalTestScreenState extends State<FinalTestScreen> with WidgetsBindingOb
                           ),
                         ),
                         child: isSelected
-                            ? Icon(Icons.check,
-                                color: Colors.white, size: 20)
+                            ? Center(
+                                child: Text(
+                                  optionKey,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              )
                             : Center(
-                              child: Text(
-                                optionKey,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.grey[600],
+                                child: Text(
+                                  optionKey,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.grey[600],
+                                  ),
                                 ),
                               ),
-                            ),
                       ),
                       SizedBox(width: 16),
                       Expanded(
@@ -1456,6 +1493,7 @@ class _FinalTestScreenState extends State<FinalTestScreen> with WidgetsBindingOb
                 ),
               ),
             );
+            
           }).toList(),
         ],
       ],
@@ -1463,9 +1501,17 @@ class _FinalTestScreenState extends State<FinalTestScreen> with WidgetsBindingOb
   }
 
   Widget _buildGroupQuestions(QuestionGroup group) {
+    // ✅ Initialize play count for this specific group
+    if (!_audioPlayCounts.containsKey(group.id)) {
+      _audioPlayCounts[group.id] = 0;
+    }
+    
+    final remainingPlays = 2 - (_audioPlayCounts[group.id] ?? 0);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // === HEADER ===
         Container(
           padding: EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -1501,8 +1547,32 @@ class _FinalTestScreenState extends State<FinalTestScreen> with WidgetsBindingOb
           ),
         ),
         SizedBox(height: 16),
+
+        // === MEDIA ===
+        // ✅ FIXED: Use group.id as unique key, not URL
         if (group.mediaType == 'audio' && group.mediaUrl != null)
-          AudioPlayerWidget(audioUrl: group.mediaUrl!)
+          AudioPlayerWidget(
+            key: ValueKey(group.id), // ✅ Unique key per group
+            audioUrl: group.mediaUrl!,
+            remainingPlays: remainingPlays,
+            onPlayStart: () {
+              // ✅ Increment play count when audio starts
+              setState(() {
+                _audioPlayCounts[group.id] = (_audioPlayCounts[group.id] ?? 0) + 1;
+                _isAudioPlaying[group.id] = true;
+              });
+              debugPrint('🎧 Audio started: ${group.id}, count: ${_audioPlayCounts[group.id]}');
+            },
+            onPlayComplete: () {
+              // ✅ Mark as not playing when completed
+              if (mounted) {
+                setState(() {
+                  _isAudioPlaying[group.id] = false;
+                });
+              }
+              debugPrint('✅ Audio completed: ${group.id}');
+            },
+          )
         else if (group.mediaType == 'text' && group.content != null)
           Container(
             padding: EdgeInsets.all(16),
@@ -1511,15 +1581,31 @@ class _FinalTestScreenState extends State<FinalTestScreen> with WidgetsBindingOb
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: Colors.grey[300]!),
             ),
-            child: Text(
-              group.content!,
-              style: TextStyle(
-                fontSize: 16,
-                height: 1.6,
-                color: Colors.black87,
+            child: MarkdownBody(
+              data: group.content!,
+              styleSheet: MarkdownStyleSheet(
+                p: TextStyle(fontSize: 16, height: 1.6, color: Colors.black87),
+                h1: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.purple.shade700),
+                h2: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.purple.shade600),
+                h3: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.purple.shade500),
+                listBullet: TextStyle(fontSize: 16, color: Colors.blue.shade700),
+                code: TextStyle(backgroundColor: Colors.grey.shade200, color: Colors.red.shade700, fontFamily: 'monospace', fontSize: 14),
+                codeblockDecoration: BoxDecoration(color: Colors.grey.shade900, borderRadius: BorderRadius.circular(8)),
+                blockquote: TextStyle(color: Colors.grey.shade700, fontStyle: FontStyle.italic),
+                blockquoteDecoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  border: Border(left: BorderSide(color: Colors.blue.shade300, width: 4)),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                strong: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
+                em: TextStyle(fontStyle: FontStyle.italic),
+                a: TextStyle(color: Colors.blue.shade600, decoration: TextDecoration.underline),
               ),
+              syntaxHighlighter: MarkdownSyntaxHighlighter(),
+              selectable: true,
             ),
           ),
+
         SizedBox(height: 24),
         Text(
           'Câu hỏi:',
@@ -1530,18 +1616,20 @@ class _FinalTestScreenState extends State<FinalTestScreen> with WidgetsBindingOb
           ),
         ),
         SizedBox(height: 12),
+
+        // === CÂU HỎI TRONG GROUP ===
         ...group.testQuestions.asMap().entries.map((entry) {
           final qIndex = entry.key;
           final question = entry.value;
           final questionNumber = qIndex + 1;
 
+          // Xử lý options
           List<MapEntry<String, String>> options = [];
           if (question.options != null) {
             if (question.options is Map) {
               final optionsMap = question.options as Map;
               options = optionsMap.entries
-                  .map((e) =>
-                      MapEntry(e.key.toString(), e.value.toString()))
+                  .map((e) => MapEntry(e.key.toString(), e.value.toString()))
                   .toList();
             } else if (question.options is List) {
               final list = question.options as List;
@@ -1574,22 +1662,48 @@ class _FinalTestScreenState extends State<FinalTestScreen> with WidgetsBindingOb
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  '$questionNumber. ${question.questionText ?? ''}',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
+                // ✅ REPLACE Text with MarkdownBody
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Question number
+                    Text(
+                      '$questionNumber. ',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    ),
+                    // Markdown question text
+                    Expanded(
+                      child: MarkdownBody(
+                        data: question.questionText ?? '',
+                        styleSheet: MarkdownStyleSheet(
+                          p: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.black87),
+                          strong: TextStyle(fontWeight: FontWeight.bold, color: Colors.lightBlue.shade900),
+                          em: TextStyle(fontStyle: FontStyle.italic),
+                          code: TextStyle(
+                            backgroundColor: Colors.purple.shade100,
+                            color: Colors.purple.shade900,
+                            fontFamily: 'monospace',
+                            fontSize: 15,
+                          ),
+                        ),
+                        selectable: true,
+                      ),
+                    ),
+                  ],
                 ),
                 SizedBox(height: 12),
-                if (question.questionType == 'fill_blank')
+
+                // Essay editor
+                if (question.questionType == 'essay') ...[
+                  _buildEssayEditorForGroup(question),
+                ]
+                // Fill blank
+                else if (question.questionType == 'fill_blank')
                   TextFormField(
                     initialValue: _userAnswers[question.id] ?? '',
                     decoration: InputDecoration(
                       labelText: 'Nhập đáp án của bạn...',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                     onChanged: (value) async {
                       setState(() {
@@ -1598,35 +1712,27 @@ class _FinalTestScreenState extends State<FinalTestScreen> with WidgetsBindingOb
 
                       if (_resultId != null) {
                         try {
-                          await Future.delayed(
-                              Duration(milliseconds: 300));
-                          await supabase.from('user_test_answers')
-                              .upsert({
+                          await Future.delayed(Duration(milliseconds: 300));
+                          
+                          await supabase.from('user_test_answers').upsert({
                             'result_id': _resultId,
                             'question_id': question.id,
                             'user_answer': value,
-                            'is_correct': value.trim().toLowerCase() ==
-                                question.correctAnswer
-                                    ?.trim()
-                                    .toLowerCase(),
-                            'answered_at':
-                                DateTime.now().toIso8601String(),
+                            'is_correct': value.trim().toLowerCase() == question.correctAnswer?.trim().toLowerCase(),
+                            'answered_at': DateTime.now().toIso8601String(),
                           }, onConflict: 'result_id,question_id');
 
-                          debugPrint(
-                              '✅ Đã lưu câu điền khuyết: ${question.id}');
+                          debugPrint('✅ Đã lưu câu điền khuyết: ${question.id}');
                         } catch (e) {
-                          debugPrint(
-                              '❌ Lỗi lưu user_test_answers (fill_blank): $e');
+                          debugPrint('❌ Lỗi lưu user_test_answers (fill_blank): $e');
                         }
                       }
                     },
-                  ),
-                if (question.questionType != 'fill_blank' &&
-                    options.isNotEmpty)
+                  )
+                // Câu chọn đáp án
+                else if (options.isNotEmpty)
                   ...options.map((opt) {
-                    final isSelected =
-                        _userAnswers[question.id] == opt.key;
+                    final isSelected = _userAnswers[question.id] == opt.key;
                     return Container(
                       margin: EdgeInsets.only(bottom: 8),
                       child: InkWell(
@@ -1635,15 +1741,12 @@ class _FinalTestScreenState extends State<FinalTestScreen> with WidgetsBindingOb
                             _userAnswers[question.id] = opt.key;
                           });
                           if (_resultId != null) {
-                            await supabase.from('user_test_answers')
-                                .upsert({
+                            await supabase.from('user_test_answers').upsert({
                               'result_id': _resultId,
                               'question_id': question.id,
                               'user_answer': opt.key,
-                              'is_correct': opt.key ==
-                                  question.correctAnswer,
-                              'answered_at':
-                                  DateTime.now().toIso8601String(),
+                              'is_correct': opt.key == question.correctAnswer,
+                              'answered_at': DateTime.now().toIso8601String(),
                             }, onConflict: 'result_id,question_id');
                           }
                         },
@@ -1668,18 +1771,13 @@ class _FinalTestScreenState extends State<FinalTestScreen> with WidgetsBindingOb
                                 height: 24,
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
-                                  color: isSelected
-                                      ? Colors.purple
-                                      : Colors.transparent,
+                                  color: isSelected ? Colors.purple : Colors.transparent,
                                   border: Border.all(
-                                    color: isSelected
-                                        ? Colors.purple
-                                        : Colors.grey.shade400,
+                                    color: isSelected ? Colors.purple : Colors.grey.shade400,
                                   ),
                                 ),
                                 child: isSelected
-                                    ? Icon(Icons.check,
-                                        color: Colors.white, size: 16)
+                                    ? Icon(Icons.check, color: Colors.white, size: 16)
                                     : Center(
                                       child: Text(
                                         opt.key,
@@ -1697,12 +1795,8 @@ class _FinalTestScreenState extends State<FinalTestScreen> with WidgetsBindingOb
                                   opt.value,
                                   style: TextStyle(
                                     fontSize: 14,
-                                    fontWeight: isSelected
-                                        ? FontWeight.w600
-                                        : FontWeight.normal,
-                                    color: isSelected
-                                        ? Colors.purple
-                                        : Colors.black87,
+                                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                                    color: isSelected ? Colors.purple : Colors.black87,
                                   ),
                                 ),
                               ),
@@ -1711,7 +1805,7 @@ class _FinalTestScreenState extends State<FinalTestScreen> with WidgetsBindingOb
                         ),
                       ),
                     );
-                  }).toList(),
+                  }),
               ],
             ),
           );
@@ -1924,6 +2018,22 @@ class _FinalTestScreenState extends State<FinalTestScreen> with WidgetsBindingOb
   }
 
   void _jumpToFlattenedQuestion(int flatIndex) {
+    // Track audio play when jumping to another question
+    final currentItem = _items[_currentQuestionIndex];
+    if (currentItem is QuestionGroup && currentItem.mediaType == 'audio') {
+      final isPlaying = _isAudioPlaying[currentItem.id] ?? false;
+      if (isPlaying) {
+        final currentCount = _audioPlayCounts[currentItem.id] ?? 0;
+        if (currentCount == 0) {
+          _audioPlayCounts[currentItem.id] = 1;
+          debugPrint('⚠️ Audio interrupted (jump): ${currentItem.id}, counted as 1 play');
+        }
+        _isAudioPlaying[currentItem.id] = false;
+      }
+    }
+
+    _resetSpeakingStateForNewQuestion();
+    // Original jump logic
     int currentIndex = 0;
 
     for (int i = 0; i < _items.length; i++) {
@@ -1949,6 +2059,33 @@ class _FinalTestScreenState extends State<FinalTestScreen> with WidgetsBindingOb
         currentIndex += group.testQuestions.length;
       }
     }
+  }
+  
+  void _resetSpeakingStateForNewQuestion() {
+    final currentItem = _items[_currentQuestionIndex];
+    
+    // ✅ FIX: Save current transcript to _userAnswers BEFORE reset
+    if (currentItem is TestQuestion && currentItem.isSpeaking) {
+      final currentTranscript = _speakingService.currentTranscript;
+      
+      // Only save if transcript is valid (not empty and not error/loading message)
+      if (currentTranscript.isNotEmpty && 
+          !currentTranscript.contains('Đang chuyển đổi') &&
+          !currentTranscript.contains('Đang lưu') &&
+          !currentTranscript.contains('Đang chấm') &&
+          !currentTranscript.contains('Lỗi')) {
+        
+        debugPrint('💾 Saving transcript before navigation: ${currentItem.id}');
+        debugPrint('   Transcript: ${currentTranscript.substring(0, currentTranscript.length > 50 ? 50 : currentTranscript.length)}...');
+        
+        setState(() {
+          _userAnswers[currentItem.id] = currentTranscript;
+        });
+      }
+    }
+    
+    // ✅ Then reset service state (clears currentTranscript)
+    _speakingService.resetState();
   }
 
   Widget _buildLegend(Color color, String text) {
@@ -1978,4 +2115,625 @@ class _FinalTestScreenState extends State<FinalTestScreen> with WidgetsBindingOb
       ],
     );
   }
+Widget _buildEssayEditor(TestQuestion question) {
+  // ✅ Get or create controller
+  if (!_essayControllers.containsKey(question.id)) {
+    _essayControllers[question.id] = TextEditingController(
+      text: _userAnswers[question.id] ?? '',
+    );
+  }
+  
+  final controller = _essayControllers[question.id]!;
+
+  // ✅ Update controller text if answer changed externally
+  if (controller.text != (_userAnswers[question.id] ?? '')) {
+    controller.text = _userAnswers[question.id] ?? '';
+  }
+
+  int wordCount = controller.text.trim().isEmpty
+      ? 0
+      : controller.text.trim().split(RegExp(r'\s+')).length;
+
+  final minWords = question.minWords ?? 0;
+  final maxWords = question.maxWords ?? 9999;
+  final isValid = wordCount >= minWords && wordCount <= maxWords;
+
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      // Word count requirement
+      Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.blue.shade50,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.blue.shade200),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.info_outline, color: Colors.blue.shade700, size: 20),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Yêu cầu: $minWords-$maxWords từ',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.blue.shade700,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(height: 16),
+
+      // Text editor
+      Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isValid ? Colors.green.shade300 : Colors.grey.shade300,
+            width: 2,
+          ),
+        ),
+        child: Directionality(
+          textDirection: TextDirection.ltr,
+          child: TextField(
+            controller: controller, // ✅ Use persistent controller
+            maxLines: 8,
+            textDirection: TextDirection.ltr,
+            textAlign: TextAlign.left,
+            decoration: InputDecoration(
+              hintText: 'Write your essay here...',
+              hintStyle: TextStyle(color: Colors.grey.shade400),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.all(16),
+            ),
+            style: const TextStyle(
+              fontSize: 16,
+              height: 1.5,
+              color: Colors.black87,
+              fontFamily: 'Roboto',
+            ),
+            onChanged: (value) async {
+              // ✅ DON'T call setState immediately - causes rebuild & lose focus
+              _userAnswers[question.id] = value;
+
+              // Auto-save essay answer with debounce
+              if (_resultId != null) {
+                try {
+                  await Future.delayed(Duration(milliseconds: 500));
+                  await supabase.from('user_test_answers').upsert({
+                    'result_id': _resultId,
+                    'question_id': question.id,
+                    'user_answer': value,
+                    'is_correct': null,
+                    'answered_at': DateTime.now().toIso8601String(),
+                  }, onConflict: 'result_id,question_id');
+
+                  debugPrint('✅ Essay saved: ${question.id}');
+                } catch (e) {
+                  debugPrint('❌ Error saving essay: $e');
+                }
+              }
+              
+              // ✅ Only update UI for word count (without rebuilding TextField)
+              if (mounted) {
+                setState(() {}); // Update word count display only
+              }
+            },
+          ),
+        ),
+      ),
+      const SizedBox(height: 12),
+
+      // Word count indicator
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            'Số từ: $wordCount',
+            style: TextStyle(
+              fontSize: 14,
+              color: isValid ? Colors.green.shade700 : Colors.orange.shade700,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          if (!isValid)
+            Text(
+              wordCount < minWords
+                  ? 'Cần thêm ${minWords - wordCount} từ'
+                  : 'Vượt ${wordCount - maxWords} từ',
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.orange.shade700,
+              ),
+            ),
+        ],
+      ),
+
+      // Guideline
+      if (question.guideline != null) ...[
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.amber.shade50,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.amber.shade200),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.lightbulb_outline, color: Colors.amber.shade700, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Gợi ý:',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.amber.shade900,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                question.guideline!,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.amber.shade900,
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ],
+  );
 }
+Widget _buildEssayEditorForGroup(TestQuestion question) {
+  // ✅ Get or create controller
+  if (!_essayControllers.containsKey(question.id)) {
+    _essayControllers[question.id] = TextEditingController(
+      text: _userAnswers[question.id] ?? '',
+    );
+  }
+  
+  final controller = _essayControllers[question.id]!;
+
+  // ✅ Update controller text if answer changed externally
+  if (controller.text != (_userAnswers[question.id] ?? '')) {
+    controller.text = _userAnswers[question.id] ?? '';
+  }
+
+  int wordCount = controller.text.trim().isEmpty
+      ? 0
+      : controller.text.trim().split(RegExp(r'\s+')).length;
+
+  final minWords = question.minWords ?? 0;
+  final maxWords = question.maxWords ?? 9999;
+  final isValid = wordCount >= minWords && wordCount <= maxWords;
+
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      // Word count requirement
+      Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: Colors.blue.shade50,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.blue.shade200),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.info_outline, color: Colors.blue.shade700, size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Yêu cầu: $minWords-$maxWords từ',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.blue.shade700,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(height: 12),
+
+      // Text editor
+      Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isValid ? Colors.green.shade300 : Colors.grey.shade300,
+            width: 2,
+          ),
+        ),
+        child: Directionality(
+          textDirection: TextDirection.ltr,
+          child: TextField(
+            controller: controller, // ✅ Use persistent controller
+            maxLines: 6,
+            textDirection: TextDirection.ltr,
+            textAlign: TextAlign.left,
+            decoration: InputDecoration(
+              hintText: 'Write your answer here...',
+              hintStyle: TextStyle(color: Colors.grey.shade400),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.all(14),
+            ),
+            style: const TextStyle(
+              fontSize: 15,
+              height: 1.5,
+              color: Colors.black87,
+              fontFamily: 'Roboto',
+            ),
+            onChanged: (value) async {
+              _userAnswers[question.id] = value;
+
+              if (_resultId != null) {
+                try {
+                  await Future.delayed(Duration(milliseconds: 500));
+                  await supabase.from('user_test_answers').upsert({
+                    'result_id': _resultId,
+                    'question_id': question.id,
+                    'user_answer': value,
+                    'is_correct': null,
+                    'answered_at': DateTime.now().toIso8601String(),
+                  }, onConflict: 'result_id,question_id');
+
+                  debugPrint('✅ Essay saved (group): ${question.id}');
+                } catch (e) {
+                  debugPrint('❌ Error saving essay (group): $e');
+                }
+              }
+              
+              if (mounted) {
+                setState(() {});
+              }
+            },
+          ),
+        ),
+      ),
+      const SizedBox(height: 10),
+
+      // Word count indicator
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            'Số từ: $wordCount',
+            style: TextStyle(
+              fontSize: 13,
+              color: isValid ? Colors.green.shade700 : Colors.orange.shade700,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          if (!isValid)
+            Text(
+              wordCount < minWords
+                  ? 'Cần thêm ${minWords - wordCount} từ'
+                  : 'Vượt ${wordCount - maxWords} từ',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.orange.shade700,
+              ),
+            ),
+        ],
+      ),
+
+      // Guideline
+      if (question.guideline != null) ...[
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: Colors.amber.shade50,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.amber.shade200),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.lightbulb_outline, color: Colors.amber.shade700, size: 18),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Gợi ý:',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.amber.shade900,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                question.guideline!,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.amber.shade900,
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ],
+  );
+}
+/// ✅ Handle start speaking
+Future<void> _handleStartSpeaking(TestQuestion question) async {
+  try {
+    await _speakingService.startRecording(question);
+  } catch (e) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Lỗi bắt đầu ghi âm: $e')),
+      );
+    }
+  }
+}
+
+/// ✅ Handle stop speaking
+/// ✅ Handle stop speaking (FIXED - Upload audio + Grade immediately)
+Future<void> _handleStopSpeaking(TestQuestion question) async {
+  try {
+    // 1. Stop recording & get transcript
+    await _speakingService.stopRecording();
+    
+    final transcript = _speakingService.currentTranscript;
+    final audioPath = _speakingService.currentAudioPath;
+    
+    if (transcript.isEmpty || transcript.contains('Lỗi')) {
+      throw Exception('Transcript không hợp lệ');
+    }
+    
+    // Save transcript to local state
+    setState(() {
+      _userAnswers[question.id] = transcript;
+    });
+
+    if (_resultId == null) {
+      throw Exception('Result ID không tồn tại');
+    }
+
+    // Show loading
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation(Colors.white),
+                ),
+              ),
+              SizedBox(width: 12),
+              Text('Đang lưu và chấm điểm...'),
+            ],
+          ),
+          duration: Duration(seconds: 10),
+        ),
+      );
+    }
+
+    // 2. Save to database (will upload audio)
+    await _speakingService.saveSpeakingAnswer(
+      resultId: _resultId!,
+      questionId: question.id,
+      transcript: transcript,
+      audioPath: audioPath,
+    );
+
+    // 3. Grade with AI immediately
+    try {
+      final aiResult = await _speakingService.gradeSpeaking(
+        question: question,
+        transcript: transcript,
+      );
+
+      // 4. Update AI score in database
+      await _speakingService.updateAiScore(
+        resultId: _resultId!,
+        questionId: question.id,
+        aiResult: aiResult,
+      );
+
+      // Show success
+      if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white, size: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Đã lưu! Điểm: ${aiResult['total_score']?.toStringAsFixed(1) ?? 'N/A'}/100',
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (gradingError) {
+      debugPrint('⚠️ AI grading failed (will retry on submit): $gradingError');
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.warning, color: Colors.white, size: 20),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text('Đã lưu! Sẽ chấm điểm khi nộp bài.'),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+  } catch (e) {
+    debugPrint('❌ Error in _handleStopSpeaking: $e');
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Lỗi: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+}
+
+/// ✅ Handle reset speaking
+Future<void> _handleResetSpeaking(TestQuestion question) async {
+  final confirm = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Row(
+        children: [
+          Icon(Icons.refresh, color: Colors.red),
+          SizedBox(width: 10),
+          Text('Bắt đầu lại?'),
+        ],
+      ),
+      content: const Text(
+        'Bạn sẽ xóa bản ghi hiện tại và bắt đầu ghi âm lại từ đầu.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('Hủy'),
+        ),
+        ElevatedButton.icon(
+          onPressed: () => Navigator.pop(context, true),
+          icon: const Icon(Icons.refresh),
+          label: const Text('Bắt đầu lại'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.red,
+            foregroundColor: Colors.white,
+          ),
+        ),
+      ],
+    ),
+  );
+
+  if (confirm == true) {
+    try {
+      setState(() {
+        _userAnswers.remove(question.id);
+      });
+      await _speakingService.resetRecording(question);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lỗi reset: $e')),
+        );
+      }
+    }
+  }
+}
+Future<void> _gradeSpeakingWithAI(List<Map<String, dynamic>> speaking) async {
+  try {
+    debugPrint('🎤 Grading ${speaking.length} speaking questions with AI...');
+    
+    int gradedCount = 0;
+    int skippedCount = 0;
+    
+    for (final sq in speaking) {
+      try {
+        final question = sq['question'] as TestQuestion;
+        final transcript = sq['transcript'] as String;
+        final questionId = sq['question_id'] as String;
+        
+        // ✅ Check if already graded
+        final existing = await supabase
+            .from('user_test_answers')
+            .select('ai_score')
+            .eq('result_id', _resultId!)
+            .eq('question_id', questionId)
+            .maybeSingle();
+
+        if (existing != null && existing['ai_score'] != null) {
+          debugPrint('⏭️ Skipping already graded: $questionId (score: ${existing['ai_score']})');
+          skippedCount++;
+          continue;
+        }
+        
+        debugPrint('   📝 Grading speaking: $questionId');
+        
+        // Grade with AI
+        final result = await _speakingService.gradeSpeaking(
+          question: question,
+          transcript: transcript,
+        );
+
+        // Update AI score
+        await _speakingService.updateAiScore(
+          resultId: _resultId!,
+          questionId: questionId,
+          aiResult: result,
+        );
+
+        gradedCount++;
+        debugPrint('✅ Speaking graded: $questionId - Score: ${result['total_score']}');
+      } catch (e, stackTrace) {
+        debugPrint('❌ Error grading speaking ${sq['question_id']}: $e');
+        debugPrint('   Stack trace: $stackTrace');
+        
+        // Save error state
+        try {
+          await supabase.from('user_test_answers').update({
+            'ai_feedback': {
+              'error': e.toString(),
+              'timestamp': DateTime.now().toIso8601String(),
+            },
+            'graded_at': DateTime.now().toIso8601String(),
+          }).match({
+            'result_id': _resultId!,
+            'question_id': sq['question_id'],
+          });
+        } catch (updateError) {
+          debugPrint('❌ Error saving error state: $updateError');
+        }
+      }
+    }
+    
+    debugPrint('✅ All speaking questions processed - Graded: $gradedCount, Skipped: $skippedCount');
+  } catch (e, stackTrace) {
+    debugPrint('❌ Error in _gradeSpeakingWithAI: $e');
+    debugPrint('   Stack trace: $stackTrace');
+  }
+}
+
+}
+
+

@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/config/supabase_config.dart';
 import '../../core/utils/encryption_helper.dart';
@@ -59,6 +60,34 @@ class AiApiKeyService {
     } catch (e) {
       print('❌ Error getting API key by provider: $e');
       throw AiApiKeyException('Không thể lấy API key cho $provider: $e');
+    }
+  }
+
+  /// ✅ NEW: Get API key by specific ID
+  Future<Map<String, dynamic>?> getApiKeyById(String apiKeyId) async {
+    try {
+      final response = await _supabase
+          .from('user_api_keys')
+          .select('id, provider, api_key_encrypted, last_used_at')
+          .eq('id', apiKeyId)
+          .eq('is_active', true)
+          .maybeSingle();
+
+      if (response == null) return null;
+
+      final decryptedKey = EncryptionHelper.decrypt(response['api_key_encrypted']);
+
+      debugPrint('✅ Got API key for provider: ${response['provider']}');
+
+      return {
+        'id': response['id'],
+        'provider': response['provider'],
+        'api_key': decryptedKey,
+        'last_used_at': response['last_used_at'],
+      };
+    } catch (e) {
+      debugPrint('❌ Error getting API key by ID: $e');
+      throw AiApiKeyException('Không thể lấy API key: $e');
     }
   }
 

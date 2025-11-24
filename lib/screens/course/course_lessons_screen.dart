@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:learning_english/screens/course/test_preview_screen.dart'; 
+import 'package:learning_english/screens/course/test_preview_screen.dart';
+import 'package:learning_english/screens/course/listening_lesson_screen.dart'; 
+import 'package:learning_english/screens/course/reading_lesson_screen.dart';
+import 'package:learning_english/screens/course/writing_lesson_screen.dart'; 
+import 'package:learning_english/screens/course/speaking_lesson_screen.dart';
 import '../../models/course_module.dart';
 import '../../models/lesson_course.dart';
 import '../../services/lesson_course_service.dart';
 import '../../services/course_module_service.dart';
+import '../../services/lesson_section_service.dart'; 
 import '../../widgets/courses/lesson_card_widget.dart';
 
 class CourseLessonsScreen extends StatefulWidget {
@@ -21,7 +26,7 @@ class CourseLessonsScreen extends StatefulWidget {
 class _CourseLessonsScreenState extends State<CourseLessonsScreen> {
   final _lessonService = LessonCourseService();
   final _moduleService = CourseModuleService();
-  bool _lessonCompleted = false;
+  final _sectionService = LessonSectionService(); 
 
   late Future<Map<String, dynamic>> _dataFuture;
 
@@ -45,7 +50,6 @@ class _CourseLessonsScreenState extends State<CourseLessonsScreen> {
       rethrow;
     }
   }
-  
 
   @override
   Widget build(BuildContext context) {
@@ -155,9 +159,7 @@ class _CourseLessonsScreenState extends State<CourseLessonsScreen> {
                       final lesson = lessons[index];
                       return LessonCardWidget(
                         lesson: lesson,
-                        onTap: () {
-                          _handleLessonTap(context, lesson);
-                        },
+                        onTap: () => _handleLessonTap(context, lesson),
                       );
                     },
                   ),
@@ -167,7 +169,9 @@ class _CourseLessonsScreenState extends State<CourseLessonsScreen> {
     );
   }
 
+  // ✅ UPDATED: Check lesson type and navigate directly
   void _handleLessonTap(BuildContext context, LessonCourse lesson) async {
+    // ✅ 1. Check if locked
     if (lesson.isLocked) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -195,23 +199,23 @@ class _CourseLessonsScreenState extends State<CourseLessonsScreen> {
       return;
     }
 
+    // ✅ 2. Handle test types
     if (lesson.lessonType == 'final_test' || lesson.lessonType == 'mid_test') {
       if (lesson.testId != null && lesson.testId!.isNotEmpty) {
         debugPrint('🚀 Navigate to TestPreviewScreen');
         
-        // 🔥 UPDATED: Await navigation result
         await Navigator.push(
           context,
           MaterialPageRoute(
             builder: (context) => TestPreviewScreen(
               testId: lesson.testId!,
+
               lessonId: lesson.id,
               lesson: lesson,
             ),
           ),
         );
         
-        // 🔥 NEW: Reload data after returning
         if (mounted) {
           debugPrint('🔄 Returned from test, reloading lessons...');
           setState(() {
@@ -248,19 +252,134 @@ class _CourseLessonsScreenState extends State<CourseLessonsScreen> {
       }
     }
 
-    // 🔥 UPDATED: Await navigation result
-    await Navigator.pushNamed(
-      context,
-      '/lessonDetail',
-      arguments: {'lessonId': lesson.id},
-    );
+    // ✅ 3. Check lesson sections to determine type
+    debugPrint('🔍 Checking lesson type for: ${lesson.id}');
     
-    // 🔥 NEW: Reload data after returning
-    if (mounted) {
-      debugPrint('🔄 Returned from lesson detail, reloading lessons...');
-      setState(() {
-        _dataFuture = _loadData();
-      });
+    try {
+      // Show loading
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+
+      // Fetch sections
+      final sections = await _sectionService.fetchSectionsByLesson(lesson.id);
+      
+      // Dismiss loading
+      if (mounted) {
+        Navigator.pop(context);
+      }
+
+      // Check section types
+      final hasTextSections = sections.any((s) => s.sectionType == 'text');
+      final hasAudioSections = sections.any((s) => s.sectionType == 'audio');
+      final hasVideoSections = sections.any((s) => s.sectionType == 'video');
+      final hasQuizSections = sections.any((s) => s.sectionType == 'quiz');
+      final hasWritingSections = sections.any((s) => s.sectionType == 'writing');
+      final hasSpeakingSections = sections.any((s) => s.sectionType == 'speaking');
+      
+      debugPrint('📊 Section analysis:');
+      debugPrint('   Text: $hasTextSections');
+      debugPrint('   Audio: $hasAudioSections');
+      debugPrint('   Quiz: $hasQuizSections');
+
+      // ✅ PRIORITY: Audio > Reading > Default
+      if (hasAudioSections && hasQuizSections) {
+        // → Listening Lesson
+        debugPrint('🎧 Navigate to ListeningLessonScreen');
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ListeningLessonScreen(
+              lessonId: lesson.id,
+            ),
+          ),
+        );
+      }else if (hasSpeakingSections) {
+        debugPrint('🎤 Navigate to SpeakingLessonScreen');
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => SpeakingLessonScreen(lessonId: lesson.id),
+          ),
+        );
+      }
+      
+      else if (hasWritingSections) { 
+      debugPrint('✍️ Navigate to WritingLessonScreen');
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => WritingLessonScreen(lessonId: lesson.id),
+        ),
+      );
+      
+      }else if (hasTextSections && hasQuizSections && !hasAudioSections) {
+        debugPrint('📖 Navigate to ReadingLessonScreen');
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ReadingLessonScreen(
+              lessonId: lesson.id,
+            ),
+          ),
+        );
+      } 
+      
+      
+      else if(hasVideoSections && hasTextSections || hasTextSections){
+        debugPrint('📚 Navigate to default LessonDetailScreen');
+        await Navigator.pushNamed(
+          context,
+          '/lessonDetail',
+          arguments: {'lessonId': lesson.id},
+        );
+      } 
+
+      // ✅ Reload lessons after returning
+      if (mounted) {
+        debugPrint('🔄 Returned from lesson, reloading...');
+        setState(() {
+          _dataFuture = _loadData();
+        });
+      }
+
+    } catch (e) {
+      // Dismiss loading if still showing
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+      
+      debugPrint('❌ Error checking lesson type: $e');
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error, color: Colors.white, size: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Lỗi tải bài học: $e',
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.red.shade600,
+            duration: const Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.all(16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        );
+      }
     }
   }
 }

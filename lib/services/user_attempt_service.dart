@@ -9,8 +9,6 @@ class UserAttemptService {
   final _supabase = Supabase.instance.client;
   final _authService = AuthService();
 
-
-
   /// ✅ Tạo attempt mới
   Future<UserLessonAttempt?> createAttempt({
     required String lessonId,
@@ -65,13 +63,31 @@ class UserAttemptService {
   Future<bool> saveQuestionAnswer({
     required String attemptId,
     required String questionId,
-    required String selectedOptionId,
+    required dynamic selectedAnswer, // ✅ Can be String or List<String>
     required bool isCorrect,
     required int timeSpent,
   }) async {
     try {
+      // ✅ Prepare data based on answer type
+      String? singleOptionId;
+      List<String>? multipleOptionIds;
+
+      if (selectedAnswer is List<String>) {
+        // Multiple choice
+        multipleOptionIds = selectedAnswer;
+        singleOptionId = selectedAnswer.isNotEmpty ? selectedAnswer.first : null;
+      } else if (selectedAnswer is String) {
+        // Single choice
+        singleOptionId = selectedAnswer;
+        multipleOptionIds = [selectedAnswer];
+      }
+
       debugPrint(
-        '💾 Saving answer: questionId=$questionId, isCorrect=$isCorrect, timeSpent=${timeSpent}s',
+       '💾 Saving answer: questionId=$questionId, '
+        'singleOption=$singleOptionId, '
+        'multipleOptions=$multipleOptionIds, '
+        'isCorrect=$isCorrect, '
+        'timeSpent=${timeSpent}s',
       );
 
       await _supabase
@@ -80,7 +96,8 @@ class UserAttemptService {
             {
               'attempt_id': attemptId,
               'question_id': questionId,
-              'selected_option_id': selectedOptionId,
+              'selected_option_id': singleOptionId, 
+              'selected_option_ids': multipleOptionIds, 
               'is_correct': isCorrect,
               'time_spent': timeSpent,
               'created_at': DateTime.now().toIso8601String(),
@@ -88,7 +105,7 @@ class UserAttemptService {
             onConflict: 'attempt_id,question_id',
           );
 
-      debugPrint('✅ Answer saved');
+      debugPrint('✅ Answer saved (${multipleOptionIds?.length ?? 1} options)');
       return true;
     } catch (e) {
       debugPrint('❌ Error saving answer: $e');
@@ -96,102 +113,96 @@ class UserAttemptService {
     }
   }
 
-  /// ✅ Kết thúc attempt & cập nhật progress
-  Future<bool> finishAttempt({
-    required String attemptId,
-    required String lessonId,
-    required double score,
-    required bool isPassed,
-  }) async {
-    try {
-      final authUser = _supabase.auth.currentUser;
-      if (authUser == null) throw Exception('User not authenticated');
+ /// ✅ Kết thúc attempt & cập nhật progress
+Future<bool> finishAttempt({
+  required String attemptId,
+  required String lessonId,
+  required double score,
+  required bool isPassed,
+}) async {
+  try {
+    final authUser = _supabase.auth.currentUser;
+    if (authUser == null) throw Exception('User not authenticated');
 
-      final authId = authUser.id;
-      final userId = await _authService.getUserIdFromAuthId(authId);
-      if (userId == null) throw Exception('User not found');
+    final authId = authUser.id;
+    final userId = await _authService.getUserIdFromAuthId(authId);
+    if (userId == null) throw Exception('User not found');
 
-      debugPrint(
-        '🏁 Finishing attempt: attemptId=$attemptId, score=$score, isPassed=$isPassed',
-      );
+    debugPrint(
+      '🏁 Finishing attempt: attemptId=$attemptId, score=$score, isPassed=$isPassed',
+    );
 
-      // 1️⃣ Update user_lesson_attempts
-      await _supabase
-          .from('user_lesson_attempts')
-          .update({
-            'finished_at': DateTime.now().toIso8601String(),
-            'score': score,
-            'is_passed': isPassed,
-          })
-          .eq('id', attemptId);
+    final now = DateTime.now().toIso8601String();
 
-      debugPrint('✅ Attempt updated');
+    // 1️⃣ Update user_lesson_attempts
+    await _supabase
+        .from('user_lesson_attempts')
+        .update({
+          'finished_at': now,
+          'score': score,
+          'is_passed': isPassed,
+        })
+        .eq('id', attemptId);
 
-      // 2️⃣ Lấy tất cả attempts để tính stats
-      final allAttempts = await _supabase
-          .from('user_lesson_attempts')
-          .select('score, is_passed')
-          .eq('user_id', userId)
-          .eq('lesson_id', lessonId);
+    debugPrint('✅ Attempt updated');
 
-      final attempts = allAttempts as List;
-      final attemptCount = attempts.length;
+    // 2️⃣ Lấy TẤT CẢ finished attempts để tính stats
+    final allAttempts = await _supabase
+        .from('user_lesson_attempts')
+        .select('score, is_passed')
+        .eq('user_id', userId)
+        .eq('lesson_id', lessonId)
+        .not('finished_at', 'is', null); 
 
-      double highestScore = 0;
-      bool isAnyPassed = false;
+    final attempts = allAttempts as List;
+    final attemptCount = attempts.length;
 
-      for (var attempt in attempts) {
-        final attemptScore = (attempt['score'] as num).toDouble();
-        if (attemptScore > highestScore) {
-          highestScore = attemptScore;
-        }
-        if (attempt['is_passed'] == true) {
-          isAnyPassed = true;
-        }
+    double highestScore = 0;
+    bool isAnyPassed = false;
+
+    for (var attempt in attempts) {
+      final attemptScore = (attempt['score'] as num?)?.toDouble() ?? 0;
+      if (attemptScore > highestScore) {
+        highestScore = attemptScore;
       }
-
-      debugPrint(
-        '📊 Stats: highestScore=$highestScore, isAnyPassed=$isAnyPassed, attempts=$attemptCount',
-      );
-
-      // 3️⃣ Update user_progress_lessons_course
-      await _supabase
-          .from('user_progress_lessons_course')
-          .upsert(
-            {
-              'user_id': userId,
-              'lesson_id': lessonId,
-              'status': isAnyPassed ? 'completed' : 'in_progress',
-              'score': highestScore,
-              'attempts': attemptCount,
-              'is_passed': isAnyPassed,
-              'completed_at': isAnyPassed ? DateTime.now().toIso8601String() : null,
-              'updated_at': DateTime.now().toIso8601String(),
-            },
-            onConflict: 'user_id,lesson_id',
-          );
-
-      debugPrint('✅ Progress updated');
-
-      // 4️⃣ ✅ Mở khóa bài học tiếp theo nếu pass
-      if (isAnyPassed) {
-        debugPrint('🔓 User passed, unlocking next lesson...');
-        final lessonService = LessonCourseService();
-        
-        final unlocked = await lessonService.unlockNextLesson(lessonId);
-        if (unlocked) {
-          debugPrint('✅ Next lesson unlocked successfully');
-        } else {
-          debugPrint('⚠️ Failed to unlock next lesson');
-        }
+      if (attempt['is_passed'] == true) {
+        isAnyPassed = true;
       }
-
-      return true;
-    } catch (e) {
-      debugPrint('❌ Error finishing attempt: $e');
-      rethrow;
     }
+
+    debugPrint(
+      '📊 Stats: highestScore=$highestScore, isAnyPassed=$isAnyPassed, attempts=$attemptCount',
+    );
+    debugPrint('🔍 CRITICAL: is_passed will be set to $isAnyPassed in user_progress_lessons_course');
+
+    // 3️⃣ ✅ CRITICAL: Update user_progress_lessons_course
+    // This MUST trigger auto_unlock_next_lesson if isAnyPassed = TRUE
+    await _supabase
+        .from('user_progress_lessons_course')
+        .upsert(
+          {
+            'user_id': userId,
+            'lesson_id': lessonId,
+            'status': isAnyPassed ? 'completed' : 'in_progress',
+            'score': highestScore,
+            'attempts': attemptCount,
+            'is_passed': isAnyPassed, 
+            'completed_at': isAnyPassed ? now : null,
+            'updated_at': now,
+          },
+          onConflict: 'user_id,lesson_id',
+        );
+
+    debugPrint('✅ Progress upserted with is_passed=$isAnyPassed');
+    debugPrint('✅ Trigger should fire if OLD.is_passed != TRUE and NEW.is_passed = TRUE');
+    
+    return true;
+  } catch (e, stackTrace) {
+    debugPrint('❌ Error finishing attempt: $e');
+    debugPrint('Stack trace: $stackTrace');
+    rethrow;
   }
+}
 
   /// ✅ Lấy chi tiết câu trả lời
   Future<List<UserAttemptQuestion>> getAttemptAnswers(String attemptId) async {
@@ -371,7 +382,21 @@ final authUser = _supabase.auth.currentUser;
       final map = <String, Map<String, dynamic>>{};
       for (var item in response as List) {
         final data = item as Map<String, dynamic>;
-        map[data['question_id'] as String] = data;
+        
+        // ✅ Parse selected_option_ids
+        List<String>? selectedIds;
+        if (data['selected_option_ids'] != null) {
+          final idsJson = data['selected_option_ids'];
+          if (idsJson is List) {
+            selectedIds = idsJson.map((e) => e.toString()).toList();
+          }
+        }
+
+        // ✅ Add to map with parsed IDs
+        map[data['question_id'] as String] = {
+          ...data,
+          'selected_option_ids_parsed': selectedIds, 
+        };
       }
 
       debugPrint('✅ Loaded ${map.length} saved answers');
@@ -405,6 +430,77 @@ final authUser = _supabase.auth.currentUser;
       return true;
     } catch (e) {
       debugPrint('❌ Error deleting attempt: $e');
+      return false;
+    }
+  }
+
+  Future<bool> initializeLessonProgress({
+    required String lessonId,
+  }) async {
+    try {
+      final authUser = _supabase.auth.currentUser;
+      if (authUser == null) throw Exception('User not authenticated');
+
+      final authId = authUser.id;
+      final userId = await _authService.getUserIdFromAuthId(authId);
+      if (userId == null) throw Exception('User not found');
+
+      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      debugPrint('🎬 INITIALIZING LESSON PROGRESS');
+      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      debugPrint('👤 User ID: $userId');
+      debugPrint('📚 Lesson ID: $lessonId');
+
+      // ✅ Check if progress already exists
+      final existing = await _supabase
+          .from('user_progress_lessons_course')
+          .select('is_passed, status')
+          .eq('user_id', userId)
+          .eq('lesson_id', lessonId)
+          .maybeSingle();
+
+      if (existing != null) {
+        debugPrint('ℹ️ Progress already exists:');
+        debugPrint('   - is_passed: ${existing['is_passed']}');
+        debugPrint('   - status: ${existing['status']}');
+        
+        // If already passed, don't reset
+        if (existing['is_passed'] == true) {
+          debugPrint('✅ Already passed, keeping existing state');
+          return true;
+        }
+      }
+
+      final now = DateTime.now().toIso8601String();
+
+      // ✅ Create or update progress with is_passed = false
+      await _supabase
+          .from('user_progress_lessons_course')
+          .upsert(
+            {
+              'user_id': userId,
+              'lesson_id': lessonId,
+              'status': 'in_progress',
+              'score': 0.0,
+              'is_passed': false, 
+              'attempts': 0,
+              'completed_at': null,
+              'created_at': existing == null ? now : null, 
+              'updated_at': now,
+            },
+            onConflict: 'user_id,lesson_id',
+          );
+
+      debugPrint('✅ Progress initialized/updated:');
+      debugPrint('   - status: in_progress');
+      debugPrint('   - is_passed: false ← IMPORTANT for trigger');
+      debugPrint('   - score: 0.0');
+      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+      return true;
+    } catch (e, stackTrace) {
+      debugPrint('❌ Error initializing progress: $e');
+      debugPrint('Stack trace: $stackTrace');
       return false;
     }
   }

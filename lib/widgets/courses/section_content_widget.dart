@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
-import 'package:chewie/chewie.dart';
-import 'package:video_player/video_player.dart';
+import 'adaptive_video_widget.dart'; 
 import '../../models/lesson_section.dart';
 import '../../models/section_media.dart';
 import '../../models/lesson_question.dart';
@@ -26,99 +25,14 @@ class SectionContentWidget extends StatefulWidget {
 }
 
 class _SectionContentWidgetState extends State<SectionContentWidget> {
-  final _sectionService = LessonSectionService();
-  final Map<int, VideoPlayerController> _videoControllers = {};
-  final Map<int, ChewieController> _chewieControllers = {};
-
   @override
   void initState() {
     super.initState();
-    _initializeVideoPlayers();
   }
 
   @override
   void dispose() {
-    // Dispose all controllers
-    _chewieControllers.forEach((_, controller) => controller.dispose());
-    _videoControllers.forEach((_, controller) => controller.dispose());
     super.dispose();
-  }
-
-  /// Initialize video players for all video medias
-  void _initializeVideoPlayers() {
-    for (var i = 0; i < widget.medias.length; i++) {
-      final media = widget.medias[i];
-      if (media.mediaType == 'video') {
-        _initializeVideoPlayer(i, media.mediaUrl);
-      }
-    }
-  }
-
-  /// Initialize single video player
-  Future<void> _initializeVideoPlayer(int index, String videoUrl) async {
-    try {
-      final videoController = VideoPlayerController.networkUrl(
-        Uri.parse(videoUrl),
-      );
-
-      await videoController.initialize();
-
-      final chewieController = ChewieController(
-        videoPlayerController: videoController,
-        autoPlay: false,
-        looping: widget.allowReplay,
-        aspectRatio: videoController.value.aspectRatio,
-        allowFullScreen: true,
-        allowMuting: true,
-        showControls: true,
-        materialProgressColors: ChewieProgressColors(
-          playedColor: Colors.blue,
-          handleColor: Colors.blueAccent,
-          backgroundColor: Colors.grey,
-          bufferedColor: Colors.lightBlue,
-        ),
-        placeholder: Container(
-          color: Colors.black,
-          child: const Center(
-            child: CircularProgressIndicator(),
-          ),
-        ),
-        errorBuilder: (context, errorMessage) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
-                  Icons.error_outline,
-                  color: Colors.red,
-                  size: 48,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Lỗi tải video',
-                  style: TextStyle(color: Colors.red.shade700),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  errorMessage,
-                  style: const TextStyle(fontSize: 12),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          );
-        },
-      );
-
-      if (mounted) {
-        setState(() {
-          _videoControllers[index] = videoController;
-          _chewieControllers[index] = chewieController;
-        });
-      }
-    } catch (e) {
-      debugPrint('❌ Error initializing video $index: $e');
-    }
   }
 
   @override
@@ -198,17 +112,64 @@ class _SectionContentWidgetState extends State<SectionContentWidget> {
           color: Colors.blue.shade800,
           height: 1.4,
         ),
+        h3: TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w600,
+          color: Colors.blue.shade700,
+          height: 1.3,
+        ),
         p: TextStyle(
           fontSize: 14,
           color: Colors.grey.shade700,
           height: 1.6,
         ),
+        // ✅ Code block styling (for email examples)
         code: TextStyle(
-          backgroundColor: Colors.grey.shade200,
-          color: Colors.red.shade700,
-          fontFamily: 'Courier New',
-          fontSize: 12,
+          backgroundColor: Colors.pink.shade50,
+          color: Colors.black,
+          fontFamily: 'Times New Roman',
+          fontSize: 13,
+          height: 1.5,
         ),
+        codeblockDecoration: BoxDecoration(
+          color: Colors.pink.shade50,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.white54, width: 1),
+        ),
+        codeblockPadding: const EdgeInsets.all(16),
+        // ✅ List styling
+        listBullet: TextStyle(
+          fontSize: 14,
+          color: Colors.blue.shade700,
+          fontWeight: FontWeight.bold,
+        ),
+        listIndent: 24,
+        // ✅ Strong/Bold text
+        strong: TextStyle(
+          fontWeight: FontWeight.bold,
+          color: Colors.grey.shade900,
+        ),
+        // ✅ Emphasis/Italic text
+        em: const TextStyle(
+          fontStyle: FontStyle.italic,
+        ),
+        // ✅ Blockquote styling
+        blockquote: TextStyle(
+          color: Colors.grey.shade600,
+          fontSize: 13,
+          fontStyle: FontStyle.italic,
+        ),
+        blockquoteDecoration: BoxDecoration(
+          color: Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(4),
+          border: Border(
+            left: BorderSide(
+              color: Colors.grey.shade400,
+              width: 4,
+            ),
+          ),
+        ),
+        blockquotePadding: const EdgeInsets.all(12),
       ),
     );
   }
@@ -319,38 +280,16 @@ class _SectionContentWidgetState extends State<SectionContentWidget> {
 
           // Media player
           if (isVideo)
-            _buildVideoPlayer(index)
+            AdaptiveVideoPlayer(
+              videoUrl: media.mediaUrl,
+              caption: media.caption,
+              allowReplay: widget.allowReplay,
+            )
           else if (isAudio)
             _buildAudioPlayer(media.mediaUrl)
           else if (isImage)
             _buildImageViewer(media.mediaUrl),
         ],
-      ),
-    );
-  }
-
-  /// Build Chewie video player
-  Widget _buildVideoPlayer(int index) {
-    final chewieController = _chewieControllers[index];
-
-    if (chewieController == null) {
-      return Container(
-        height: 200,
-        decoration: BoxDecoration(
-          color: Colors.black,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: const Center(
-          child: CircularProgressIndicator(color: Colors.white),
-        ),
-      );
-    }
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(8),
-      child: AspectRatio(
-        aspectRatio: chewieController.videoPlayerController.value.aspectRatio,
-        child: Chewie(controller: chewieController),
       ),
     );
   }

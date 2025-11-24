@@ -451,8 +451,8 @@ class _NotificationBellState extends State<NotificationBell> {
         ),
         if (_unreadCount > 0)
           Positioned(
-            top: 8,
-            right: 8,
+            top: 6,
+            right: 2,
             child: Container(
               padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(

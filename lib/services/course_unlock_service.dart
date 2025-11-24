@@ -5,19 +5,12 @@ import '../models/course.dart';
 class CourseUnlockService {
   final _supabase = Supabase.instance.client;
 
-  /// ✅ Kiểm tra khóa học có thể mở được không
-  /// Logic:
-  /// - Khóa học được đạt từ test → UNLOCK
-  /// - Khóa học có order < recommended course → UNLOCK
-  /// - Khóa học đã hoàn thành trong user_progress_course → UNLOCK
-  /// - Khóa khác → LOCK
   Future<bool> canUnlockCourse(
     String authUserId,
     String courseId,
     List<Course> allCourses,
   ) async {
     try {
-      // Lấy user DB ID
       final userRecord = await _supabase
           .from('users')
           .select('id')
@@ -31,7 +24,26 @@ class CourseUnlockService {
 
       final dbUserId = userRecord['id'] as String;
 
-      // ✅ 1. Kiểm tra khóa học được recommend từ placement test
+      // ✅ 1. KIỂM TRA user_course_locks TRƯỚC TIÊN (Ưu tiên cao nhất)
+      final lockData = await _supabase
+          .from('user_course_locks')
+          .select('is_locked')
+          .eq('user_id', dbUserId)
+          .eq('course_id', courseId)
+          .maybeSingle();
+
+      if (lockData != null) {
+        final isLocked = lockData['is_locked'] as bool;
+        if (!isLocked) {
+          debugPrint('✅ Course $courseId unlocked (user_course_locks)');
+          return true;
+        } else {
+          debugPrint('🔒 Course $courseId explicitly locked');
+          return false;
+        }
+      }
+
+      //  Kiểm tra recommended course từ placement test
       final recommendedCourse = await _getRecommendedCourse(dbUserId);
       if (recommendedCourse != null) {
         final currentCourse = allCourses.firstWhere(
@@ -44,9 +56,7 @@ class CourseUnlockService {
           orElse: () => Course(id: '', courseName: '', courseOrder: 0),
         );
 
-        // ✅ Unlock nếu:
         // - Là khóa học được đề xuất
-        // - Hoặc có courseOrder < khóa học được đề xuất
         if (courseId == recommendedCourse ||
             currentCourse.courseOrder <= recommendedCourseData.courseOrder) {
           debugPrint(
@@ -56,7 +66,7 @@ class CourseUnlockService {
         }
       }
 
-      // ✅ 2. Kiểm tra xem khóa học đã hoàn thành trong user_progress_course
+      //  Kiểm tra xem khóa học đã hoàn thành trong user_progress_course
       final progressData = await _supabase
           .from('user_progress_course')
           .select('is_completed')
@@ -69,7 +79,7 @@ class CourseUnlockService {
         return true;
       }
 
-      debugPrint('🔒 Course $courseId locked');
+      debugPrint('🔒 Course $courseId locked (no unlock condition met)');
       return false;
     } catch (e) {
       debugPrint('❌ Error checking unlock: $e');
@@ -102,7 +112,7 @@ class CourseUnlockService {
     }
   }
 
-  /// ✅ Kiểm tra tất cả course để lấy unlock status
+  /// Kiểm tra tất cả course để lấy unlock status
   Future<Map<String, bool>> checkAllCourseUnlockStatus(
     String authUserId,
     List<Course> courses,
@@ -126,7 +136,7 @@ class CourseUnlockService {
     return unlockedStatus;
   }
 
-  /// ✅ Lấy khóa học gần nhất cần unlock (cho snackbar)
+  ///  Lấy khóa học gần nhất cần unlock (cho snackbar)
   String getNextCourseToUnlock(
     String courseId,
     List<Course> allCourses,
@@ -154,4 +164,6 @@ class CourseUnlockService {
     // Nếu không có khóa học thấp hơn, return khóa học được recommend
     return 'Khóa học được đề xuất';
   }
+
+  
 }

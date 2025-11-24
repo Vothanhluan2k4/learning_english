@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../../core/config/ai_config.dart';
 import '../../models/ai_question.dart';
@@ -138,49 +139,72 @@ Chỉ trả về JSON array, không thêm text nào khác.
       throw AiException('Lỗi kết nối Groq: $e');
     }
   }
-
   Future<String> _callGeminiApi(String apiKey, String prompt) async {
-    try {
-      final url = '${AiConfig.geminiBaseUrl}/${AiConfig.geminiDefaultModel}:generateContent?key=$apiKey';
-      
-      final response = await http
-          .post(
-            Uri.parse(url),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'contents': [
-                {
-                  'parts': [
-                    {
-                      'text': 'You are an English teaching assistant. '
-                          'Generate multiple choice questions in JSON format. '
-                          'CRITICAL RULE: correct_answer MUST be EXACTLY one of the 4 options. '
-                          'DO NOT create new text for correct_answer.\n\n$prompt',
-                    }
-                  ]
-                }
-              ],
-              'generationConfig': {
-                'temperature': 0.7,
-                'maxOutputTokens': 2000,
-              },
-            }),
-          )
-          .timeout(AiConfig.apiTimeout);
+  // ✅ FIXED: Endpoint phải có model name
+  const model = 'gemini-2.5-flash';
+  final endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent';
+  
+  try {
+    final response = await http.post(
+      Uri.parse('$endpoint?key=$apiKey'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        "contents": [
+          {
+            "parts": [
+              {"text": prompt}
+            ]
+          }
+        ],
+        "generationConfig": {
+          "temperature": 0.7,
+          "maxOutputTokens": 8000,
+        },
+        // ✅ ADDED: Safety settings để tránh bị block
+        "safetySettings": [
+          {
+            "category": "HARM_CATEGORY_HARASSMENT",
+            "threshold": "BLOCK_NONE"
+          },
+          {
+            "category": "HARM_CATEGORY_HATE_SPEECH",
+            "threshold": "BLOCK_NONE"
+          },
+          {
+            "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+            "threshold": "BLOCK_NONE"
+          },
+          {
+            "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+            "threshold": "BLOCK_NONE"
+          }
+        ],
+      }),
+    ).timeout(const Duration(seconds: 30));
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final content = data['candidates'][0]['content']['parts'][0]['text'] as String;
-        return content.trim();
-      } else {
-        throw AiException(
-          'Gemini API error: ${response.statusCode} - ${response.body}',
-        );
-      }
-    } catch (e) {
-      throw AiException('Lỗi kết nối Gemini: $e');
+    debugPrint("✅ Gemini Status: ${response.statusCode}");
+
+    if (response.statusCode != 200) {
+      debugPrint("❌ Gemini Error Body: ${response.body}");
+      throw AiException(
+          "Gemini API error: ${response.statusCode} - ${response.body}");
     }
+
+    final data = jsonDecode(response.body);
+    
+    // ✅ VALIDATE: Check candidates exist
+    if (data["candidates"] == null || data["candidates"].isEmpty) {
+      throw AiException("Gemini returned empty response");
+    }
+    
+    final text = data["candidates"][0]["content"]["parts"][0]["text"] as String;
+    return text.trim();
+    
+  } catch (e) {
+    debugPrint("❌ Gemini API call failed: $e");
+    throw AiException("Lỗi kết nối Gemini: $e");
   }
+}
 
   List<AiQuestion> _parseResponse(String response, String provider) {
     try {

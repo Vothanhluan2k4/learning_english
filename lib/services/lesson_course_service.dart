@@ -152,62 +152,6 @@ class LessonCourseService {
     }
   }
 
-  /// Mở khóa bài học tiếp theo khi hoàn thành bài hiện tại
-  Future<bool> unlockNextLesson(String lessonId) async {
-    try {
-      debugPrint('🔓 Unlocking next lesson after: $lessonId');
-
-      // 1️⃣ Lấy thông tin bài học hiện tại
-      final currentLesson = await fetchLessonById(lessonId);
-      if (currentLesson == null) {
-        throw Exception('Current lesson not found');
-      }
-
-      debugPrint('📖 Current lesson: ${currentLesson.lessonName}');
-      debugPrint('   Module ID: ${currentLesson.moduleId}');
-      debugPrint('   Order Index: ${currentLesson.orderIndex}');
-
-      // 2️⃣ Lấy tất cả lessons trong module, sắp xếp theo order_index
-      final allLessons = await fetchLessonsByModule(currentLesson.moduleId);
-      if (allLessons.isEmpty) {
-        throw Exception('No lessons found in module');
-      }
-
-      debugPrint('📊 Total lessons in module: ${allLessons.length}');
-
-      // 3️⃣ Tìm bài học tiếp theo theo order_index
-      final nextOrderIndex = currentLesson.orderIndex + 1;
-      LessonCourse? nextLesson;
-      
-      for (var lesson in allLessons) {
-        if (lesson.orderIndex == nextOrderIndex) {
-          nextLesson = lesson;
-          break;
-        }
-      }
-
-      if (nextLesson == null) {
-        debugPrint('⚠️ No next lesson found (order_index: $nextOrderIndex)');
-        return true; // Đây là bài cuối cùng
-      }
-
-      debugPrint('🔓 Next lesson found: ${nextLesson.lessonName}');
-      debugPrint('   Order Index: ${nextLesson.orderIndex}');
-      debugPrint('   Is Locked: ${nextLesson.isLocked}');
-
-      // 4️⃣ Mở khóa bài học tiếp theo
-      await _supabase
-          .from('lessons_course')
-          .update({'is_locked': false})
-          .eq('id', nextLesson.id);
-
-      debugPrint('✅ Unlocked next lesson: ${nextLesson.lessonName}');
-      return true;
-    } catch (e) {
-      debugPrint('❌ Error unlocking next lesson: $e');
-      return false;
-    }
-  }
 
   /// ✅ Lấy icon theo loại lesson
   IconData getLessonIcon(String lessonType) {
