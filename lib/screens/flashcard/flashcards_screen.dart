@@ -398,7 +398,7 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> with SingleTickerPr
               indicatorSize: TabBarIndicatorSize.label, // Indicator chuyên nghiệp hơn
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
               tabs: const [
-                Tab(text: 'Bộ thẻ của tôi'),
+                Tab(text: 'Bộ thẻ'),
                 Tab(text: 'Đang học'),
                 Tab(text: 'Khám phá'),
               ],
@@ -773,7 +773,7 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> with SingleTickerPr
           side: BorderSide(color: primaryColor.withOpacity(0.4), width: 1.5),
         ),
         // Thêm màu nền nhẹ để tách biệt
-        color: primaryColor.withOpacity(0.08),
+        color: Colors.white.withOpacity(0.9),
         child: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -960,15 +960,32 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> with SingleTickerPr
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: AppSpacing.xs),
-                  Row(
+                  Wrap(
+                    spacing: AppSpacing.sm,        // khoảng cách ngang giữa 2 cụm
+                    runSpacing: AppSpacing.xs,     // khoảng cách dọc khi xuống dòng
                     children: [
-                      Icon(Icons.schedule_outlined, size: 14, color: errorColor),
-                      const SizedBox(width: AppSpacing.xs),
-                      Text('Cần ôn tập: $toReview', style: TextStyle(fontSize: 13, color: errorColor)),
-                      const SizedBox(width: AppSpacing.sm),
-                      Icon(Icons.done_all_rounded, size: 14, color: warningColor),
-                      const SizedBox(width: AppSpacing.xs),
-                      Text('Đã nhớ: $remembered', style: TextStyle(fontSize: 13, color: warningColor)),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.schedule_outlined, size: 14, color: errorColor),
+                          const SizedBox(width: AppSpacing.xs),
+                          Text(
+                            'Cần ôn tập: $toReview',
+                            style: const TextStyle(fontSize: 13, color: AppColors.error, fontWeight: FontWeight.w500),
+                          ),
+                        ],
+                      ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.done_all_rounded, size: 14, color: warningColor),
+                          const SizedBox(width: AppSpacing.xs),
+                          Text(
+                            'Đã nhớ: $remembered',
+                            style: const TextStyle(fontSize: 13, color: AppColors.warning, fontWeight: FontWeight.w500),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                   const SizedBox(height: AppSpacing.xs),
