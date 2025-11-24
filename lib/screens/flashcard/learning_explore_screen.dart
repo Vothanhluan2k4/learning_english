@@ -1105,72 +1105,93 @@ class _LearningExploreScreenState extends State<LearningExploreScreen> {
     );
   }
 
-  Widget _buildInitialAssessmentControls() {
-    return Center(
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 600),
-        child: Column(
-          children: [
-            const Text(
-              'Bạn nhớ từ này ở mức độ nào?',
+ Widget _buildInitialAssessmentControls() {
+  return Center(
+    child: Container(
+      constraints: const BoxConstraints(maxWidth: 600),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        children: [
+          const Text(
+            'Bạn nhớ từ này ở mức độ nào?',
+            style: TextStyle(
+              fontSize: 19,
+              fontWeight: FontWeight.bold,
+              color: _PRIMARY,
+              letterSpacing: -0.4,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 32),
+
+          // 3 nút căn giữa đẹp tuyệt đối
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final double buttonSize = constraints.maxWidth < 500 ? 80 : 96;
+              final double spacing = constraints.maxWidth < 500 ? 16 : 32;
+
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _buildLevelButton(
+                    'Dễ',
+                    _EASY_COLOR,
+                    Icons.sentiment_satisfied_alt_rounded,
+                    () => _startReviewLevel(Difficulty.easy),
+                    size: buttonSize,
+                  ),
+                  SizedBox(width: spacing),
+                  _buildLevelButton(
+                    'Trung bình',
+                    _MEDIUM_COLOR,
+                    Icons.sentiment_neutral_rounded,
+                    () => _startReviewLevel(Difficulty.medium),
+                    size: buttonSize,
+                  ),
+                  SizedBox(width: spacing),
+                  _buildLevelButton(
+                    'Khó',
+                    _HARD_COLOR,
+                    Icons.sentiment_dissatisfied_rounded,
+                    () => _startReviewLevel(Difficulty.hard),
+                    size: buttonSize,
+                  ),
+                ],
+              );
+            },
+          ),
+
+          const SizedBox(height: 36),
+
+          // Nút bỏ qua
+          TextButton.icon(
+            onPressed: _moveToNextWord,
+            icon: Icon(Icons.skip_next_rounded, color: Colors.blue[700], size: 26),
+            label: Text(
+              'Bỏ qua từ này',
               style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: _PRIMARY,
-                letterSpacing: -0.3,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final isNarrow = constraints.maxWidth < 400;
-
-                if (isNarrow) {
-                  return Column(
-                    children: [
-                      _buildLevelButton('Dễ', _EASY_COLOR, Icons.sentiment_satisfied_alt, () => _startReviewLevel(Difficulty.easy)),
-                      const SizedBox(height: 16),
-                      _buildLevelButton('Trung bình', _MEDIUM_COLOR, Icons.sentiment_neutral, () => _startReviewLevel(Difficulty.medium)),
-                      const SizedBox(height: 16),
-                      _buildLevelButton('Khó', _HARD_COLOR, Icons.sentiment_dissatisfied, () => _startReviewLevel(Difficulty.hard)),
-                    ],
-                  );
-                }
-
-                return Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _buildLevelButton('Dễ', _EASY_COLOR, Icons.sentiment_satisfied_alt, () => _startReviewLevel(Difficulty.easy)),
-                    _buildLevelButton('Trung bình', _MEDIUM_COLOR, Icons.sentiment_neutral, () => _startReviewLevel(Difficulty.medium)),
-                    _buildLevelButton('Khó', _HARD_COLOR, Icons.sentiment_dissatisfied, () => _startReviewLevel(Difficulty.hard)),
-                  ],
-                );
-              },
-            ),
-            const SizedBox(height: 28),
-            TextButton.icon(
-              onPressed: _moveToNextWord,
-              icon: Icon(Icons.skip_next_rounded, color: Colors.blue[700], size: 24),
-              label: Text(
-                'Bỏ qua',
-                style: TextStyle(
-                  color: Colors.blue[700],
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                color: Colors.blue[700],
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
               ),
             ),
-          ],
-        ),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+            ),
+          ),
+        ],
       ),
-    );
-  }
+    ),
+  );
+}
 
-  Widget _buildLevelButton(String text, Color color, IconData icon, VoidCallback onPressed) {
+  Widget _buildLevelButton(String text,
+    Color color,
+    IconData icon,
+    VoidCallback onPressed, {
+    double size = 96, // mặc định
+  }) {
     return Column(
       children: [
         Container(

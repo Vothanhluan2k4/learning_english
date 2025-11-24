@@ -417,48 +417,53 @@ class _ExploreListDetailScreenState extends State<ExploreListDetailScreen> {
     );
   }
 
-  Widget _buildActionButtons() {
-    return Row(
-      children: [
-        // Learn Button
-        Expanded(
-          flex: 3,
-          child: _buildPrimaryButton(
-            onPressed: _startFlashcardSession,
-            icon: Icons.play_circle_filled_rounded,
-            label: 'Học ngay',
-            gradient: LinearGradient(
-              colors: [primaryColor, primaryColor.withOpacity(0.8)],
-            ),
+Widget _buildActionButtons() {
+  return Row(
+    children: [
+      // 1. Nút "Học ngay" – chiếm phần lớn
+      Expanded(
+        child: _buildPrimaryButton(
+          onPressed: _startFlashcardSession,
+          icon: Icons.play_circle_filled_rounded,
+          label: 'Học ',
+          gradient: LinearGradient(
+            colors: [primaryColor, primaryColor.withOpacity(0.8)],
           ),
         ),
-        const SizedBox(width: 12),
+      ),
+      const SizedBox(width: 9),
 
-        // Follow Button
-        Expanded(
-          flex: 2,
+      // 2. Nút Theo dõi / Bỏ theo dõi – dùng Flexible + FittedBox (tự co giãn thông minh)
+      Flexible(
+        fit: FlexFit.loose,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            maxWidth: 150,    // Giới hạn tối đa (rất quan trọng!)
+          ),
           child: _buildOutlineButton(
             onPressed: _isProcessing ? null : _handleFollowToggle,
             icon: _isProcessing
                 ? null
                 : (_hasFollowed ? Icons.favorite_rounded : Icons.favorite_border_rounded),
-            label: _isProcessing ? 'Đang...' : (_hasFollowed ? 'Bỏ theo dõi' : 'Theo dõi'),
-            color: _hasFollowed ? Colors.grey : Colors.red,
+            label: _isProcessing
+                ? 'Đang...'
+                : (_hasFollowed ? 'Bỏ theo dõi' : 'Theo dõi'),
+            color: _hasFollowed ? Colors.grey.shade600 : Colors.redAccent,
             isLoading: _isProcessing,
           ),
         ),
-        const SizedBox(width: 12),
+      ),
+      const SizedBox(width: 9),
 
-        // Shuffle Button
-        _buildIconButton(
-          onPressed: _shuffleList,
-          icon: Icons.shuffle_rounded,
-          tooltip: 'Xáo trộn',
-        ),
-      ],
-    );
-  }
-
+      // 3. Nút xáo trộn – cố định
+      _buildIconButton(
+        onPressed: _shuffleList,
+        icon: Icons.shuffle_rounded,
+        tooltip: 'Xáo trộn',
+      ),
+    ],
+  );
+}
   Widget _buildPrimaryButton({
     required VoidCallback onPressed,
     required IconData icon,
