@@ -123,7 +123,7 @@ class _ReadingLessonScreenState extends State<ReadingLessonScreen> {
           final quizSections = <LessonSection>[];
           
           for (var section in sections) {
-            if (section.sectionType == 'text') {
+            if ( section.sectionType == 'reading') {
               textSections.add(section);
             } else if (section.sectionType == 'quiz') {
               quizSections.add(section);

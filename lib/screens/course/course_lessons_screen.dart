@@ -280,13 +280,14 @@ class _CourseLessonsScreenState extends State<CourseLessonsScreen> {
       final hasQuizSections = sections.any((s) => s.sectionType == 'quiz');
       final hasWritingSections = sections.any((s) => s.sectionType == 'writing');
       final hasSpeakingSections = sections.any((s) => s.sectionType == 'speaking');
+      final hasReadingSections = sections.any((s) => s.sectionType == 'reading' );
       
       debugPrint('📊 Section analysis:');
       debugPrint('   Text: $hasTextSections');
       debugPrint('   Audio: $hasAudioSections');
       debugPrint('   Quiz: $hasQuizSections');
 
-      // ✅ PRIORITY: Audio > Reading > Default
+
       if (hasAudioSections && hasQuizSections) {
         // → Listening Lesson
         debugPrint('🎧 Navigate to ListeningLessonScreen');
@@ -307,7 +308,6 @@ class _CourseLessonsScreenState extends State<CourseLessonsScreen> {
           ),
         );
       }
-      
       else if (hasWritingSections) { 
       debugPrint('✍️ Navigate to WritingLessonScreen');
       await Navigator.push(
@@ -316,8 +316,7 @@ class _CourseLessonsScreenState extends State<CourseLessonsScreen> {
           builder: (context) => WritingLessonScreen(lessonId: lesson.id),
         ),
       );
-      
-      }else if (hasTextSections && hasQuizSections && !hasAudioSections) {
+      }else if (hasReadingSections && !hasTextSections ) {
         debugPrint('📖 Navigate to ReadingLessonScreen');
         await Navigator.push(
           context,
@@ -328,8 +327,6 @@ class _CourseLessonsScreenState extends State<CourseLessonsScreen> {
           ),
         );
       } 
-      
-      
       else if(hasVideoSections && hasTextSections || hasTextSections){
         debugPrint('📚 Navigate to default LessonDetailScreen');
         await Navigator.pushNamed(
@@ -337,7 +334,8 @@ class _CourseLessonsScreenState extends State<CourseLessonsScreen> {
           '/lessonDetail',
           arguments: {'lessonId': lesson.id},
         );
-      } 
+      }
+       
 
       // ✅ Reload lessons after returning
       if (mounted) {
