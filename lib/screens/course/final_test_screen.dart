@@ -1083,12 +1083,12 @@ Future<void> _submitTest() async {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.isPlacementTest ? 'Kiểm tra đầu vào' : 'Kiểm tra cuối bài',
+        title: Text(widget.isPlacementTest ? 'Kiểm tra đầu vào' : 'Kiểm tra cuối',
           style: TextStyle(
             fontSize: 20
           ),
         ),
-        centerTitle: true,
+        centerTitle: false,
         backgroundColor: Colors.blueAccent,
         foregroundColor: Colors.white,
         leading: IconButton(
@@ -1103,14 +1103,14 @@ Future<void> _submitTest() async {
               child: Row(
                 children: [
                   Icon(Icons.timer,
-                      color: _timeRemaining < 300 ? Colors.red : Colors.white),
+                      color: _timeRemaining < 180 ? Colors.red : Colors.white),
                   SizedBox(width: 4),
                   Text(
                     _formatTime(_timeRemaining),
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
-                      color: _timeRemaining < 300 ? Colors.red : Colors.white,
+                      color: _timeRemaining < 180 ? Colors.red : Colors.white,
                     ),
                   ),
                 ],

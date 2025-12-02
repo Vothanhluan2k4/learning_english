@@ -85,9 +85,10 @@ class _ChooseCourseScreenState extends State<ChooseCourseScreen> {
       backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text('Chọn lộ trình học của bạn', 
-        style: TextStyle(color: Colors.white),),
+        style: TextStyle(color: Colors.white , fontSize: 21),),
         centerTitle: true,
         backgroundColor: Colors.blueAccent,
+        
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),

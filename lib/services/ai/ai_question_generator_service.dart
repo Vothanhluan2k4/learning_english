@@ -90,10 +90,10 @@ VÍ DỤ SAI (TUYỆT ĐỐI TRÁNH):
 {
   "question": "By the time I arrived, they ___ their homework.",
   "options": ["finish", "finished", "finishing", "finishes"],
-  "correct_answer": "had finished", ❌ SAI: không có trong options!
+  "correct_answer": "had finished",  SAI: không có trong options!
 }
 
-Chỉ trả về JSON array, không thêm text nào khác.
+Chỉ trả về JSON array, không thêm text nào khác.(chỉ tạo câu bằng tiếng Anh)
 ''';
   }
 

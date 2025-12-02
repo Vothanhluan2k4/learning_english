@@ -551,7 +551,7 @@ class _CourseQuizContentState extends State<CourseQuizContent> {
               SnackBar(
                 content: Row(
                     children: const [
-                      Icon(Icons.check, size: 20),
+                      Icon(Icons.check, size: 20 , color: Colors.white),
                       SizedBox(width: 8),
                       Text('Đã xoá câu trả lời, bắt đầu lại bài tập'),
                     ]

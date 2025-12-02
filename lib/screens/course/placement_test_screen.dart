@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:learning_english/core/utils/test_timer.dart';
 import 'package:learning_english/screens/drawer_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'dart:async';
 import '../../models/question_group.dart';
 import '../../models/test_question.dart';
+import '../../services/test/placement_test_result_service.dart';
+import '../../services/test/test_question_service.dart';
 import '../../widgets/audio_player.dart';
 
 class PlacementTestScreen extends StatefulWidget {
@@ -13,8 +15,14 @@ class PlacementTestScreen extends StatefulWidget {
   State<PlacementTestScreen> createState() => _PlacementTestScreenState();
 }
 
-class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsBindingObserver {
+class _PlacementTestScreenState extends State<PlacementTestScreen> 
+    with WidgetsBindingObserver {
   final supabase = Supabase.instance.client;
+  
+  // ✅ Services
+  final _resultService = TestResultService();
+  final _questionService = TestQuestionService();
+  late TestTimer _testTimer;
 
   String? _testId;
   String? _resultId;
@@ -26,13 +34,28 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
   Map<String, String> _userAnswers = {};
   bool _isPanelOpen = false;
 
-  // ✅ UPDATED: Track audio plays per GROUP ID (not URL)
-  final Map<String, int> _audioPlayCounts = {}; // groupId -> playCount
-  final Map<String, bool> _isAudioPlaying = {}; // groupId -> isPlaying
+  final Map<String, int> _audioPlayCounts = {}; 
+  final Map<String, bool> _isAudioPlaying = {}; 
 
-  Timer? _timer;
-  int _timeRemaining = 0;
-  bool _isTimeUp = false;
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    
+    // ✅ Initialize timer
+    _testTimer = TestTimer(
+      onTick: () => setState(() {}),
+      onTimeout: _handleTimeout,
+      onMinutePassed: (minutes) => _updateLastActivity(),
+    );
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _testTimer.dispose();
+    super.dispose();
+  }
 
   @override
   void didChangeDependencies() {
@@ -46,91 +69,148 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
   }
 
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused) {
       _saveTestProgress();
     }
   }
 
+  // ✅ REFACTORED: Use service
   Future<void> _saveTestProgress() async {
     if (_resultId != null) {
-      try {
-        await supabase.from('user_test_results').update({
-          'status': 'in_progress',
-          'time_remaining': _timeRemaining ~/ 60,
-          'last_activity': DateTime.now().toIso8601String(),
-        }).eq('id', _resultId as String);
-      } catch (e) {
-        debugPrint('Error saving test progress: $e');
-      }
+      await _resultService.saveTestProgress(
+        resultId: _resultId!,
+        timeRemaining: _testTimer.timeRemaining,
+      );
     }
   }
 
-  String _formatTime(int seconds) {
-    int minutes = seconds ~/ 60;
-    int remainingSeconds = seconds % 60;
-    return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
-  }
-
-  void _startTimer(int minutes) {
-    _timeRemaining = minutes * 60;
-    _timer?.cancel();
-    _timer = Timer.periodic(Duration(seconds: 1), (timer) {
-      setState(() {
-        if (_timeRemaining > 0) {
-          _timeRemaining--;
-          if (_timeRemaining % 60 == 0) {
-            _updateLastActivity();
-          }
-        } else {
-          _isTimeUp = true;
-          timer.cancel();
-          _handleTimeout();
-        }
-      });
-    });
-  }
-
+  // ✅ REFACTORED: Use service
   Future<void> _updateLastActivity() async {
     if (_resultId == null) return;
     
-    try {
-      await supabase.from('user_test_results').update({
-        'time_remaining': _timeRemaining ~/ 60,
-        'last_activity': DateTime.now().toIso8601String(),
-      }).eq('id', _resultId as String);
-    } catch (e) {
-      debugPrint('❌ Error updating last activity: $e');
-    }
+    await _resultService.updateLastActivity(
+      resultId: _resultId!,
+      timeRemaining: _testTimer.timeRemaining,
+    );
   }
 
+  // ✅ REFACTORED: Use service
   Future<void> _handleTimeout() async {
     if (_resultId == null) return;
 
+    await _resultService.handleTimeout(_resultId!);
+    _showTimeoutDialog();
+  }
+
+  // ✅ REFACTORED: Use service
+  Future<void> _fetchQuestions(String testId) async {
     try {
-      await supabase.from('user_test_results').update({
-        'status': 'timeout',
-        'completed_at': DateTime.now().toIso8601String(),
-        'time_remaining': 0,
-      }).eq('id', _resultId as String);
+      setState(() => _isLoading = true);
+
+      // Get test info
+      final testInfo = await _questionService.getTestInfo(testId);
       
-      _showTimeoutDialog();
+      // Get questions
+      final items = await _questionService.fetchTestQuestions(testId);
+
+      // Create user test result
+      await _createUserTestResult();
+
+      // Start timer if needed
+      if (testInfo['time_limit'] != null) {
+        _testTimer.start(testInfo['time_limit']);
+      }
+
+      setState(() {
+        _items = items;
+        _isLoading = false;
+      });
     } catch (e) {
-      debugPrint('❌ Error handling timeout: $e');
+      debugPrint('❌ Error loading questions: $e');
+      setState(() => _isLoading = false);
     }
+  }
+
+  // ✅ REFACTORED: Use service
+  Future<void> _createUserTestResult() async {
+    final authId = supabase.auth.currentUser?.id;
+    if (authId == null || _testId == null) return;
+
+    try {
+      // Get user ID
+      final userRecord = await supabase
+          .from('users')
+          .select('id')
+          .eq('auth_id', authId)
+          .maybeSingle();
+
+      if (userRecord == null) {
+        debugPrint('❌ No user found with auth_id: $authId');
+        return;
+      }
+
+      _userId = userRecord['id'];
+      
+      // Create or get result ID
+      _resultId = await _resultService.createUserTestResult(
+        userId: _userId!,
+        testId: _testId!,
+      );
+    } catch (e) {
+      debugPrint('❌ Error creating test result: $e');
+    }
+  }
+
+  // ✅ REFACTORED: Use service
+  Future<void> _submitTest() async {
+    _testTimer.pause();
+    
+    // Calculate score
+    int total = 0;
+    int correct = 0;
+
+    for (final item in _items) {
+      if (item is TestQuestion) {
+        total++;
+        final userAnswer = _userAnswers[item.id];
+        if (userAnswer == item.correctAnswer) correct++;
+      } else if (item is QuestionGroup) {
+        for (final q in item.testQuestions) {
+          total++;
+          final userAnswer = _userAnswers[q.id];
+          if (userAnswer == q.correctAnswer) correct++;
+        }
+      }
+    }
+
+    final score = total > 0 ? (correct / total * 100) : 0.0;
+
+    // Submit test
+    if (_resultId != null) {
+      await _resultService.submitTest(
+        resultId: _resultId!,
+        score: score,
+        totalQuestions: total,
+        correctAnswers: correct,
+        isTimeout: _testTimer.isTimeUp,
+      );
+    }
+
+    // Get test info for placement
+    final testInfo = await _questionService.getTestInfo(_testId!);
+
+    // ✅ Update placement - Service will calculate recommended course
+    if (testInfo['test_type'] == 'placement' && _userId != null) {
+      await _resultService.updatePlacementSummary(
+        userId: _userId!,
+        testId: _testId!,
+        resultId: _resultId!,
+        score: score,
+      );
+    }
+
+    _showResultDialog(score, correct, total);
   }
 
   void _showTimeoutDialog() {
@@ -166,260 +246,14 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
     );
   }
 
-  Future<void> _fetchQuestions(String testId) async {
+  Future<void> _showResultDialog(double score, int correct, int total) async {
     try {
-      setState(() => _isLoading = true);
-
-      final testInfo = await supabase
-          .from('tests')
-          .select('time_limit, test_type')
-          .eq('id', testId)
-          .single();
-
-      final allItems = <dynamic>[];
-
-      final directRes = await supabase
-          .from('test_questions')
-          .select()
-          .eq('test_id', testId)
-          .isFilter('group_id', null)
-          .order('order_in_test', ascending: true);
-
-      final directQuestions = 
-          (directRes as List).map((q) => TestQuestion.fromJson(q)).toList();
-      allItems.addAll(directQuestions);
-
-      final groupRes = await supabase
-          .from('question_groups')
-          .select('''
-          id, test_id, title, instruction, media_type, media_url, content, order_in_test,
-          test_questions!inner(*)
-        ''')
-          .eq('test_id', testId)
-          .order('order_in_test', ascending: true);
-
-      for (final g in groupRes) {
-        final group = QuestionGroup.fromJson(g);
-        group.testQuestions.sort((a, b) => 
-            (a.orderInTest ?? 0).compareTo(b.orderInTest ?? 0));
-        allItems.add(group);
-      }
-
-      allItems.sort((a, b) {
-        final orderA = a is TestQuestion ? a.orderInTest : (a as QuestionGroup).orderInTest;
-        final orderB = b is TestQuestion ? b.orderInTest : (b as QuestionGroup).orderInTest;
-        return (orderA ?? 0).compareTo(orderB ?? 0);
-      });
-
-      await _createUserTestResult();
-
-      if (testInfo['time_limit'] != null) {
-        _startTimer(testInfo['time_limit']);
-      }
-
-      setState(() {
-        _items = allItems;
-        _isLoading = false;
-      });
-    } catch (e) {
-      debugPrint('❌ Error loading questions: $e');
-      setState(() => _isLoading = false);
-    }
-  }
-
-  // ✅ UPDATE: _nextQuestion to track audio plays
-  void _nextQuestion() {
-    // Track audio play when leaving current question
-    final currentItem = _items[_currentQuestionIndex];
-    if (currentItem is QuestionGroup && currentItem.mediaType == 'audio') {
-      final isPlaying = _isAudioPlaying[currentItem.id] ?? false;
-      if (isPlaying) {
-        setState(() {
-          final currentCount = _audioPlayCounts[currentItem.id] ?? 0;
-          if (currentCount == 0) {
-            _audioPlayCounts[currentItem.id] = 1;
-            debugPrint('⚠️ Audio interrupted: ${currentItem.id}, counted as 1 play');
-          }
-          _isAudioPlaying[currentItem.id] = false;
-        });
-      }
-    }
-
-    // Original navigation logic
-    if (_currentQuestionIndex < _items.length - 1) {
-      setState(() {
-        _currentQuestionIndex++;
-        _isPanelOpen = false;
-      });
-    } else {
-      _submitTest();
-    }
-  }
-
-  // ✅ UPDATE: _previousQuestion to track audio plays
-  void _previousQuestion() {
-    // Track audio play when leaving current question
-    final currentItem = _items[_currentQuestionIndex];
-    if (currentItem is QuestionGroup && currentItem.mediaType == 'audio') {
-      final isPlaying = _isAudioPlaying[currentItem.id] ?? false;
-      if (isPlaying) {
-        setState(() {
-          final currentCount = _audioPlayCounts[currentItem.id] ?? 0;
-          if (currentCount == 0) {
-            _audioPlayCounts[currentItem.id] = 1;
-            debugPrint('⚠️ Audio interrupted (back): ${currentItem.id}, counted as 1 play');
-          }
-          _isAudioPlaying[currentItem.id] = false;
-        });
-      }
-    }
-
-    // Original navigation logic
-    if (_currentQuestionIndex > 0) {
-      setState(() {
-        _currentQuestionIndex--;
-        _isPanelOpen = false;
-      });
-    }
-  }
-
-  void _jumpToQuestion(int index) {
-    setState(() {
-      _currentQuestionIndex = index;
-      _isPanelOpen = false;
-    });
-  }
-
-  bool _canMoveNext() {
-    final currentItem = _items[_currentQuestionIndex];
-
-    if (currentItem is TestQuestion) {
-      return _userAnswers[currentItem.id]?.trim().isNotEmpty ?? false;
-    } else if (currentItem is QuestionGroup) {
-      return currentItem.testQuestions.every(
-              (q) => _userAnswers[q.id]?.trim().isNotEmpty ?? false
-      );
-    }
-
-    return false;
-  }
-
-  Future<void> _createUserTestResult() async {
-    final authId = supabase.auth.currentUser?.id;
-
-    if(authId != null){
-      debugPrint('⚠️ Có user: $authId');
-    }
-    if (authId == null || _testId == null) {
-      debugPrint('⚠️ Không có auth user hoặc test ID');
-      return;
-    }
-
-    try {
-      final userRecord = await supabase
-          .from('users')
-          .select('id')
-          .eq('auth_id', authId)
-          .maybeSingle();
-
-      if (userRecord == null) {
-        debugPrint('❌ Không tìm thấy user với auth_id: $authId');
-        debugPrint('💡 Cần tạo user trong bảng users trước khi làm bài test');
-      } else {
-        _userId = userRecord['id'];
-        debugPrint('✅ Tìm thấy user id: $_userId');
-      }
-
-      final existing = await supabase
-          .from('user_test_results')
-          .select('id, status')
-          .eq('user_id', _userId as String)
-          .eq('test_id', _testId as String)
-          .maybeSingle();
-
-      if (existing != null) {
-        _resultId = existing['id'];
-        
-        if (existing['status'] == 'in_progress' && 
-            existing['time_remaining'] != null) {
-          _startTimer(existing['time_remaining']);
-        }
-      } else {
-        final newResult = await supabase.from('user_test_results').insert({
-          'user_id': _userId,
-          'test_id': _testId,
-          'status': 'in_progress',
-          'started_at': DateTime.now().toIso8601String(),
-          'last_activity': DateTime.now().toIso8601String(),
-        }).select('id').single();
-
-        _resultId = newResult['id'];
-      }
-    } catch (e) {
-      debugPrint('❌ Lỗi tạo user_test_results: $e');
-    }
-  }
-
-  Future<void> _submitTest() async {
-    _timer?.cancel();
-    
-    int total = 0;
-    int correct = 0;
-
-    for (final item in _items) {
-      if (item is TestQuestion) {
-        total++;
-        final userAnswer = _userAnswers[item.id];
-        if (userAnswer == item.correctAnswer) correct++;
-      } else if (item is QuestionGroup) {
-        for (final q in item.testQuestions) {
-          total++;
-          final userAnswer = _userAnswers[q.id];
-          if (userAnswer == q.correctAnswer) correct++;
-        }
-      }
-    }
-
-    final score = total > 0 ? (correct / total * 100) : 0.0;
-
-    if (_resultId != null) {
-      await supabase.from('user_test_results').update({
-        'score': score,
-        'total_questions': total,
-        'correct_answers': correct,
-        'status': _isTimeUp ? 'timeout' : 'completed',
-        'completed_at': DateTime.now().toIso8601String(),
-        'time_remaining': 0,
-      }).eq('id', _resultId as String);
-    }
-
-    final testInfo = await supabase
-        .from('tests')
-        .select('test_type, recommended_course_id')
-        .eq('id', _testId as String)
-        .single();
-
-    if (testInfo['test_type'] == 'placement') {
-      await supabase.from('user_placement_summary').upsert({
-        'user_id': _userId,
-        'placement_test_id': _testId,
-        'latest_result_id': _resultId,
-        'score': score,
-        'recommended_course_id': testInfo['recommended_course_id'],
-        'updated_at': DateTime.now().toIso8601String(),
-      });
-    }
-
-    _showResultDialog(score, correct, total, testInfo['recommended_course_id']);
-  }
-
-  Future<void> _showResultDialog(double score, int correct, int total, String? recommendedCourseId) async {
-    try {
+      // ✅ Query with JOIN to get course name
       final placementData = await supabase
           .from('user_placement_summary')
           .select('''
             score,
-            courses:recommended_course_id (
+            courses!user_placement_summary_recommended_course_id_fkey (
               course_name
             )
           ''')
@@ -432,7 +266,10 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
         return;
       }
 
-      debugPrint('✅ Tìm thấy khóa học phù hợp: ${placementData['courses']['course_name']}');
+      // ✅ Access course name correctly
+      final courseName = placementData['courses']?['course_name'] ?? 'Chưa xác định';
+      
+      debugPrint('✅ Tìm thấy khóa học phù hợp: $courseName');
 
       showDialog(
         context: context,
@@ -515,7 +352,7 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
                       _buildDetailRow(
                         Icons.school,
                         'Khóa học phù hợp',
-                        placementData['courses']['course_name'] ?? 'Chưa xác định',
+                        courseName, 
                         Colors.blue,
                       ),
                     ],
@@ -667,7 +504,7 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
     if (_items.isEmpty) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('Kiểm tra đầu vào'),
+          title: const Text('Placement Test'),
           leading: IconButton(
             icon: const Icon(Icons.arrow_back, color: Colors.white),
             onPressed: () => Navigator.pop(context),
@@ -682,7 +519,7 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
     return Scaffold(
       appBar: AppBar(
         title: const Text('Kiểm tra đầu vào'),
-        centerTitle: true,
+        centerTitle: false,
         backgroundColor: Colors.blueAccent,
         foregroundColor: Colors.white,
         leading: IconButton(
@@ -690,21 +527,22 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
           onPressed: _showExitDialog,
         ),
         actions: [
-          if (_timeRemaining > 0)
+          // ✅ Use timer formatter
+          if (_testTimer.timeRemaining > 0)
             Container(
               padding: EdgeInsets.symmetric(horizontal: 16),
               alignment: Alignment.center,
               child: Row(
                 children: [
                   Icon(Icons.timer,
-                      color: _timeRemaining < 300 ? Colors.red : Colors.white),
+                      color: _testTimer.timeRemaining < 180 ? Colors.red : Colors.white),
                   SizedBox(width: 4),
                   Text(
-                    _formatTime(_timeRemaining),
+                    _testTimer.formatTime(),
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
-                      color: _timeRemaining < 300 ? Colors.red : Colors.white,
+                      color: _testTimer.timeRemaining < 180 ? Colors.red : Colors.white,
                     ),
                   ),
                 ],
@@ -832,7 +670,7 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
 
   Future<void> _exitTest() async {
     await _saveTestProgress();
-    _timer?.cancel();
+    _testTimer.pause();
 
     if (mounted) {
       Navigator.pop(context);
@@ -922,7 +760,7 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
         if (question.questionType == 'fill_blank') ...[
           TextField(
             decoration: InputDecoration(
-              labelText: 'Nhập đáp án của bạn...',
+              labelText: 'Nhập đáp án của bạn',
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -1588,4 +1426,283 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> with WidgetsB
       ],
     );
   }
+
+    void _nextQuestion() {
+    // Track audio play when leaving current question
+    final currentItem = _items[_currentQuestionIndex];
+    if (currentItem is QuestionGroup && currentItem.mediaType == 'audio') {
+      final isPlaying = _isAudioPlaying[currentItem.id] ?? false;
+      if (isPlaying) {
+        setState(() {
+          final currentCount = _audioPlayCounts[currentItem.id] ?? 0;
+          if (currentCount == 0) {
+            _audioPlayCounts[currentItem.id] = 1;
+            debugPrint('⚠️ Audio interrupted: ${currentItem.id}, counted as 1 play');
+          }
+          _isAudioPlaying[currentItem.id] = false;
+        });
+      }
+    }
+
+    // ✅ Check if this is the last question
+    if (_currentQuestionIndex < _items.length - 1) {
+      setState(() {
+        _currentQuestionIndex++;
+        _isPanelOpen = false;
+      });
+    } else {
+      // ✅ Check for unanswered questions before submitting
+      _checkAndSubmitTest();
+    }
+  }
+
+  // ✅ NEW: Check for unanswered questions before submitting
+  Future<void> _checkAndSubmitTest() async {
+    final unansweredQuestions = _getUnansweredQuestions();
+    
+    if (unansweredQuestions.isNotEmpty) {
+      _showIncompleteTestDialog(unansweredQuestions);
+    } else {
+      _submitTest();
+    }
+  }
+
+  // ✅ NEW: Get list of unanswered questions
+  List<int> _getUnansweredQuestions() {
+    final List<int> unanswered = [];
+    int questionNumber = 1;
+    
+    for (var item in _items) {
+      if (item is TestQuestion) {
+        final isAnswered = _userAnswers[item.id]?.trim().isNotEmpty ?? false;
+        if (!isAnswered) {
+          unanswered.add(questionNumber);
+        }
+        questionNumber++;
+      } else if (item is QuestionGroup) {
+        for (var question in item.testQuestions) {
+          final isAnswered = _userAnswers[question.id]?.trim().isNotEmpty ?? false;
+          if (!isAnswered) {
+            unanswered.add(questionNumber);
+          }
+          questionNumber++;
+        }
+      }
+    }
+    
+    return unanswered;
+  }
+
+  // ✅ NEW: Show dialog for incomplete test
+  void _showIncompleteTestDialog(List<int> unansweredQuestions) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 32),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Bài kiểm tra chưa hoàn thành',
+                style: TextStyle(fontSize: 18),
+              ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Bạn còn ${unansweredQuestions.length} câu hỏi chưa trả lời:',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              SizedBox(height: 12),
+              Container(
+                padding: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange.shade200),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.info_outline, 
+                             color: Colors.orange.shade700, 
+                             size: 20),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Danh sách câu chưa trả lời:',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.orange.shade900,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: unansweredQuestions.map((num) {
+                        return Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: Colors.orange.shade300,
+                            ),
+                          ),
+                          child: Text(
+                            'Câu $num',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.orange.shade900,
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(height: 16),
+              Container(
+                padding: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.lightbulb_outline, 
+                         color: Colors.blue.shade700, 
+                         size: 20),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Bạn có thể quay lại và hoàn thành các câu này trước khi nộp bài.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.blue.shade900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                Navigator.pop(context);
+                if (unansweredQuestions.isNotEmpty) {
+                  _jumpToFlattenedQuestion(unansweredQuestions.first - 1);
+                }
+              },
+              icon: Icon(Icons.arrow_back),
+              label: Text('Quay lại làm tiếp'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.blue,
+                padding: EdgeInsets.symmetric(vertical: 14),
+              ),
+            ),
+          ),
+
+          SizedBox(height: 12),
+
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                Navigator.pop(context);
+                _submitTest();
+              },
+              icon: Icon(Icons.send),
+              label: Text('Nộp bài luôn'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red.shade400,
+                foregroundColor: Colors.white,
+                padding: EdgeInsets.symmetric(vertical: 14),
+              ),
+            ),
+          ),
+        ],
+        actionsPadding: EdgeInsets.fromLTRB(16, 0, 16, 16),
+
+      ),
+    );
+  }
+
+  void _previousQuestion() {
+    // Track audio play when leaving current question
+    final currentItem = _items[_currentQuestionIndex];
+    if (currentItem is QuestionGroup && currentItem.mediaType == 'audio') {
+      final isPlaying = _isAudioPlaying[currentItem.id] ?? false;
+      if (isPlaying) {
+        setState(() {
+          final currentCount = _audioPlayCounts[currentItem.id] ?? 0;
+          if (currentCount == 0) {
+            _audioPlayCounts[currentItem.id] = 1;
+            debugPrint('⚠️ Audio interrupted (back): ${currentItem.id}, counted as 1 play');
+          }
+          _isAudioPlaying[currentItem.id] = false;
+        });
+      }
+    }
+
+    // Original navigation logic
+    if (_currentQuestionIndex > 0) {
+      setState(() {
+        _currentQuestionIndex--;
+        _isPanelOpen = false;
+      });
+    }
+  }
+
+  void _jumpToQuestion(int index) {
+    setState(() {
+      _currentQuestionIndex = index;
+      _isPanelOpen = false;
+    });
+  }
+
+  bool _canMoveNext() {
+    final currentItem = _items[_currentQuestionIndex];
+
+    if (currentItem is TestQuestion) {
+      return _userAnswers[currentItem.id]?.trim().isNotEmpty ?? false;
+    } else if (currentItem is QuestionGroup) {
+      return currentItem.testQuestions.every(
+              (q) => _userAnswers[q.id]?.trim().isNotEmpty ?? false
+      );
+    }
+
+    return false;
+  }
+
 }

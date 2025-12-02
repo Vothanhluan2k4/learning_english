@@ -17,14 +17,11 @@ class CourseUnlockService {
           .eq('auth_id', authUserId)
           .maybeSingle();
 
-      if (userRecord == null) {
-        debugPrint('❌ User not found');
-        return false;
-      }
+      if (userRecord == null) return false;
 
       final dbUserId = userRecord['id'] as String;
 
-      // ✅ 1. KIỂM TRA user_course_locks TRƯỚC TIÊN (Ưu tiên cao nhất)
+      // ✅ Check user_course_locks (trigger đã tự động update)
       final lockData = await _supabase
           .from('user_course_locks')
           .select('is_locked')
@@ -34,16 +31,13 @@ class CourseUnlockService {
 
       if (lockData != null) {
         final isLocked = lockData['is_locked'] as bool;
-        if (!isLocked) {
-          debugPrint('✅ Course $courseId unlocked (user_course_locks)');
-          return true;
-        } else {
-          debugPrint('🔒 Course $courseId explicitly locked');
-          return false;
-        }
+        debugPrint(isLocked 
+            ? '🔒 Course locked' 
+            : '✅ Course unlocked');
+        return !isLocked;
       }
 
-      //  Kiểm tra recommended course từ placement test
+      // ✅ Nếu chưa có record, check recommended course
       final recommendedCourse = await _getRecommendedCourse(dbUserId);
       if (recommendedCourse != null) {
         final currentCourse = allCourses.firstWhere(
@@ -56,30 +50,22 @@ class CourseUnlockService {
           orElse: () => Course(id: '', courseName: '', courseOrder: 0),
         );
 
-        // - Là khóa học được đề xuất
-        if (courseId == recommendedCourse ||
-            currentCourse.courseOrder <= recommendedCourseData.courseOrder) {
-          debugPrint(
-            '✅ Course $courseId unlocked (recommended or lower order)',
-          );
-          return true;
+        final canUnlock = courseId == recommendedCourse ||
+            currentCourse.courseOrder <= recommendedCourseData.courseOrder;
+
+        if (canUnlock) {
+          // Tạo lock record
+          await _supabase.from('user_course_locks').insert({
+            'user_id': dbUserId,
+            'course_id': courseId,
+            'is_locked': false,
+            'unlocked_at': DateTime.now().toIso8601String(),
+          });
         }
+
+        return canUnlock;
       }
 
-      //  Kiểm tra xem khóa học đã hoàn thành trong user_progress_course
-      final progressData = await _supabase
-          .from('user_progress_course')
-          .select('is_completed')
-          .eq('user_id', dbUserId)
-          .eq('course_id', courseId)
-          .maybeSingle();
-
-      if (progressData != null && progressData['is_completed'] == true) {
-        debugPrint('✅ Course $courseId unlocked (already completed)');
-        return true;
-      }
-
-      debugPrint('🔒 Course $courseId locked (no unlock condition met)');
       return false;
     } catch (e) {
       debugPrint('❌ Error checking unlock: $e');
@@ -112,6 +98,23 @@ class CourseUnlockService {
     }
   }
 
+  /// ✅ Lấy khóa học trước đó (theo course_order)
+  Course? _getPreviousCourse(String courseId, List<Course> allCourses) {
+    final currentCourse = allCourses.firstWhere(
+      (c) => c.id == courseId,
+      orElse: () => Course(id: '', courseName: '', courseOrder: 0),
+    );
+
+    if (currentCourse.id.isEmpty || currentCourse.courseOrder <= 1) {
+      return null;
+    }
+
+    return allCourses.firstWhere(
+      (c) => c.courseOrder == currentCourse.courseOrder - 1,
+      orElse: () => Course(id: '', courseName: '', courseOrder: 0),
+    );
+  }
+
   /// Kiểm tra tất cả course để lấy unlock status
   Future<Map<String, bool>> checkAllCourseUnlockStatus(
     String authUserId,
@@ -136,7 +139,7 @@ class CourseUnlockService {
     return unlockedStatus;
   }
 
-  ///  Lấy khóa học gần nhất cần unlock (cho snackbar)
+  /// ✅ Lấy khóa học gần nhất cần unlock (cho snackbar)
   String getNextCourseToUnlock(
     String courseId,
     List<Course> allCourses,
@@ -164,6 +167,4 @@ class CourseUnlockService {
     // Nếu không có khóa học thấp hơn, return khóa học được recommend
     return 'Khóa học được đề xuất';
   }
-
-  
 }
