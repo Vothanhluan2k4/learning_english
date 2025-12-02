@@ -74,7 +74,7 @@ class AiConfig {
 
   static const Duration apiTimeout = Duration(seconds: 30);
 
-  static const String encryptionKey = "learning-english-2025-app-key!!!";
+  static const String encryptionKey = "12345678901234567890123456789012";
 
   // ==================== HELPERS ====================
   
