@@ -34,7 +34,6 @@ class _AllCommunityNotificationsScreenState
     try {
       setState(() => isLoading = true);
 
-      // ✅ Lấy TẤT CẢ thông báo final_test với score > 70
       final notifications =
           await _notificationService.getAllCommunityNotifications();
 
@@ -44,7 +43,9 @@ class _AllCommunityNotificationsScreenState
       });
     } catch (e) {
       debugPrint('❌ Error loading all notifications: $e');
-      setState(() => isLoading = false);
+      if (mounted) {
+        setState(() => isLoading = false);
+      }
     }
   }
 
@@ -144,6 +145,16 @@ class _AllCommunityNotificationsScreenState
   // ✅ COMMUNITY NOTIFICATION CARD
   Widget _buildCommunityNotificationCard(
       CommunityNotification notif, int index) {
+    // ✅ SAFE: Check null values
+    final userName = notif.userName ?? 'Người dùng';
+    final userAvatar = notif.userAvatar;
+    final score = notif.metadata?.score ?? 0.0;
+    final correctAnswers = notif.metadata?.correctAnswers ?? 0;
+    final totalQuestions = notif.metadata?.totalQuestions ?? 0;
+    final attempts = notif.metadata?.attempts ?? 0;
+    final courseName = notif.metadata?.courseName ?? '';
+    final moduleName = notif.metadata?.moduleName ?? '';
+
     return Container(
       margin: EdgeInsets.only(bottom: 16),
       padding: EdgeInsets.all(18),
@@ -161,7 +172,7 @@ class _AllCommunityNotificationsScreenState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ✅ HEADER: User + Score + Time
+          // HEADER
           Row(
             children: [
               // Ranking badge
@@ -192,38 +203,19 @@ class _AllCommunityNotificationsScreenState
                 ),
               SizedBox(width: index < 3 ? 12 : 0),
 
-              // Avatar
+              // ✅ FIXED: Avatar with null check
               ClipOval(
-                child: Image.network(
-                  notif.userAvatar!,
-                  width: 44,
-                  height: 44,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [Color(0xFF64B5F6), Color(0xFF2196F3)],
-                        ),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Center(
-                        child: Text(
-                          notif.userName.isNotEmpty 
-                              ? notif.userName[0].toUpperCase() 
-                              : '?',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
+                child: userAvatar != null && userAvatar.isNotEmpty
+                    ? Image.network(
+                        userAvatar,
+                        width: 44,
+                        height: 44,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return _buildDefaultAvatar(userName);
+                        },
+                      )
+                    : _buildDefaultAvatar(userName),
               ),
               SizedBox(width: 12),
 
@@ -233,7 +225,7 @@ class _AllCommunityNotificationsScreenState
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      notif.userName,
+                      userName,
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
@@ -258,9 +250,9 @@ class _AllCommunityNotificationsScreenState
                 padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: notif.metadata.score >= 90
+                    colors: score >= 90
                         ? [Color(0xFF66BB6A), Color(0xFF4CAF50)]
-                        : notif.metadata.score >= 80
+                        : score >= 80
                             ? [Color(0xFF81C784), Color(0xFF66BB6A)]
                             : [Color(0xFFFDD835), Color(0xFFFBC02D)],
                   ),
@@ -276,14 +268,10 @@ class _AllCommunityNotificationsScreenState
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      Icons.stars,
-                      size: 14,
-                      color: Colors.white,
-                    ),
+                    Icon(Icons.stars, size: 14, color: Colors.white),
                     SizedBox(width: 4),
                     Text(
-                      '${notif.metadata.score.toStringAsFixed(1)}%',
+                      '${score.toStringAsFixed(1)}%',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
@@ -298,7 +286,7 @@ class _AllCommunityNotificationsScreenState
 
           SizedBox(height: 12),
 
-          // ✅ TITLE
+          // TITLE
           Text(
             notif.title,
             style: TextStyle(
@@ -311,7 +299,7 @@ class _AllCommunityNotificationsScreenState
 
           SizedBox(height: 8),
 
-          // ✅ MESSAGE
+          // MESSAGE
           Text(
             notif.message,
             style: TextStyle(
@@ -325,7 +313,7 @@ class _AllCommunityNotificationsScreenState
 
           SizedBox(height: 12),
 
-          // ✅ STATS ROW
+          // STATS ROW
           Container(
             padding: EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -336,104 +324,38 @@ class _AllCommunityNotificationsScreenState
               children: [
                 // Correct answers
                 Expanded(
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: Color(0xFF4CAF50).withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(
-                          Icons.check_circle,
-                          size: 18,
-                          color: Color(0xFF4CAF50),
-                        ),
-                      ),
-                      SizedBox(width: 8),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${notif.metadata.correctAnswers}/${notif.metadata.totalQuestions}',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF4CAF50),
-                            ),
-                          ),
-                          Text(
-                            'Câu đúng',
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Color(0xFF999999),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                  child: _buildStatItem(
+                    icon: Icons.check_circle,
+                    iconColor: Color(0xFF4CAF50),
+                    value: '$correctAnswers/$totalQuestions',
+                    label: 'Câu đúng',
                   ),
                 ),
 
                 // Attempts
                 Expanded(
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: Color(0xFF2196F3).withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(
-                          Icons.repeat,
-                          size: 18,
-                          color: Color(0xFF2196F3),
-                        ),
-                      ),
-                      SizedBox(width: 8),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${notif.metadata.attempts}',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF2196F3),
-                            ),
-                          ),
-                          Text(
-                            'Lần thử',
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Color(0xFF999999),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                  child: _buildStatItem(
+                    icon: Icons.repeat,
+                    iconColor: Color(0xFF2196F3),
+                    value: '$attempts',
+                    label: 'Lần thử',
                   ),
                 ),
               ],
             ),
           ),
 
-          // ✅ COURSE INFO (if available)
-          if (notif.metadata.courseName.isNotEmpty)
+          // COURSE INFO
+          if (courseName.isNotEmpty)
             Padding(
               padding: EdgeInsets.only(top: 12),
               child: Row(
                 children: [
-                  Icon(
-                    Icons.school,
-                    size: 14,
-                    color: Color(0xFF999999),
-                  ),
+                  Icon(Icons.school, size: 14, color: Color(0xFF999999)),
                   SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      '${notif.metadata.courseName} - ${notif.metadata.moduleName}',
+                      '$courseName${moduleName.isNotEmpty ? " - $moduleName" : ""}',
                       style: TextStyle(
                         fontSize: 11,
                         color: Color(0xFF999999),
@@ -448,6 +370,72 @@ class _AllCommunityNotificationsScreenState
             ),
         ],
       ),
+    );
+  }
+
+  // ✅ Helper: Default avatar
+  Widget _buildDefaultAvatar(String name) {
+    return Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF64B5F6), Color(0xFF2196F3)],
+        ),
+        shape: BoxShape.circle,
+      ),
+      child: Center(
+        child: Text(
+          name.isNotEmpty ? name[0].toUpperCase() : '?',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ✅ Helper: Stat item
+  Widget _buildStatItem({
+    required IconData icon,
+    required Color iconColor,
+    required String value,
+    required String label,
+  }) {
+    return Row(
+      children: [
+        Container(
+          padding: EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: iconColor.withOpacity(0.15),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, size: 18, color: iconColor),
+        ),
+        SizedBox(width: 8),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: iconColor,
+              ),
+            ),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                color: Color(0xFF999999),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

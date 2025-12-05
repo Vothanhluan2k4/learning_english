@@ -7,7 +7,7 @@ class NotificationService {
 
   NotificationService({required this.supabase});
 
-  // ✅ Get user info
+  /// Get user info
   Future<UserInfo?> getUserInfo(String userId) async {
     try {
       debugPrint('🔍 Getting user info for auth_id: $userId');
@@ -30,14 +30,13 @@ class NotificationService {
     }
   }
 
-  // ✅ Get community notifications (FINAL TEST ONLY)
+  /// ✅ FIXED: Get community notifications - Sorted by SCORE (highest first)
   Future<List<CommunityNotification>> getCommunityNotifications({
     int limit = 10,
   }) async {
     try {
-      debugPrint('📡 Loading community notifications (final tests only, score > 70)...');
+      debugPrint('📡 Loading community notifications (sorted by score)...');
 
-      // 🔥 FIX: Improved query with explicit join
       final response = await supabase
           .from('notifications')
           .select('''
@@ -57,18 +56,26 @@ class NotificationService {
           .eq('type', 'ket_qua_test')
           .filter('metadata->>test_type', 'eq', 'final_test')
           .filter('metadata->>score', 'gte', '70')
-          .order('created_at', ascending: false)
-          .limit(limit);
+          .order('created_at', ascending: false) // Get recent first
+          .limit(limit * 3); // ✅ Get more records for sorting
 
-      debugPrint('✅ Raw response: $response');
-      debugPrint('✅ Found ${(response as List).length} community final test notifications');
+      debugPrint('✅ Found ${(response as List).length} notifications');
 
-      return (response as List)
-          .map((json) {
-            debugPrint('📦 Processing notification: $json');
-            return CommunityNotification.fromJson(json);
-          })
+      // ✅ Convert to objects
+      final notifications = (response as List)
+          .map((json) => CommunityNotification.fromJson(json))
           .toList();
+
+      // ✅ Sort by score (highest first), then by created_at
+      notifications.sort((a, b) {
+        final scoreCompare = b.metadata.score.compareTo(a.metadata.score);
+        if (scoreCompare != 0) return scoreCompare;
+        return b.createdAt.compareTo(a.createdAt); // Same score → newest first
+      });
+
+      // ✅ Return only top N
+      return notifications.take(limit).toList();
+
     } catch (e, stackTrace) {
       debugPrint('❌ Error getting community notifications: $e');
       debugPrint('Stack trace: $stackTrace');
@@ -76,12 +83,11 @@ class NotificationService {
     }
   }
 
-  // ✅ Get ALL community notifications (FINAL TEST ONLY)
+  /// ✅ FIXED: Get ALL community notifications - Sorted by SCORE
   Future<List<CommunityNotification>> getAllCommunityNotifications() async {
     try {
-      debugPrint('📡 Loading ALL community final test notifications...');
+      debugPrint('📡 Loading ALL community notifications (sorted by score)...');
       
-      // 🔥 FIX: Improved query
       final response = await supabase
           .from('notifications')
           .select('''
@@ -101,13 +107,24 @@ class NotificationService {
           .eq('type', 'ket_qua_test')
           .filter('metadata->>test_type', 'eq', 'final_test')
           .filter('metadata->>score', 'gte', '70')
-          .order('created_at', ascending: false);
+          .order('created_at', ascending: false); // Get all recent records
 
-      debugPrint('✅ Found ${(response as List).length} total final test notifications');
+      debugPrint('✅ Found ${(response as List).length} total notifications');
 
-      return (response as List)
+      // ✅ Convert to objects
+      final notifications = (response as List)
           .map((json) => CommunityNotification.fromJson(json))
           .toList();
+
+      // ✅ Sort by score (highest first), then by created_at
+      notifications.sort((a, b) {
+        final scoreCompare = b.metadata.score.compareTo(a.metadata.score);
+        if (scoreCompare != 0) return scoreCompare;
+        return b.createdAt.compareTo(a.createdAt);
+      });
+
+      return notifications;
+
     } catch (e, stackTrace) {
       debugPrint('❌ Error getting all community notifications: $e');
       debugPrint('Stack trace: $stackTrace');
@@ -115,7 +132,7 @@ class NotificationService {
     }
   }
 
-  // ✅ Get unread count
+  /// Get unread count
   Future<int> getUnreadCount(String currentUserId) async {
     try {
       final userInfo = await getUserInfo(currentUserId);
@@ -135,7 +152,7 @@ class NotificationService {
     }
   }
 
-  // ✅ Mark notification as read
+  /// Mark notification as read
   Future<void> markAsRead(String notificationId) async {
     try {
       await supabase
@@ -152,7 +169,7 @@ class NotificationService {
     }
   }
 
-  // ✅ Mark all notifications as read
+  /// Mark all notifications as read
   Future<void> markAllAsRead(String currentUserId) async {
     try {
       final userInfo = await getUserInfo(currentUserId);
