@@ -21,10 +21,10 @@ abstract class AppColors {
   static const Color primaryDark = Color(0xFF5348C3);
 
   // Status/Accent Colors (Màu Trạng thái)
-  static const Color success = Color(0xFF00A8E9A); // Modern Green (Đã hoàn thành)
-  static const Color warning = Color(0xFFFFB300); // Amber (Cần ôn tập/Nhớ)
-  static const Color error = Color(0xFFFF6B6B); // Red (Lỗi/Khẩn cấp)
-  static const Color info = Color(0xFF00B894); // Secondary Color
+  static const Color success = Color(0xFF00B894); // Modern Green (Đã hoàn thành/Info)
+  static const Color warning = Color(0xFFFFB300); // Amber (Đã nhớ/Đang học)
+  static const Color error = Color(0xFFFF6B6B); // Red (Lỗi/Khẩn cấp/Cần ôn tập)
+  static const Color info = Color(0xFF00A8E9A); // Green/Secondary for general info
 
   // Backgrounds & Text (Nền và Chữ)
   static const Color background = Color(0xFFF8F9FA); // Light Background
@@ -59,10 +59,8 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> with SingleTickerPr
   late TabController _tabController;
 
   // Sử dụng GETTER không static hoặc STATIC FINAL cho màu sắc
-  // để tránh lỗi biên dịch 'Invalid constant value' liên quan đến opacity
-  // (Dựa trên kinh nghiệm trước đây của bạn).
   Color get primaryColor => AppColors.primary;
-  Color get secondaryColor => AppColors.info;
+  Color get secondaryColor => AppColors.info; // Dùng AppColors.info cho general secondary
   Color get accentColor => AppColors.error;
   Color get backgroundColor => AppColors.background;
   Color get cardColor => AppColors.card;
@@ -382,7 +380,7 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> with SingleTickerPr
       floating: true,
       forceElevated: true,
       shadowColor: Colors.black.withOpacity(0.1),
-      toolbarHeight: 0, 
+      toolbarHeight: 0,
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(kToolbarHeight),
         child: Center(
@@ -456,24 +454,32 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> with SingleTickerPr
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildInfoBanner(),
-                _buildDeckGrid(context, lists),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-                  child: Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton.icon( // Sử dụng TextButton.icon cho thẩm mỹ hơn
-                      icon: Icon(Icons.arrow_forward_ios_rounded, size: 14, color: primaryColor),
-                      label: const Text(
-                        "Xem tất cả bộ thẻ",
-                        style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold),
+                if (lists.isEmpty)
+                  _buildEmptyState(
+                    icon: Icons.style_rounded,
+                    title: 'Chưa có bộ thẻ nào',
+                    message: 'Hãy tạo bộ thẻ đầu tiên để bắt đầu học!',
+                  )
+                else ...[
+                  _buildDeckGrid(context, lists),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton.icon( // Sử dụng TextButton.icon cho thẩm mỹ hơn
+                        icon: Icon(Icons.arrow_forward_ios_rounded, size: 14, color: primaryColor),
+                        label: const Text(
+                          "Xem tất cả bộ thẻ",
+                          style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold),
+                        ),
+                        onPressed: () {
+                          _tabController.animateTo(1);
+                        },
                       ),
-                      onPressed: () {
-                        _tabController.animateTo(1);
-                      },
                     ),
                   ),
-                ),
-                const SizedBox(height: AppSpacing.lg),
+                  const SizedBox(height: AppSpacing.lg),
+                ],
               ],
             ),
           ),
@@ -546,6 +552,7 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> with SingleTickerPr
         }
 
         final lists = snapshot.data!;
+        // Chỉ hiển thị các list đã có từ vựng
         final activeLists = lists.where((l) => (l.wordCount ?? 0) > 0).toList();
 
         if (activeLists.isEmpty) {
@@ -575,7 +582,7 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> with SingleTickerPr
               'total': total,
               'studied': studied,
               'remembered': remembered,
-              'toReview': toReview, // Thêm toReview vào cache
+              'toReview': toReview,
             };
 
             return list;
@@ -588,6 +595,17 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> with SingleTickerPr
             int totalStudied = progressCache.values.fold(0, (sum, p) => sum + (p['studied'] ?? 0));
             int totalRemembered = progressCache.values.fold(0, (sum, p) => sum + (p['remembered'] ?? 0));
             int totalToReview = progressCache.values.fold(0, (sum, p) => sum + (p['toReview'] ?? 0));
+
+            // Tính tổng số từ
+            final int overallTotal = totalStudied + totalRemembered + totalToReview;
+
+            // Sắp xếp Active Lists: Ưu tiên list cần ôn tập nhiều nhất lên đầu
+            activeLists.sort((a, b) {
+              final aReview = progressCache[a.id!]?['toReview'] ?? 0;
+              final bReview = progressCache[b.id!]?['toReview'] ?? 0;
+              return bReview.compareTo(aReview);
+            });
+
 
             return SingleChildScrollView(
               padding: const EdgeInsets.all(AppSpacing.md),
@@ -604,21 +622,21 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> with SingleTickerPr
                   ),
                   const SizedBox(height: AppSpacing.md),
                   // Thanh tiến trình tổng thể
-                  _buildProgressBar(totalStudied, totalRemembered, totalToReview),
+                  _buildOverallProgress(totalStudied, totalRemembered, totalToReview, overallTotal),
                   const SizedBox(height: AppSpacing.md),
                   // Thẻ thống kê
                   Row(
                     children: [
-                      _buildStatCard('$totalStudied\nĐã học', successColor, Icons.auto_stories),
+                      _buildStatCard('$totalStudied', 'Đã học', successColor, Icons.auto_stories),
                       const SizedBox(width: AppSpacing.sm),
-                      _buildStatCard('$totalRemembered\nĐã nhớ', warningColor, Icons.check_circle),
+                      _buildStatCard('$totalRemembered', 'Đã nhớ', warningColor, Icons.check_circle),
                       const SizedBox(width: AppSpacing.sm),
-                      _buildStatCard('$totalToReview\nCần ôn tập', errorColor, Icons.refresh),
+                      _buildStatCard('$totalToReview', 'Cần ôn tập', errorColor, Icons.refresh),
                     ],
                   ),
                   const SizedBox(height: AppSpacing.lg),
                   Text(
-                    'Bộ thẻ đang hoạt động:',
+                    'Bộ thẻ đang hoạt động (${activeLists.length}):',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -628,12 +646,11 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> with SingleTickerPr
                   const SizedBox(height: AppSpacing.md),
                   // Danh sách thẻ đang học
                   ...activeLists.map((list) {
-                    final p = progressCache[list.id!] ??
-                        {'total': 0, 'studied': 0, 'remembered': 0, 'toReview': 0};
-                    final total = p['total']!;
+                    final p = progressCache[list.id!]!;
                     final toReview = p['toReview']!;
+                    final remembered = p['remembered']!;
 
-                    return _buildActiveLearningCard(context, list, p, toReview);
+                    return _buildActiveLearningCard(context, list, p, toReview, remembered);
                   }).toList(),
                 ],
               ),
@@ -644,13 +661,14 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> with SingleTickerPr
     );
   }
 
-  // Cải tiến: Thiết kế thanh tiến trình chuyên nghiệp hơn
-  Widget _buildProgressBar(int studied, int remembered, int toReview) {
-    final total = studied + remembered + toReview;
-    if (total == 0) return const SizedBox.shrink();
+  // Cải tiến: Thiết kế thanh tiến trình chuyên nghiệp hơn (Stacked Bar Chart)
+  Widget _buildOverallProgress(int studied, int remembered, int toReview, int overallTotal) {
+    if (overallTotal == 0) return const SizedBox.shrink();
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // 1. Dữ liệu số liệu
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
@@ -659,9 +677,11 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> with SingleTickerPr
             _buildProgressNumber(toReview, "Cần ôn tập", errorColor),
           ],
         ),
-        const SizedBox(height: AppSpacing.sm),
+        const SizedBox(height: AppSpacing.md),
+
+        // 2. Thanh Stacked Bar Chart
         Container(
-          height: AppSpacing.sm, // Giảm chiều cao thanh tiến trình
+          height: AppSpacing.md,
           decoration: BoxDecoration(
             color: borderColor,
             borderRadius: BorderRadius.circular(AppSpacing.xs),
@@ -689,6 +709,14 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> with SingleTickerPr
             ),
           ),
         ),
+        const SizedBox(height: AppSpacing.xs),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+          child: Text(
+            'Tổng cộng: $overallTotal từ',
+            style: TextStyle(fontSize: 12, color: textSecondary, fontWeight: FontWeight.w500),
+          ),
+        )
       ],
     );
   }
@@ -887,8 +915,7 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> with SingleTickerPr
   }
 
   // Cải tiến: Thẻ thống kê
-  Widget _buildStatCard(String text, Color color, IconData icon) {
-    final lines = text.split('\n');
+  Widget _buildStatCard(String value, String label, Color color, IconData icon) {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: AppSpacing.md, horizontal: AppSpacing.sm),
@@ -905,15 +932,22 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> with SingleTickerPr
         ),
         child: Column(
           children: [
-            Icon(icon, color: color, size: AppSpacing.lg),
+            Container(
+              padding: const EdgeInsets.all(AppSpacing.sm),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(AppSpacing.sm),
+              ),
+              child: Icon(icon, color: color, size: AppSpacing.lg),
+            ),
             const SizedBox(height: AppSpacing.sm),
             Text(
-              lines[0],
+              value,
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color),
               textAlign: TextAlign.center,
             ),
             Text(
-              lines[1],
+              label,
               style: TextStyle(fontSize: 12, color: textSecondary),
               textAlign: TextAlign.center,
             ),
@@ -924,104 +958,126 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> with SingleTickerPr
   }
 
   // Cải tiến: Thẻ học tập đang hoạt động
-  Widget _buildActiveLearningCard(BuildContext context, ListWord list, Map<String, int> progress, int toReview) {
+  Widget _buildActiveLearningCard(BuildContext context, ListWord list, Map<String, int> progress, int toReview, int remembered) {
     final int total = progress['total'] ?? 0;
-    final int remembered = progress['remembered'] ?? 0;
     final double completion = total > 0 ? (remembered / total) : 0;
+    final int studied = progress['studied'] ?? 0;
+    final int currentProgress = studied + remembered; // Tiến độ tổng thể (Đã học + Đã nhớ)
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: AppSpacing.md),
-      elevation: 2, // Thêm elevation nhẹ
-      shadowColor: Colors.black.withOpacity(0.05),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSpacing.md)),
-      color: cardColor,
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Row(
-          children: [
-            Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                color: primaryColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(AppSpacing.sm),
+    // Tính completion dựa trên số từ Đã học + Đã nhớ
+    final double overallCompletion = total > 0 ? (currentProgress / total) : 0;
+
+    return InkWell(
+      onTap: () async {
+        final result = await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => ReviewLearningScreen(list: list)),
+        );
+        if (result == true) _refreshListWords();
+      },
+      borderRadius: BorderRadius.circular(AppSpacing.md),
+      child: Card(
+        margin: const EdgeInsets.only(bottom: AppSpacing.md),
+        elevation: 2, // Thêm elevation nhẹ
+        shadowColor: Colors.black.withOpacity(0.05),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSpacing.md)),
+        color: cardColor,
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Row(
+            children: [
+              // Icon Deck
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: primaryColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(AppSpacing.sm),
+                ),
+                child: Icon(Icons.style_rounded, color: primaryColor, size: AppSpacing.lg),
               ),
-              child: Icon(Icons.style_rounded, color: primaryColor, size: AppSpacing.lg),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    list.title,
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textPrimary),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Wrap(
-                    spacing: AppSpacing.sm,        // khoảng cách ngang giữa 2 cụm
-                    runSpacing: AppSpacing.xs,     // khoảng cách dọc khi xuống dòng
-                    children: [
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.schedule_outlined, size: 14, color: errorColor),
-                          const SizedBox(width: AppSpacing.xs),
-                          Text(
-                            'Cần ôn tập: $toReview',
-                            style: const TextStyle(fontSize: 13, color: AppColors.error, fontWeight: FontWeight.w500),
-                          ),
-                        ],
-                      ),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.done_all_rounded, size: 14, color: warningColor),
-                          const SizedBox(width: AppSpacing.xs),
-                          Text(
-                            'Đã nhớ: $remembered',
-                            style: const TextStyle(fontSize: 13, color: AppColors.warning, fontWeight: FontWeight.w500),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  LinearProgressIndicator(
-                    value: completion,
-                    backgroundColor: borderColor,
-                    valueColor: AlwaysStoppedAnimation<Color>(successColor),
-                    minHeight: 4,
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    'Hoàn thành: ${((completion) * 100).toStringAsFixed(0)}%',
-                    style: TextStyle(fontSize: 11, color: successColor, fontWeight: FontWeight.bold),
-                  ),
-                ],
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      list.title,
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textPrimary),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    // Thông tin chi tiết (Cần ôn tập, Đã nhớ)
+                    Wrap(
+                      spacing: AppSpacing.md,
+                      runSpacing: AppSpacing.xs,
+                      children: [
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.schedule_outlined, size: 14, color: errorColor),
+                            const SizedBox(width: AppSpacing.xs),
+                            Text(
+                              'Cần ôn tập: $toReview',
+                              style: TextStyle(fontSize: 13, color: errorColor, fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.done_all_rounded, size: 14, color: warningColor),
+                            const SizedBox(width: AppSpacing.xs),
+                            Text(
+                              'Đã nhớ: $remembered',
+                              style: TextStyle(fontSize: 13, color: warningColor, fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    // Thanh tiến trình
+                    LinearProgressIndicator(
+                      value: overallCompletion,
+                      backgroundColor: borderColor,
+                      valueColor: AlwaysStoppedAnimation<Color>(successColor),
+                      minHeight: 6, // Tăng nhẹ chiều cao
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      'Hoàn thành: ${((overallCompletion) * 100).toStringAsFixed(0)}% ($currentProgress/$total)',
+                      style: TextStyle(fontSize: 11, color: successColor, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            ElevatedButton(
-              onPressed: () async {
-                final result = await Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => ReviewLearningScreen(list: list)),
-                );
-                if (result == true) _refreshListWords();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryColor,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSpacing.sm)),
-                elevation: 0,
+              const SizedBox(width: AppSpacing.md),
+              // Nút Học tiếp
+              ElevatedButton(
+                onPressed: () async {
+                  final result = await Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => ReviewLearningScreen(list: list)),
+                  );
+                  if (result == true) _refreshListWords();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryColor,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSpacing.sm)),
+                  elevation: 0,
+                ),
+                child: Text(
+                    toReview > 0 ? 'Ôn tập' : 'Học tiếp',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)
+                ),
               ),
-              child: const Text('Học tiếp', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
