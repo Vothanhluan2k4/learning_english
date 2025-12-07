@@ -54,8 +54,10 @@ class _CourseScreenState extends State<CourseScreen> {
       final groupId = await _courseService.getTestGroupId(authUserId);
       if (groupId == null) {
         debugPrint('❌ No group ID found');
-        setState(() => _isLoading = false);
-        setState(() => _showPlacement = true);
+        setState(() {
+          _isLoading = false;
+          _showPlacement = true;
+        });
         return;
       }
 
@@ -88,6 +90,33 @@ class _CourseScreenState extends State<CourseScreen> {
     }
   }
 
+  // ✅ NEW: Refresh handler
+  Future<void> _handleRefresh() async {
+    debugPrint('🔄 Refreshing courses...');
+    await _initData();
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.white, size: 20),
+              SizedBox(width: 12),
+              Text('Đã cập nhật dữ liệu'),
+            ],
+          ),
+          backgroundColor: Color(0xFF4CAF50),
+          duration: Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          margin: EdgeInsets.all(16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -115,126 +144,134 @@ class _CourseScreenState extends State<CourseScreen> {
       );
     }
 
+    // ✅ WRAP CustomScrollView with RefreshIndicator
     return Scaffold(
       backgroundColor: Color(0xFFF8F9FA),
-      body: CustomScrollView(
-        slivers: [
-          // 🔥 MODERN APP BAR with gradient
-          SliverAppBar(
-            pinned: true,
-            floating: false,
-            elevation: 0,
-            backgroundColor: Colors.white,
-            automaticallyImplyLeading: false,
-            centerTitle: true,
-            title: Text(
-              _groupName,
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: Colors.blue,
-                
-              ),
-            ),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.info_outline, size: 26, color: Colors.blue),
-                onPressed: () {
-                  _showCourseInfo(context);
-                },
-              ),
-            ],
-          ),
-
-
-          // 🔥 PLACEMENT BANNER (if needed)
-          if (_showPlacement)
-            SliverToBoxAdapter(
-              child: PlacementBannerWidget(
-                onTakePlacementTest: () {
-                  Navigator.pushNamed(context, '/chooseCourse');
-                },
-              ),
-            ),
-
-          // 🔥 RECOMMENDED COURSE SECTION
-          if (!_showPlacement && _recommendedCourse != null)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(16, 20, 16, 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.star_rounded, color: Color(0xFFFF9800), size: 24),
-                        SizedBox(width: 8),
-                        Text(
-                          'Khóa học phù hợp với bạn',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF1A1A1A),
-                          ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 12),
-                    _buildRecommendedCard(_recommendedCourse!),
-                  ],
+      body: RefreshIndicator(
+        onRefresh: _handleRefresh,
+        color: Color(0xFF2196F3),
+        backgroundColor: Colors.white,
+        strokeWidth: 3,
+        displacement: 40,
+        child: CustomScrollView(
+          physics: AlwaysScrollableScrollPhysics(), // ✅ Enable pull-to-refresh even when content is short
+          slivers: [
+            // 🔥 MODERN APP BAR with gradient
+            SliverAppBar(
+              pinned: true,
+              floating: false,
+              elevation: 0,
+              backgroundColor: Colors.white,
+              automaticallyImplyLeading: false,
+              centerTitle: true,
+              title: Text(
+                _groupName,
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue,
                 ),
               ),
-            ),
-
-          // 🔥 ALL COURSES SECTION
-          if (!_showPlacement)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  children: [
-                    Icon(Icons.school_outlined, color: Color(0xFF2196F3), size: 22),
-                    SizedBox(width: 8),
-                    Text(
-                      'Tất cả khóa học',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1A1A1A),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-          // 🔥 COURSES LIST
-          if (!_showPlacement)
-            SliverPadding(
-              padding: EdgeInsets.all(16),
-              sliver: SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final course = _courses[index];
-                    final isRecommended = _recommendedCourse != null && 
-                                         course.id == _recommendedCourse!.id;
-                    final isUnlocked = _unlockedCourses[course.id] ?? false;
-
-                    return Padding(
-                      padding: EdgeInsets.only(bottom: 16),
-                      child: _buildCourseCard(course, isRecommended, isUnlocked),
-                    );
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.info_outline, size: 26, color: Colors.blue),
+                  onPressed: () {
+                    _showCourseInfo(context);
                   },
-                  childCount: _courses.length,
+                  tooltip: 'Thông tin',
                 ),
-              ),
+              ],
             ),
 
-          // 🔥 BOTTOM SPACING
-          SliverToBoxAdapter(
-            child: SizedBox(height: 24),
-          ),
-        ],
+            // 🔥 PLACEMENT BANNER (if needed)
+            if (_showPlacement)
+              SliverToBoxAdapter(
+                child: PlacementBannerWidget(
+                  onTakePlacementTest: () {
+                    Navigator.pushNamed(context, '/chooseCourse');
+                  },
+                ),
+              ),
+
+            // 🔥 RECOMMENDED COURSE SECTION
+            if (!_showPlacement && _recommendedCourse != null)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(16, 20, 16, 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.star_rounded, color: Color(0xFFFF9800), size: 24),
+                          SizedBox(width: 8),
+                          Text(
+                            'Khóa học phù hợp với bạn',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1A1A1A),
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 12),
+                      _buildRecommendedCard(_recommendedCourse!),
+                    ],
+                  ),
+                ),
+              ),
+
+            // 🔥 ALL COURSES SECTION
+            if (!_showPlacement)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    children: [
+                      Icon(Icons.school_outlined, color: Color(0xFF2196F3), size: 22),
+                      SizedBox(width: 8),
+                      Text(
+                        'Tất cả khóa học',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1A1A1A),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+            // 🔥 COURSES LIST
+            if (!_showPlacement)
+              SliverPadding(
+                padding: EdgeInsets.all(16),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final course = _courses[index];
+                      final isRecommended = _recommendedCourse != null && 
+                                           course.id == _recommendedCourse!.id;
+                      final isUnlocked = _unlockedCourses[course.id] ?? false;
+
+                      return Padding(
+                        padding: EdgeInsets.only(bottom: 16),
+                        child: _buildCourseCard(course, isRecommended, isUnlocked),
+                      );
+                    },
+                    childCount: _courses.length,
+                  ),
+                ),
+              ),
+
+            // 🔥 BOTTOM SPACING
+            SliverToBoxAdapter(
+              child: SizedBox(height: 24),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -487,11 +524,7 @@ class _CourseScreenState extends State<CourseScreen> {
                                 SizedBox(width: 6),
                                 Flexible(
                                   child: Text(
-                                    'Hoàn thành "${_courseUnlockService.getNextCourseToUnlock(
-                                      course.id,
-                                      _courses,
-                                      _unlockedCourses,
-                                    )}" để mở khóa',
+                                    'Hoàn thành bên dưới để mở khóa',
                                     style: TextStyle(
                                       fontSize: 11,
                                       color: Color(0xFFD32F2F),
@@ -623,7 +656,7 @@ class _CourseScreenState extends State<CourseScreen> {
                   ),
                   SizedBox(height: 2),
                   Text(
-                    'Hoàn thành "$nextCourse" để mở khóa',
+                    'Hoàn thành bên dưới để mở khóa',
                     style: TextStyle(
                       color: Colors.white.withOpacity(0.9),
                       fontSize: 12,

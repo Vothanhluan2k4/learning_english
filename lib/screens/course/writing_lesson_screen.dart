@@ -595,13 +595,13 @@ class _WritingLessonScreenState extends State<WritingLessonScreen> {
                         ),
                         const SizedBox(height: 12),
                         if (feedback['grammar_score'] != null)
-                          _buildGradingDetail('Ngữ pháp', '${feedback['grammar_score']}/100', isScore: true),
+                          _buildGradingDetail('Ngữ pháp', '${feedback['grammar_score']}/30', isScore: true),
                         if (feedback['content_score'] != null)
-                          _buildGradingDetail('Nội dung', '${feedback['content_score']}/100', isScore: true),
+                          _buildGradingDetail('Nội dung', '${feedback['content_score']}/30', isScore: true),
                         if (feedback['organization_score'] != null)
-                          _buildGradingDetail('Cấu trúc', '${feedback['organization_score']}/100', isScore: true),
-                        if (feedback['task_score'] != null)
-                          _buildGradingDetail('Hoàn thành', '${feedback['task_score']}/100', isScore: true),
+                          _buildGradingDetail('Cấu trúc', '${feedback['organization_score']}/20', isScore: true),
+                        if (feedback['vocabulary_score'] != null)
+                          _buildGradingDetail('Từ vựng', '${feedback['vocabulary_score']}/20', isScore: true),
                         if (feedback['word_count'] != null)
                           _buildGradingDetail('Số từ', '${feedback['word_count']} từ'),
                       ],
@@ -813,13 +813,13 @@ class _WritingLessonScreenState extends State<WritingLessonScreen> {
                         ),
                         const SizedBox(height: 12),
                         if (result['grammar_score'] != null)
-                          _buildGradingDetail('Ngữ pháp', '${result['grammar_score']}/100', isScore: true),
+                          _buildGradingDetail('Ngữ pháp', '${result['grammar_score']}/30', isScore: true),
                         if (result['content_score'] != null)
-                          _buildGradingDetail('Nội dung', '${result['content_score']}/100', isScore: true),
+                          _buildGradingDetail('Nội dung', '${result['content_score']}/30', isScore: true),
                         if (result['organization_score'] != null)
-                          _buildGradingDetail('Cấu trúc', '${result['organization_score']}/100', isScore: true),
-                        if (result['task_score'] != null)
-                          _buildGradingDetail('Hoàn thành', '${result['task_score']}/100', isScore: true),
+                          _buildGradingDetail('Cấu trúc', '${result['organization_score']}/20', isScore: true),
+                        if (result['vocabulary_score'] != null)
+                          _buildGradingDetail('Từ vựng', '${result['vocabulary_score']}/20', isScore: true),
                         if (result['word_count'] != null)
                           _buildGradingDetail('Số từ', '${result['word_count']} từ'),
                       ],
@@ -1019,129 +1019,179 @@ class _WritingLessonScreenState extends State<WritingLessonScreen> {
         await showDialog(
           context: context,
           barrierDismissible: false,
-          builder: (context) => AlertDialog(
+          builder: (context) => Dialog(
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: Row(
-              children: [
-                Icon(
-                  isPassed ? Icons.emoji_events : Icons.refresh,
-                  color: isPassed ? Colors.amber : Colors.orange,
-                  size: 32,
-                ),
-                const SizedBox(width: 12),
-                const Text('Hoàn thành bài học'),
-              ],
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 100,
-                  height: 100,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      colors: isPassed
-                          ? [Colors.green.shade400, Colors.green.shade700]
-                          : [Colors.orange.shade400, Colors.orange.shade700],
+            child: Container(
+              constraints: BoxConstraints(maxWidth: 400, maxHeight: 600), // ✅ Add maxHeight
+              child: Column( // ✅ Wrap in Column
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Header (fixed)
+                  Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Row(
+                      children: [
+                        Icon(
+                          isPassed ? Icons.emoji_events : Icons.refresh,
+                          color: isPassed ? Colors.amber : Colors.orange,
+                          size: 32,
+                        ),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Hoàn thành bài học',
+                            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  child: Center(
-                    child: Text(
-                      '${avgScore.toStringAsFixed(1)}',
-                      style: const TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                  
+                  Divider(height: 1),
+                  
+                  // ✅ Scrollable content
+                  Flexible(
+                    child: SingleChildScrollView(
+                      padding: EdgeInsets.all(20),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Score circle
+                          Container(
+                            width: 100,
+                            height: 100,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: LinearGradient(
+                                colors: isPassed
+                                    ? [Colors.green.shade400, Colors.green.shade700]
+                                    : [Colors.orange.shade400, Colors.orange.shade700],
+                              ),
+                            ),
+                            child: Center(
+                              child: Text(
+                                '${avgScore.toStringAsFixed(1)}',
+                                style: TextStyle(
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                          SizedBox(height: 16),
+                          
+                          Text(
+                            isPassed ? '🎉 Xuất sắc!' : '💪 Cố gắng lên!',
+                            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                          ),
+                          SizedBox(height: 8),
+                          
+                          Text(
+                            isPassed
+                                ? 'Bạn đã hoàn thành bài học với điểm số tốt!'
+                                : 'Bạn có thể làm lại để cải thiện điểm số.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
+                          ),
+                          SizedBox(height: 16),
+                          
+                          // Stats
+                          Container(
+                            padding: EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade100,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Column(
+                              children: [
+                                _buildStatRow('Số câu đã chấm', '$gradedCount/${_questions.length}'),
+                                Divider(height: 16),
+                                _buildStatRow('Điểm trung bình', '${avgScore.toStringAsFixed(1)}/100'),
+                                Divider(height: 16),
+                                _buildStatRow(
+                                  'Kết quả',
+                                  isPassed ? 'Đạt ' : 'Chưa đạt ',
+                                  valueColor: isPassed ? Colors.green : Colors.orange,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  isPassed ? '🎉 Xuất sắc!' : '💪 Cố gắng lên!',
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  isPassed
-                      ? 'Bạn đã hoàn thành bài học với điểm số tốt!'
-                      : 'Bạn có thể làm lại để cải thiện điểm số.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(8),
+                  
+                  Divider(height: 1),
+                  
+                  // ✅ Buttons (fixed at bottom)
+                  Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        if (!isPassed) ...[
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () {
+                                Navigator.pop(context);
+                                Navigator.pop(context);
+                              },
+                              child: Text('Về trang chủ'),
+                            ),
+                          ),
+                          SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: () async {
+                                Navigator.pop(context);
+                                setState(() {
+                                  _isLoading = true;
+                                  _currentIndex = 0;
+                                  _userAnswers.clear();
+                                  _previousResults.clear();
+                                });
+                                await _loadData();
+                              },
+                              icon: Icon(Icons.refresh),
+                              label: Text('Làm lại'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.orange,
+                                foregroundColor: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ] else ...[
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () {
+                                Navigator.pop(context);
+                                Navigator.pop(context);
+                              },
+                              child: Text('Đóng'),
+                            ),
+                          ),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: () {
+                                Navigator.pop(context);
+                                Navigator.pop(context);
+                              },
+                              icon: Icon(Icons.arrow_forward),
+                              label: Text('Bài sau'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
+                                foregroundColor: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
-                  child: Column(
-                    children: [
-                      _buildStatRow('Số câu đã chấm', '$gradedCount/${_questions.length}'),
-                      const Divider(height: 16),
-                      _buildStatRow('Điểm trung bình', '${avgScore.toStringAsFixed(1)}/100'),
-                      const Divider(height: 16),
-                      _buildStatRow(
-                        'Kết quả',
-                        isPassed ? 'Đạt ✅' : 'Chưa đạt ⚠️',
-                        valueColor: isPassed ? Colors.green : Colors.orange,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
-            actions: [
-              if (!isPassed) ...[
-                OutlinedButton(
-                  onPressed: () {
-                    Navigator.pop(context); // Close dialog
-                    Navigator.pop(context); // Back to lesson list
-                  },
-                  child: const Text('Về trang chủ'),
-                ),
-                ElevatedButton.icon(
-                  onPressed: () async {
-                    Navigator.pop(context); // Close dialog
-                    setState(() {
-                      _isLoading = true;
-                      _currentIndex = 0;
-                      _userAnswers.clear();
-                      _previousResults.clear();
-                    });
-                    await _loadData();
-                  },
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('Làm lại'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.orange,
-                    foregroundColor: Colors.white,
-                  ),
-                ),
-              ] else ...[
-                OutlinedButton(
-                  onPressed: () {
-                    Navigator.pop(context); // Close dialog
-                    Navigator.pop(context); // Back to lesson list
-                  },
-                  child: const Text('Đóng'),
-                ),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.pop(context); // Close dialog
-                    Navigator.pop(context); // Back to lesson list - next lesson should be unlocked
-                  },
-                  icon: const Icon(Icons.arrow_forward),
-                  label: const Text('Bài tiếp theo'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
-                  ),
-                ),
-              ],
-            ],
           ),
         );
       }

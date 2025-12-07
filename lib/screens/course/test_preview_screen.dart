@@ -134,7 +134,9 @@ class _TestPreviewScreenState extends State<TestPreviewScreen> {
       onWillPop: () async => true,
       child: Scaffold(
         appBar: AppBar(
-          title: Text(widget.lesson.lessonName),
+          title: Text(widget.lesson.lessonName, 
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+          ),
           centerTitle: true,
           backgroundColor: Colors.white,
           foregroundColor: Colors.black,
