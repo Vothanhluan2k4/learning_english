@@ -36,6 +36,9 @@ class AiGradingService {
         throw UnsupportedError('Provider $provider không được hỗ trợ');
       }
 
+      // ✅ Validate and fix result
+      result = _validateAndFixGradingResult(result);
+
       final responseTime = DateTime.now().difference(startTime).inMilliseconds;
       debugPrint('✅ AI grading completed in ${responseTime}ms');
 
@@ -64,7 +67,7 @@ class AiGradingService {
         'messages': [
           {
             'role': 'system',
-            'content': 'You are an English writing teacher. Always respond with valid JSON only.',
+            'content': 'You are an English writing teacher. Always respond with valid JSON only. Do NOT wrap JSON in markdown code blocks.',
           },
           {
             'role': 'user',
@@ -100,13 +103,17 @@ class AiGradingService {
         'contents': [
           {
             'parts': [
-              {'text': prompt}
+              {
+                'text': '$prompt\n\n**IMPORTANT:** Return ONLY valid JSON. Do NOT wrap in markdown code blocks (```json). Do NOT include any text before or after the JSON object.'
+              }
             ]
           }
         ],
         'generationConfig': {
           'temperature': 0.7,
-          'maxOutputTokens': 2000,
+          'maxOutputTokens': 4096, // ✅ Increase to prevent truncation
+          'topP': 0.95,
+          'topK': 40,
         },
         'safetySettings': [
           {
@@ -139,26 +146,122 @@ class AiGradingService {
       throw Exception('Gemini returned empty response');
     }
     
-    final content = data['candidates'][0]['content']['parts'][0]['text'];
+    final content = data['candidates'][0]['content']['parts'][0]['text'] as String;
     
-    // Parse JSON from text
-    try {
-      return jsonDecode(content) as Map<String, dynamic>;
-    } catch (e) {
-      // Extract JSON from markdown
-      final jsonMatch = RegExp(r'```json\s*([\s\S]*?)\s*```').firstMatch(content);
-      if (jsonMatch != null) {
-        return jsonDecode(jsonMatch.group(1)!) as Map<String, dynamic>;
+    debugPrint('📥 Raw Gemini response length: ${content.length} chars');
+    debugPrint('📄 First 500 chars: ${content.substring(0, content.length > 500 ? 500 : content.length)}');
+
+    // ✅ IMPROVED: Parse JSON from text
+    return _parseJsonFromText(content);
+  }
+
+  /// ✅ NEW: Parse JSON from text (handles markdown, truncation, etc.)
+  Map<String, dynamic> _parseJsonFromText(String text) {
+    String cleaned = text.trim();
+
+    // 1. Remove markdown code blocks
+    if (cleaned.contains('```json')) {
+      final match = RegExp(r'```json\s*([\s\S]*?)\s*```', multiLine: true).firstMatch(cleaned);
+      if (match != null) {
+        cleaned = match.group(1)!.trim();
       }
-      
-      // Fallback: find any JSON object
-      final objectMatch = RegExp(r'\{[\s\S]*\}').firstMatch(content);
-      if (objectMatch != null) {
-        return jsonDecode(objectMatch.group(0)!) as Map<String, dynamic>;
+    } else if (cleaned.contains('```')) {
+      final match = RegExp(r'```\s*([\s\S]*?)\s*```', multiLine: true).firstMatch(cleaned);
+      if (match != null) {
+        cleaned = match.group(1)!.trim();
       }
-      
-      throw Exception('Cannot parse JSON from Gemini response: $content');
     }
+
+    // 2. Extract JSON object
+    final jsonStart = cleaned.indexOf('{');
+    final jsonEnd = cleaned.lastIndexOf('}');
+
+    if (jsonStart == -1 || jsonEnd == -1 || jsonEnd < jsonStart) {
+      throw Exception('No valid JSON object found in response');
+    }
+
+    cleaned = cleaned.substring(jsonStart, jsonEnd + 1);
+
+    // 3. Try to parse
+    try {
+      return jsonDecode(cleaned) as Map<String, dynamic>;
+    } catch (e) {
+      debugPrint('❌ JSON parse error: $e');
+      debugPrint('📄 Cleaned text: $cleaned');
+      
+      // 4. Last resort: Try to fix common issues
+      try {
+        // Remove trailing commas
+        cleaned = cleaned.replaceAll(RegExp(r',(\s*[}\]])'), r'$1');
+        // Fix unescaped quotes in strings
+        cleaned = cleaned.replaceAll(RegExp(r'(?<!\\)"(?=\s*[^"]*":)'), '\\"');
+        
+        return jsonDecode(cleaned) as Map<String, dynamic>;
+      } catch (e2) {
+        throw Exception('Cannot parse JSON even after cleanup: $e2\nOriginal text: ${text.substring(0, text.length > 200 ? 200 : text.length)}...');
+      }
+    }
+  }
+
+  /// ✅ NEW: Validate and fix grading result
+  Map<String, dynamic> _validateAndFixGradingResult(Map<String, dynamic> result) {
+    // Fix: Replace task_score with vocabulary_score
+    if (result.containsKey('task_score') && !result.containsKey('vocabulary_score')) {
+      result['vocabulary_score'] = result['task_score'];
+      result.remove('task_score');
+      debugPrint('⚠️ Converted task_score to vocabulary_score');
+    }
+
+    // Validate required fields
+    final requiredFields = [
+      'grammar_score',
+      'content_score',
+      'organization_score',
+      'vocabulary_score',
+      'total_score',
+    ];
+
+    for (final field in requiredFields) {
+      if (!result.containsKey(field)) {
+        throw Exception('Missing required field: $field');
+      }
+    }
+
+    // Validate score ranges
+    final grammarScore = (result['grammar_score'] as num).toInt();
+    final contentScore = (result['content_score'] as num).toInt();
+    final organizationScore = (result['organization_score'] as num).toInt();
+    final vocabularyScore = (result['vocabulary_score'] as num).toInt();
+    
+    if (grammarScore < 0 || grammarScore > 30) {
+      throw Exception('Invalid grammar_score: $grammarScore (must be 0-30)');
+    }
+    if (contentScore < 0 || contentScore > 30) {
+      throw Exception('Invalid content_score: $contentScore (must be 0-30)');
+    }
+    if (organizationScore < 0 || organizationScore > 20) {
+      throw Exception('Invalid organization_score: $organizationScore (must be 0-20)');
+    }
+    if (vocabularyScore < 0 || vocabularyScore > 20) {
+      throw Exception('Invalid vocabulary_score: $vocabularyScore (must be 0-20)');
+    }
+
+    // Fix total score if needed
+    final expectedTotal = grammarScore + contentScore + organizationScore + vocabularyScore;
+    final totalScore = (result['total_score'] as num).toInt();
+    
+    if ((totalScore - expectedTotal).abs() > 1) {
+      debugPrint('⚠️ Total score mismatch. Expected: $expectedTotal, Got: $totalScore. Fixing...');
+      result['total_score'] = expectedTotal;
+    }
+
+    // Ensure arrays exist
+    result['strengths'] ??= [];
+    result['weaknesses'] ??= [];
+    result['suggestions'] ??= [];
+    result['detailed_feedback'] ??= 'Không có nhận xét chi tiết';
+
+    return result;
   }
 
   /// Count words in text
@@ -241,6 +344,8 @@ class AiGradingService {
         result = await _gradeWithGemini(prompt);
       }
 
+      result = _validateAndFixGradingResult(result);
+
       return {
         ...result,
         'provider': provider,
@@ -275,6 +380,8 @@ $userAnswer
   "mistakes": ["<specific errors>"],
   "strengths": ["<what was done well>"]
 }
+
+**IMPORTANT:** Return ONLY valid JSON. Do NOT wrap in markdown code blocks.
 ''';
   }
 
@@ -305,6 +412,8 @@ $userAnswer
   "strengths": ["<good points>"],
   "suggestions": ["<improvement tips>"]
 }
+
+**IMPORTANT:** Return ONLY valid JSON. Do NOT wrap in markdown code blocks.
 ''';
   }
 
@@ -332,6 +441,8 @@ $userAnswer
   "strengths": ["<strengths>"],
   "suggestions": ["<tips for improvement>"]
 }
+
+**IMPORTANT:** Return ONLY valid JSON. Do NOT wrap in markdown code blocks.
 ''';
   }
 }

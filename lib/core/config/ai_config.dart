@@ -172,7 +172,7 @@ You are an English writing teacher. Grade the following student essay.
 1. Grammar & Vocabulary (30 points)
 2. Content & Ideas (30 points)
 3. Organization & Structure (20 points)
-4. Task Achievement (20 points)
+4. Vocabulary (20 points)
 
 **Response Format (JSON only):**
 {{
@@ -180,7 +180,7 @@ You are an English writing teacher. Grade the following student essay.
   "grammar_score": <number 0-30>,
   "content_score": <number 0-30>,
   "organization_score": <number 0-20>,
-  "task_score": <number 0-20>,
+  "vocabulary_score": <number 0-20>,
   "word_count": <number>,
   "strengths": ["strength 1", "strength 2"],
   "weaknesses": ["weakness 1", "weakness 2"],

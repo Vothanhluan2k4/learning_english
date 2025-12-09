@@ -30,64 +30,12 @@ class NotificationService {
     }
   }
 
-  /// ✅ FIXED: Get community notifications - Sorted by SCORE (highest first)
-  Future<List<CommunityNotification>> getCommunityNotifications({
-    int limit = 10,
-  }) async {
-    try {
-      debugPrint('📡 Loading community notifications (sorted by score)...');
-
-      final response = await supabase
-          .from('notifications')
-          .select('''
-            id,
-            user_id,
-            title,
-            message,
-            metadata,
-            created_at,
-            users!notifications_user_id_fkey (
-              id,
-              full_name,
-              avatar_url,
-              email
-            )
-          ''')
-          .eq('type', 'ket_qua_test')
-          .filter('metadata->>test_type', 'eq', 'final_test')
-          .filter('metadata->>score', 'gte', '70')
-          .order('created_at', ascending: false) // Get recent first
-          .limit(limit * 3); // ✅ Get more records for sorting
-
-      debugPrint('✅ Found ${(response as List).length} notifications');
-
-      // ✅ Convert to objects
-      final notifications = (response as List)
-          .map((json) => CommunityNotification.fromJson(json))
-          .toList();
-
-      // ✅ Sort by score (highest first), then by created_at
-      notifications.sort((a, b) {
-        final scoreCompare = b.metadata.score.compareTo(a.metadata.score);
-        if (scoreCompare != 0) return scoreCompare;
-        return b.createdAt.compareTo(a.createdAt); // Same score → newest first
-      });
-
-      // ✅ Return only top N
-      return notifications.take(limit).toList();
-
-    } catch (e, stackTrace) {
-      debugPrint('❌ Error getting community notifications: $e');
-      debugPrint('Stack trace: $stackTrace');
-      return [];
-    }
-  }
-
-  /// ✅ FIXED: Get ALL community notifications - Sorted by SCORE
+  /// ✅ FIXED: Get ALL community notifications - Filter in Dart, not SQL
   Future<List<CommunityNotification>> getAllCommunityNotifications() async {
     try {
-      debugPrint('📡 Loading ALL community notifications (sorted by score)...');
+      debugPrint('📡 Loading ALL community notifications...');
       
+      // ✅ Get ALL ket_qua_test notifications without score filter
       final response = await supabase
           .from('notifications')
           .select('''
@@ -105,28 +53,82 @@ class NotificationService {
             )
           ''')
           .eq('type', 'ket_qua_test')
-          .filter('metadata->>test_type', 'eq', 'final_test')
-          .filter('metadata->>score', 'gte', '70')
-          .order('created_at', ascending: false); // Get all recent records
+          .order('created_at', ascending: false);
 
-      debugPrint('✅ Found ${(response as List).length} total notifications');
+      debugPrint('✅ Found ${(response as List).length} raw notifications');
 
-      // ✅ Convert to objects
-      final notifications = (response as List)
-          .map((json) => CommunityNotification.fromJson(json))
-          .toList();
+      // ✅ Filter in Dart to handle numeric comparison correctly
+      final validNotifications = <CommunityNotification>[];
+      
+      for (var json in response as List) {
+        try {
+          final metadata = json['metadata'] as Map<String, dynamic>?;
+          
+          if (metadata == null) {
+            debugPrint('⚠️ Skipping notification with null metadata: ${json['id']}');
+            continue;
+          }
+
+          // ✅ Parse test_type
+          final testType = metadata['test_type']?.toString() ?? '';
+          
+          // ✅ Parse score (handle string "100.0", int 100, double 100.0)
+          final scoreRaw = metadata['score'];
+          double? score;
+          
+          if (scoreRaw is num) {
+            score = scoreRaw.toDouble();
+          } else if (scoreRaw is String) {
+            score = double.tryParse(scoreRaw);
+          }
+
+          final id = (json['id'] as String).substring(0, 8);
+          debugPrint('🔍 [$id] test_type=$testType, score=$score (raw: $scoreRaw)');
+
+          // ✅ Filter: test_type == 'final_test' AND score >= 70
+          if (testType == 'final_test' && score != null && score >= 70.0) {
+            final notification = CommunityNotification.fromJson(json);
+            validNotifications.add(notification);
+            debugPrint('   ✅ INCLUDED - ${notification.userName}: $score%');
+          } else {
+            debugPrint('   ❌ FILTERED OUT');
+          }
+        } catch (e) {
+          debugPrint('⚠️ Error parsing notification: $e');
+        }
+      }
+
+      debugPrint('✅ Filtered to ${validNotifications.length} valid notifications');
 
       // ✅ Sort by score (highest first), then by created_at
-      notifications.sort((a, b) {
+      validNotifications.sort((a, b) {
         final scoreCompare = b.metadata.score.compareTo(a.metadata.score);
         if (scoreCompare != 0) return scoreCompare;
         return b.createdAt.compareTo(a.createdAt);
       });
 
-      return notifications;
+      return validNotifications;
 
     } catch (e, stackTrace) {
       debugPrint('❌ Error getting all community notifications: $e');
+      debugPrint('Stack trace: $stackTrace');
+      return [];
+    }
+  }
+
+  /// ✅ FIXED: Get community notifications - Top N
+  Future<List<CommunityNotification>> getCommunityNotifications({
+    int limit = 10,
+  }) async {
+    try {
+      debugPrint('📡 Loading top $limit community notifications...');
+      
+      final allNotifications = await getAllCommunityNotifications();
+      
+      return allNotifications.take(limit).toList();
+
+    } catch (e, stackTrace) {
+      debugPrint('❌ Error getting community notifications: $e');
       debugPrint('Stack trace: $stackTrace');
       return [];
     }

@@ -159,8 +159,8 @@ class _SpeakingLessonScreenState extends State<SpeakingLessonScreen> {
                     'grammar_score': feedbackData['grammar_score'],
                     'vocabulary_score': feedbackData['vocabulary_score'],
                     'organization_score': feedbackData['organization_score'],
-                    'pronunciation_score': feedbackData['pronunciation_score'],
-                    'fluency_score': feedbackData['fluency_score'],
+                    // 'pronunciation_score': feedbackData['pronunciation_score'],
+                    // 'fluency_score': feedbackData['fluency_score'],
                     'detailed_feedback': feedbackData['detailed_feedback'],
                     'mistakes': feedbackData['mistakes'] ?? [],
                     'strengths': feedbackData['strengths'] ?? [],
@@ -989,6 +989,16 @@ Widget _buildFeedbackSection(Map<String, dynamic> result) {
     return [];
   }
 
+  // ✅ Define max scores for each category
+  const Map<String, int> maxScores = {
+    'content_score': 30,
+    'grammar_score': 30,
+    'vocabulary_score': 20,
+    'organization_score': 20,
+    'pronunciation_score': 20,
+    'fluency_score': 20,
+  };
+
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
@@ -1009,24 +1019,24 @@ Widget _buildFeedbackSection(Map<String, dynamic> result) {
       ),
       const SizedBox(height: 12),
       
-      // ✅ Display all available scores
+      // ✅ Display scores with dynamic max values
       if (getScore('content_score') != null)
-        _buildScoreRow('Nội dung', getScore('content_score')!),
+        _buildScoreRow('Nội dung', getScore('content_score')!, maxScore: maxScores['content_score']!),
       
       if (getScore('grammar_score') != null)
-        _buildScoreRow('Ngữ pháp', getScore('grammar_score')!),
+        _buildScoreRow('Ngữ pháp', getScore('grammar_score')!, maxScore: maxScores['grammar_score']!),
       
       if (getScore('vocabulary_score') != null)
-        _buildScoreRow('Từ vựng', getScore('vocabulary_score')!),
+        _buildScoreRow('Từ vựng', getScore('vocabulary_score')!, maxScore: maxScores['vocabulary_score']!),
       
       if (getScore('organization_score') != null)
-        _buildScoreRow('Tổ chức ý', getScore('organization_score')!),
+        _buildScoreRow('Tổ chức ý', getScore('organization_score')!, maxScore: maxScores['organization_score']!),
       
       if (getScore('pronunciation_score') != null)
-        _buildScoreRow('Phát âm', getScore('pronunciation_score')!),
+        _buildScoreRow('Phát âm', getScore('pronunciation_score')!, maxScore: maxScores['pronunciation_score']!),
       
       if (getScore('fluency_score') != null)
-        _buildScoreRow('Lưu loát', getScore('fluency_score')!),
+        _buildScoreRow('Lưu loát', getScore('fluency_score')!, maxScore: maxScores['fluency_score']!),
       
       // ✅ Strengths
       if (getList('strengths').isNotEmpty) ...[
@@ -1169,7 +1179,7 @@ Widget _buildFeedbackSection(Map<String, dynamic> result) {
 }
 
   /// ✅ NEW: Score row
-  Widget _buildScoreRow(String label, dynamic score) {
+  Widget _buildScoreRow(String label, dynamic score, {required int maxScore}) {
     final scoreValue = (score as num).toDouble();
     final color = scoreValue >= 80
         ? Colors.green
@@ -1195,7 +1205,7 @@ Widget _buildFeedbackSection(Map<String, dynamic> result) {
               border: Border.all(color: color.shade200),
             ),
             child: Text(
-              '${scoreValue.toStringAsFixed(0)}/100',
+              '${scoreValue.toStringAsFixed(0)}/$maxScore',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.bold,

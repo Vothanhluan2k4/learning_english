@@ -88,22 +88,48 @@ class NotificationMetadata {
   });
 
   factory NotificationMetadata.fromJson(Map<String, dynamic> json) {
+    // ✅ FIX: Parse score from string/int/double
+    final scoreRaw = json['score'];
+    double score = 0.0;
+    
+    if (scoreRaw is num) {
+      score = scoreRaw.toDouble();
+    } else if (scoreRaw is String) {
+      score = double.tryParse(scoreRaw) ?? 0.0;
+    }
+    
     return NotificationMetadata(
-      score: (json['score'] as num?)?.toDouble() ?? 0,
-      testId: json['test_id'] ?? '',
-      attempts: json['attempts'] ?? 0,
-      lessonId: json['lesson_id'] ?? '',
-      testName: json['test_name'] ?? 'Unknown',
-      testType: json['test_type'] ?? 'lesson',
-      courseName: json['course_name'] ?? 'Unknown',
-      lessonName: json['lesson_name'] ?? 'Unknown',
-      moduleName: json['module_name'] ?? 'Unknown',
-      passStatus: json['pass_status'] ?? 'unknown',
-      targetScore: (json['target_score'] as num?)?.toDouble() ?? 0,
-      correctAnswers: json['correct_answers'] ?? 0,
-      totalQuestions: json['total_questions'] ?? 0,
-      targetCorrectAnswers: json['target_correct_answers'] ?? 0,
+      score: score,
+      testId: json['test_id']?.toString() ?? '',
+      attempts: _parseInt(json['attempts']),
+      lessonId: json['lesson_id']?.toString() ?? '',
+      testName: json['test_name']?.toString() ?? 'Unknown',
+      testType: json['test_type']?.toString() ?? 'lesson',
+      courseName: json['course_name']?.toString() ?? 'Unknown',
+      lessonName: json['lesson_name']?.toString() ?? 'Unknown',
+      moduleName: json['module_name']?.toString() ?? 'Unknown',
+      passStatus: json['pass_status']?.toString() ?? 'unknown',
+      targetScore: _parseDouble(json['target_score']),
+      correctAnswers: _parseInt(json['correct_answers']),
+      totalQuestions: _parseInt(json['total_questions']),
+      targetCorrectAnswers: _parseInt(json['target_correct_answers']),
     );
+  }
+
+  // ✅ Helper: Parse int from various types
+  static int _parseInt(dynamic value) {
+    if (value is int) return value;
+    if (value is String) return int.tryParse(value) ?? 0;
+    if (value is double) return value.toInt();
+    return 0;
+  }
+
+  // ✅ Helper: Parse double from various types
+  static double _parseDouble(dynamic value) {
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? 0.0;
+    return 0.0;
   }
 
   bool get isPassed => passStatus == 'passed';

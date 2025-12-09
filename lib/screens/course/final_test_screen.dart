@@ -332,8 +332,16 @@ Future<void> _submitTest() async {
           });
         }
       } else {
-        // Regular questions
-        if (_userAnswers[item.id] == item.correctAnswer) correct++;
+        // ✅ FIX: Normalize comparison for fill_blank and multiple_choice
+        final userAnswer = (_userAnswers[item.id] ?? '').trim().toLowerCase();
+        final correctAnswer = (item.correctAnswer ?? '').trim().toLowerCase();
+        
+        if (userAnswer == correctAnswer) {
+          correct++;
+          debugPrint('   ✅ Question ${item.id.substring(0, 8)}: CORRECT');
+        } else {
+          debugPrint('   ❌ Question ${item.id.substring(0, 8)}: user="$userAnswer" vs correct="$correctAnswer"');
+        }
       }
     } else if (item is QuestionGroup) {
       for (final q in item.testQuestions) {
@@ -361,7 +369,15 @@ Future<void> _submitTest() async {
             });
           }
         } else {
-          if (_userAnswers[q.id] == q.correctAnswer) correct++;
+          final userAnswer = (_userAnswers[q.id] ?? '').trim().toLowerCase();
+          final correctAnswer = (q.correctAnswer ?? '').trim().toLowerCase();
+          
+          if (userAnswer == correctAnswer) {
+            correct++;
+            debugPrint('   ✅ Group question ${q.id.substring(0, 8)}: CORRECT');
+          } else {
+            debugPrint('   ❌ Group question ${q.id.substring(0, 8)}: user="$userAnswer" vs correct="$correctAnswer"');
+          }
         }
       }
     }
