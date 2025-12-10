@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:learning_english/widgets/markdown_content_widget.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:collection/collection.dart';
 import '../../models/lesson_question.dart';
@@ -1335,14 +1336,12 @@ class _CourseQuizContentState extends State<CourseQuizContent> {
                       Icon(Icons.info_outline, size: 16, color: Colors.blue.shade700),
                       const SizedBox(width: 8),
                       Expanded(
-                        child: Text(
-                          question.explanation!,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.blue.shade700,
-                            height: 1.5,
-                          ),
+                        child: MarkdownContentWidget(
+                          content: question.explanation!,
+                          fontSize: 12,
+                          textColor: Colors.blue.shade700,
                         ),
+                        
                       ),
                     ],
                   ),
