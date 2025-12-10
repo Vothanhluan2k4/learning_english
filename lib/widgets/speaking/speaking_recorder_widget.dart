@@ -133,7 +133,7 @@ class SpeakingRecorderWidget extends StatelessWidget {
                       icon: Icon(isPaused ? Icons.play_arrow : Icons.pause, size: 22),
                       label: Text(isPaused ? 'Tiếp tục' : 'Tạm dừng'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: isPaused ? Colors.green : Colors.orange,
+                        backgroundColor: isPaused ? Colors.blue.shade600 : Colors.orange,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(

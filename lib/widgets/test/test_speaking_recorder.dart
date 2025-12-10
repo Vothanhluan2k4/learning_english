@@ -137,7 +137,7 @@ class TestSpeakingRecorder extends StatelessWidget {
                       icon: Icon(isPaused ? Icons.play_arrow : Icons.pause, size: 22),
                       label: Text(isPaused ? 'Tiếp tục' : 'Tạm dừng'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: isPaused ? Colors.green : Colors.orange,
+                        backgroundColor: isPaused ? Colors.blue.shade600 : Colors.orange,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
@@ -153,7 +153,7 @@ class TestSpeakingRecorder extends StatelessWidget {
                       icon: const Icon(Icons.check, size: 22),
                       label: const Text('Hoàn thành'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue.shade600,
+                        backgroundColor: Colors.green.shade600,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(

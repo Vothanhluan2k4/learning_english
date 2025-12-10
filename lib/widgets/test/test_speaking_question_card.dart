@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
 import '../../models/test_question.dart';
+import '../../widgets/markdown_content_widget.dart';
 import 'test_speaking_recorder.dart';
 
 class TestSpeakingQuestionCard extends StatelessWidget {
@@ -107,7 +107,7 @@ class TestSpeakingQuestionCard extends StatelessWidget {
           const SizedBox(height: 16),
         ],
 
-        // Question text
+        // ✅ Question text with Markdown
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -115,21 +115,15 @@ class TestSpeakingQuestionCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: Colors.grey[300]!),
           ),
-          child: MarkdownBody(
-            data: question.questionText ?? '',
-            styleSheet: MarkdownStyleSheet(
-              p: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                height: 1.5,
-                color: Colors.black87,
-              ),
-            ),
+          child: MarkdownContentWidget(
+            content: question.questionText ?? '',
+            fontSize: 18,
+            textColor: Colors.black87,
           ),
         ),
         const SizedBox(height: 16),
 
-        // Reference text (for read_aloud mode)
+        // ✅ Reference text with Markdown (for read_aloud mode)
         if (question.speakingMode == 'read_aloud' && question.referenceText != null) ...[
           Container(
             padding: const EdgeInsets.all(16),
@@ -150,13 +144,10 @@ class TestSpeakingQuestionCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  question.referenceText!,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    height: 1.6,
-                    color: Colors.black87,
-                  ),
+                MarkdownContentWidget(
+                  content: question.referenceText!,
+                  fontSize: 16,
+                  textColor: Colors.black87,
                 ),
               ],
             ),
@@ -164,7 +155,7 @@ class TestSpeakingQuestionCard extends StatelessWidget {
           const SizedBox(height: 16),
         ],
 
-        // Expected answer (for reference - collapsible)
+        // ✅ Expected answer with Markdown
         if (question.expectedAnswer != null) ...[
           ExpansionTile(
             leading: Icon(Icons.lightbulb_outline, color: Colors.amber.shade700),
@@ -178,15 +169,13 @@ class TestSpeakingQuestionCard extends StatelessWidget {
             ),
             children: [
               Container(
+                width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 color: Colors.amber.shade50,
-                child: Text(
-                  question.expectedAnswer!,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.amber.shade900,
-                    height: 1.4,
-                  ),
+                child: MarkdownContentWidget(
+                  content: question.expectedAnswer!,
+                  fontSize: 14,
+                  textColor: Colors.amber.shade900,
                 ),
               ),
             ],
@@ -194,7 +183,7 @@ class TestSpeakingQuestionCard extends StatelessWidget {
           const SizedBox(height: 16),
         ],
 
-        // Guideline
+        // ✅ Guideline with Markdown
         if (question.guideline != null) ...[
           Container(
             padding: const EdgeInsets.all(12),
@@ -221,13 +210,10 @@ class TestSpeakingQuestionCard extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  question.guideline!,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.orange.shade900,
-                    height: 1.4,
-                  ),
+                MarkdownContentWidget(
+                  content: question.guideline!,
+                  fontSize: 14,
+                  textColor: Colors.orange.shade900,
                 ),
               ],
             ),
