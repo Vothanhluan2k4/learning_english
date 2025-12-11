@@ -28,7 +28,7 @@ class _HomeScreenState extends State<HomeScreen> {
   
   String? learningSuggestion;
   LearningMistake? topMistake;
-  List<LearningMistake> allMistakes = []; // 🔥 NEW: Store all mistakes
+  List<LearningMistake> allMistakes = []; 
 
   bool isLoading = true;
 
@@ -172,21 +172,10 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ),
                             SizedBox(height: 16),
-                            _buildChallengeCard(),
+                            _buildLearningTipCard(),
                           ],
                         ),
                       ),
-
-                      SizedBox(height: 24),
-
-                      // 🔥 LEARNING TIP - UPDATED
-                      if (learningSuggestion != null)
-                        Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 16),
-                          child: _buildLearningTipCard(),
-                        ),
-
-                      SizedBox(height: 24),
 
                       // NOTIFICATIONS
                       if (personalNotification != null || communityNotifications.isNotEmpty)
@@ -440,74 +429,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // CHALLENGE CARD - ENHANCED
-  Widget _buildChallengeCard() {
-    return Container(
-      padding: EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFFFF7043), Color(0xFFFF5722)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Color(0xFFFF5722).withOpacity(0.4),
-            blurRadius: 15,
-            offset: Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.25),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Icon(
-              Icons.emoji_events,
-              size: 36,
-              color: Colors.white,
-            ),
-          ),
-          SizedBox(width: 20),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Cuộc thi 30 ngày',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                SizedBox(height: 6),
-                Text(
-                  '"Quizz" - Chiến nào!',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.white.withOpacity(0.95),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Icon(
-            Icons.arrow_forward_ios,
-            color: Colors.white,
-            size: 20,
-          ),
-        ],
-      ),
-    );
-  }
+ 
 
   // LEARNING TIP - UPDATED WITH ALL MISTAKES INFO
   Widget _buildLearningTipCard() {

@@ -376,6 +376,24 @@ class _StatisticalScreenState extends State<StatisticalScreen> {
       );
     }
 
+    // Tính max value và interval động
+    final maxValue = _statistics!.weeklyExercises.values.reduce((a, b) => a > b ? a : b);
+    double interval;
+    
+    if (maxValue <= 10) {
+      interval = 2;
+    } else if (maxValue <= 20) {
+      interval = 5;
+    } else if (maxValue <= 50) {
+      interval = 10;
+    } else if (maxValue <= 100) {
+      interval = 20;
+    } else {
+      interval = 50;
+    }
+
+    final maxY = ((maxValue / interval).ceil() + 1) * interval;
+
     return Container(
       height: 200,
       padding: const EdgeInsets.all(16),
@@ -393,7 +411,7 @@ class _StatisticalScreenState extends State<StatisticalScreen> {
       child: BarChart(
         BarChartData(
           alignment: BarChartAlignment.spaceAround,
-          maxY: (_statistics!.weeklyExercises.values.reduce((a, b) => a > b ? a : b) + 5).toDouble(),
+          maxY: maxY.toDouble(),
           barTouchData: BarTouchData(
             enabled: true,
             touchTooltipData: BarTouchTooltipData(
@@ -420,14 +438,30 @@ class _StatisticalScreenState extends State<StatisticalScreen> {
                 getTitlesWidget: (value, meta) {
                   final keys = _statistics!.weeklyExercises.keys.toList();
                   if (value.toInt() < keys.length) {
-                    return Text(keys[value.toInt()], style: const TextStyle(fontSize: 10));
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: Text(
+                        keys[value.toInt()],
+                        style: const TextStyle(fontSize: 10),
+                      ),
+                    );
                   }
                   return const Text('');
                 },
               ),
             ),
             leftTitles: AxisTitles(
-              sideTitles: SideTitles(showTitles: true, reservedSize: 28),
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 40,
+                interval: interval,
+                getTitlesWidget: (value, meta) {
+                  return Text(
+                    value.toInt().toString(),
+                    style: const TextStyle(fontSize: 12),
+                  );
+                },
+              ),
             ),
             topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
             rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),

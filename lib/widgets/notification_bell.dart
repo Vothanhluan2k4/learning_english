@@ -439,19 +439,22 @@ class _NotificationBellState extends State<NotificationBell> {
     return Stack(
       alignment: Alignment.center,
       children: [
-        IconButton(
-          icon: Icon(
-            _hasNotification
-                ? Icons.notifications_active
-                : Icons.notifications_none,
-            size: 28,
-            color: Colors.white,
+        Padding(
+          padding: const EdgeInsets.only(right: 5), 
+          child: IconButton(
+            icon: Icon(
+              _hasNotification
+                  ? Icons.notifications_active
+                  : Icons.notifications_none,
+              size: 28,
+              color: Colors.white,
+            ),
+            onPressed: _showNotificationsBox,
           ),
-          onPressed: _showNotificationsBox,
         ),
         if (_unreadCount > 0)
           Positioned(
-            top: 6,
+            top: 4,
             right: 2,
             child: Container(
               padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),

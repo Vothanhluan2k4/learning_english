@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:learning_english/screens/profile/profile_screen.dart';
 import 'package:learning_english/screens/course/course_screen.dart';
-import 'package:learning_english/screens/course/course_screen.dart';
 import 'package:learning_english/screens/grammar/grammar_screen.dart';
 import 'package:learning_english/screens/home_screen.dart';
 import 'package:learning_english/screens/statistical_screen.dart';
@@ -10,8 +9,6 @@ import 'package:learning_english/services/auth/auth_service.dart';
 import 'package:learning_english/services/auth/user_service.dart';
 import 'package:learning_english/screens/flashcard/flashcards_screen.dart';
 import 'package:learning_english/services/auth/google_auth_service.dart';
-import 'package:learning_english/services/auth/auth_service.dart';
-import 'package:learning_english/services/auth/user_service.dart';
 import 'package:learning_english/widgets/notification_bell.dart';
 import '../services/user_prefs.dart';
 

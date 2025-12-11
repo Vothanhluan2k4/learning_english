@@ -69,7 +69,6 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
   }
 
-
   //Auth Check Login
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -179,7 +178,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         return FinalTestScreen(
           testId: args?['testId'] ?? '',
           lessonId: args?['lessonId'],
-          isPlacementTest: false, // ✅ Lesson test
+          isPlacementTest: false, 
           targetScore: args?['targetScore'] as double?,
         );
       },
