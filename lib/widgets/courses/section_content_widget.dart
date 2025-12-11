@@ -4,7 +4,7 @@ import 'adaptive_video_widget.dart';
 import '../../models/lesson_section.dart';
 import '../../models/section_media.dart';
 import '../../models/lesson_question.dart';
-import '../../services/lesson_section_service.dart';
+import '../../services/course/lesson_section_service.dart';
 
 class SectionContentWidget extends StatefulWidget {
   final LessonSection section;

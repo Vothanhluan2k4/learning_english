@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:learning_english/services/test/final_test_speaking_service.dart';
 import 'package:learning_english/screens/drawer_screen.dart';
 import 'package:learning_english/services/ai/ai_grading_service.dart';
-import 'package:learning_english/services/auth_service.dart';
+import 'package:learning_english/services/auth/auth_service.dart';
 import 'package:learning_english/services/test/test_final_service.dart';
 import 'package:learning_english/widgets/markdown_content_widget.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';

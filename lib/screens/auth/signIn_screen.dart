@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../services/auth_service.dart';
-import '../../services/google_auth_service.dart';
+import '../../services/auth/auth_service.dart';
+import '../../services/auth/google_auth_service.dart';
 import '../../services/user_prefs.dart';
-import '../../services/placement_test_service.dart';
+import '../../services/test/placement_test_service.dart';
 
 
 class SignInScreen extends StatefulWidget {

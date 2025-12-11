@@ -4,9 +4,9 @@ import 'package:audioplayers/audioplayers.dart';
 import '../../models/lesson_course.dart';
 import '../../models/lesson_section.dart';
 import '../../models/section_media.dart';
-import '../../services/lesson_course_service.dart';
-import '../../services/lesson_section_service.dart';
-import '../../services/user_attempt_service.dart';
+import '../../services/course/lesson_course_service.dart';
+import '../../services/course/lesson_section_service.dart';
+import '../../services/course/user_attempt_service.dart';
 import 'course_quiz_content.dart';
 
 class ListeningLessonScreen extends StatefulWidget {

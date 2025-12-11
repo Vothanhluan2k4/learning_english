@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:learning_english/services/auth_service.dart';
+import 'package:learning_english/services/auth/auth_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/course_module.dart';
 import '../../models/lesson_course.dart';
-import '../../services/lesson_course_service.dart';
-import '../../services/lesson_section_service.dart';
-import '../../services/user_attempt_service.dart';
+import '../../services/course/lesson_course_service.dart';
+import '../../services/course/lesson_section_service.dart';
+import '../../services/course/user_attempt_service.dart';
 import '../../widgets/courses/section_content_widget.dart';
 import 'course_quiz_content.dart'; 
 import 'final_test_screen.dart'; 

@@ -1,8 +1,8 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../models/topic.dart';
-import '../models/lesson.dart';
-import '../models/lesson_content.dart';
-import '../models/exercise.dart';
+import '../../models/topic.dart';
+import '../../models/lesson.dart';
+import '../../models/lesson_content.dart';
+import '../../models/exercise.dart';
 
 class GrammarService {
   final SupabaseClient _supabase = Supabase.instance.client;

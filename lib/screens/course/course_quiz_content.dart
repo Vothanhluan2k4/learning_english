@@ -5,9 +5,9 @@ import 'package:collection/collection.dart';
 import '../../models/lesson_question.dart';
 import '../../models/question_option.dart';
 import '../../models/lesson_section.dart';
-import '../../services/auth_service.dart';
-import '../../services/lesson_section_service.dart';
-import '../../services/user_attempt_service.dart';
+import '../../services/auth/auth_service.dart';
+import '../../services/course/lesson_section_service.dart';
+import '../../services/course/user_attempt_service.dart';
 
 class CourseQuizContent extends StatefulWidget {
   final String lessonId;

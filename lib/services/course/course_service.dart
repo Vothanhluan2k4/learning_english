@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:learning_english/models/course.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../models/course_group.dart';
+import '../../models/course_group.dart';
 
 class CourseService {
   final supabase = Supabase.instance.client;

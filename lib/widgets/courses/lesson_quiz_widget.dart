@@ -3,7 +3,7 @@ import 'package:learning_english/models/lesson_course.dart';
 import 'package:learning_english/widgets/courses/section_content_widget.dart';
 import '../../models/lesson_question.dart';
 import '../../models/question_option.dart';
-import '../../services/lesson_section_service.dart';
+import '../../services/course/lesson_section_service.dart';
 
 class LessonQuizWidget extends StatefulWidget {
   final List<Map<String, dynamic>> questions;

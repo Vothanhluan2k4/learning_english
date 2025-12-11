@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../models/lesson_course.dart';
-import '../../services/lesson_course_service.dart';
+import '../../services/course/lesson_course_service.dart';
 
 class LessonCardWidget extends StatelessWidget {
   final LessonCourse lesson;

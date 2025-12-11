@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:learning_english/services/auth_service.dart';
-import 'package:learning_english/services/lesson_course_service.dart';
+import 'package:learning_english/services/auth/auth_service.dart';
+import 'package:learning_english/services/course/lesson_course_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../models/user_lesson_attempt.dart';
-import '../models/user_attempt_question.dart';
+import '../../models/user_lesson_attempt.dart';
+import '../../models/user_attempt_question.dart';
 
 class UserAttemptService {
   final _supabase = Supabase.instance.client;

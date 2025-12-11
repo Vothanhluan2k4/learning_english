@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/lesson_course.dart';
-import '../../services/auth_service.dart';
+import '../../services/auth/auth_service.dart';
 import 'final_test_screen.dart';
 
 class TestPreviewScreen extends StatefulWidget {

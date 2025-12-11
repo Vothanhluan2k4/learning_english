@@ -6,9 +6,9 @@ import 'package:learning_english/screens/course/writing_lesson_screen.dart';
 import 'package:learning_english/screens/course/speaking_lesson_screen.dart';
 import '../../models/course_module.dart';
 import '../../models/lesson_course.dart';
-import '../../services/lesson_course_service.dart';
-import '../../services/course_module_service.dart';
-import '../../services/lesson_section_service.dart'; 
+import '../../services/course/lesson_course_service.dart';
+import '../../services/course/course_module_service.dart';
+import '../../services/course/lesson_section_service.dart'; 
 import '../../widgets/courses/lesson_card_widget.dart';
 
 class CourseLessonsScreen extends StatefulWidget {

@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:learning_english/services/auth_service.dart';
+import 'package:learning_english/services/auth/auth_service.dart';
 import 'package:learning_english/widgets/courses/writing_editor_widget.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/writing_question.dart';
-import '../../services/writing_lesson_service.dart';
-import '../../services/lesson_section_service.dart';
-import '../../services/user_attempt_service.dart'; 
+import '../../services/course/writing_lesson_service.dart';
+import '../../services/course/lesson_section_service.dart';
+import '../../services/course/user_attempt_service.dart'; 
 import 'dart:convert';
 
 class WritingLessonScreen extends StatefulWidget {

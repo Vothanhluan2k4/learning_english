@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:learning_english/models/course.dart';
 import 'package:learning_english/models/course_group.dart';
-import 'package:learning_english/services/course_unlock_service.dart';
+import 'package:learning_english/services/course/course_unlock_service.dart';
 import 'package:learning_english/widgets/courses/course_card_widget.dart';
 import 'package:learning_english/widgets/courses/placement_banner_widget.dart';
 import 'package:learning_english/widgets/courses/recommended_course_card.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../services/course_service.dart';
-import '../../services/placement_test_service.dart';
+import '../../services/course/course_service.dart';
+import '../../services/test/placement_test_service.dart';
 
 class CourseScreen extends StatefulWidget {
   const CourseScreen({super.key});

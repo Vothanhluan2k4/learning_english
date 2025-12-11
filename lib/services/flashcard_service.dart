@@ -4,7 +4,7 @@ import 'package:learning_english/models/word.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:io';
 import 'dart:typed_data';
-import '../../services/auth_service.dart';
+import 'auth/auth_service.dart';
 import 'package:learning_english/core/config/supabase_config.dart';
 
 class FlashcardService {

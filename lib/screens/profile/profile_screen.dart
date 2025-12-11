@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:learning_english/services/profile_service.dart';
+import 'package:learning_english/services/auth/profile_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'package:learning_english/services/google_auth_service.dart';
-import 'package:learning_english/services/auth_service.dart';
-import 'package:learning_english/services/user_service.dart';
+import 'package:learning_english/services/auth/google_auth_service.dart';
+import 'package:learning_english/services/auth/auth_service.dart';
+import 'package:learning_english/services/auth/user_service.dart';
 import 'package:learning_english/services/user_prefs.dart';
 import 'package:learning_english/widgets/profile_widet.dart';
 import 'package:learning_english/screens/profile/profile_screen.dart';

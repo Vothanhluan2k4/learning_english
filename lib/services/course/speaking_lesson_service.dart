@@ -1,8 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../core/config/supabase_config.dart';
-import '../models/speaking_question.dart';
-import '../models/lesson_section.dart';
+import '../../core/config/supabase_config.dart';
+import '../../models/speaking_question.dart';
+import '../../models/lesson_section.dart';
 
 class SpeakingQuestionService {
   final _supabase = SupabaseConfig.client;

@@ -17,10 +17,10 @@ import 'package:learning_english/screens/grammar/grammar_screen.dart';
 import 'package:learning_english/screens/auth/signIn_screen.dart';
 import 'package:learning_english/screens/auth/signUp_screen.dart';
 import 'package:learning_english/screens/welcome_screen.dart';
-import 'package:learning_english/services/auth_service.dart'; // Import AuthService
+import 'package:learning_english/services/auth/auth_service.dart'; 
 import 'dart:async';
 
-import 'package:learning_english/services/google_auth_service.dart';
+import 'package:learning_english/services/auth/google_auth_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 

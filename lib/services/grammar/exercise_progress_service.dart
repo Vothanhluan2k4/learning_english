@@ -1,5 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../models/exercise_progress.dart';
+import '../../models/exercise_progress.dart';
 
 class ExerciseProgressService {
   final _supabase = Supabase.instance.client;

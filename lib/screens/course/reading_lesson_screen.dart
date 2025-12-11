@@ -3,9 +3,9 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:url_launcher/url_launcher.dart';        
 import '../../models/lesson_course.dart';
 import '../../models/lesson_section.dart';
-import '../../services/lesson_course_service.dart';
-import '../../services/lesson_section_service.dart';
-import '../../services/user_attempt_service.dart';
+import '../../services/course/lesson_course_service.dart';
+import '../../services/course/lesson_section_service.dart';
+import '../../services/course/user_attempt_service.dart';
 import 'course_quiz_content.dart';
 
 class ReadingLessonScreen extends StatefulWidget {

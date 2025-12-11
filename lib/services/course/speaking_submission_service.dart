@@ -1,8 +1,8 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../core/config/supabase_config.dart';
-import '../services/auth_service.dart';
+import '../../core/config/supabase_config.dart';
+import '../auth/auth_service.dart';
 
 class SpeakingSubmissionService {
   final _supabase = SupabaseConfig.client;

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:learning_english/models/lesson.dart';
-import '../../../services/grammar_service.dart';
+import '../../../services/grammar/grammar_service.dart';
 import '../articles/articles_detail_screen.dart';
 
 class ArticlesScreen extends StatefulWidget {

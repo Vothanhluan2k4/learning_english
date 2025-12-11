@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../models/lesson_section.dart';
-import '../models/section_media.dart';
-import '../models/lesson_question.dart';
-import '../models/question_option.dart';
+import '../../models/lesson_section.dart';
+import '../../models/section_media.dart';
+import '../../models/lesson_question.dart';
+import '../../models/question_option.dart';
 
 class LessonSectionService {
   final _supabase = Supabase.instance.client;

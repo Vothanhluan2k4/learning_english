@@ -2,8 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
-import 'package:learning_english/widgets/pronunciation_lesson.dart';
-import 'package:learning_english/widgets/pronunciation_item.dart';
+import 'package:learning_english/widgets/grammar/pronunciation_lesson.dart';
+import 'package:learning_english/widgets/grammar/pronunciation_item.dart';
 
 class PronunciationScreen extends StatefulWidget {
   const PronunciationScreen({super.key});
@@ -381,23 +381,23 @@ class _PronunciationScreenState extends State<PronunciationScreen> {
             title: "Ngữ điệu (Intonation)",
             items: [
               PronunciationItem(
-                sound: "Phát biểu ↓",
-                examples: ["I like coffee↓", "She is beautiful↓"],
+                sound: "Phát biểu ",
+                examples: ["I like coffee", "She is beautiful"],
                 vietnamese: "Giọng xuống ở cuối câu khẳng định",
               ),
               PronunciationItem(
-                sound: "Yes/No ↑",
-                examples: ["Are you ready↑?", "Do you like it↑?"],
+                sound: "Yes/No ",
+                examples: ["Are you ready?", "Do you like it?"],
                 vietnamese: "Giọng lên ở cuối câu hỏi Yes/No",
               ),
               PronunciationItem(
-                sound: "Câu hỏi Wh- ↓",
-                examples: ["What time is it↓?", "Where are you going↓?"],
+                sound: "Câu hỏi Wh- ",
+                examples: ["What time is it?", "Where are you going?"],
                 vietnamese: "Giọng xuống với câu hỏi thông tin",
               ),
               PronunciationItem(
-                sound: "Liệt kê ↑,↑,↓",
-                examples: ["I need pen↑, paper↑, and book↓"],
+                sound: "Liệt kê ",
+                examples: ["I need pen, paper, and book"],
                 vietnamese: "Giọng lên các item đầu, xuống item cuối",
               ),
             ],
@@ -435,7 +435,7 @@ class _PronunciationScreenState extends State<PronunciationScreen> {
               ),
               PronunciationItem(
                 sound: "Bất quy tắc",
-                examples: ["says /sez/", "does /dʌz/"],
+                examples: ["says ", "does"],
                 vietnamese: "Một số từ có cách đọc đặc biệt",
               ),
             ],
@@ -460,7 +460,7 @@ class _PronunciationScreenState extends State<PronunciationScreen> {
               ),
               PronunciationItem(
                 sound: "Bất quy tắc",
-                examples: ["learned /lɜːnd/", "blessed /blesɪd/"],
+                examples: ["learned ", "blessed "],
                 vietnamese: "Một số từ có cách đọc đặc biệt",
               ),
             ],
@@ -918,42 +918,6 @@ class _PronunciationScreenState extends State<PronunciationScreen> {
                                 );
                               }).toList(),
 
-                              // Practice Button
-                              Container(
-                                width: double.infinity,
-                                child: ElevatedButton(
-                                  onPressed: () {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text('Bắt đầu luyện tập ${lesson.title}'),
-                                        backgroundColor: lesson.color,
-                                      ),
-                                    );
-                                  },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: lesson.color,
-                                    padding: const EdgeInsets.symmetric(vertical: 16),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: const [
-                                      Icon(Icons.play_arrow, color: Colors.white),
-                                      SizedBox(width: 8),
-                                      Text(
-                                        'Bắt đầu luyện tập',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 16,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
                             ],
                           ),
                         ),

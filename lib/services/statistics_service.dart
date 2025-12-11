@@ -1,5 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../services/auth_service.dart';
+import 'auth/auth_service.dart';
 
 class StatisticsData {
   final int totalLearnedWords;

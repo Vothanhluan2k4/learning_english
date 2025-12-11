@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/foundation.dart';
-import '../models/writing_question.dart';
-import '../services/ai/ai_grading_service.dart';
+import '../../models/writing_question.dart';
+import '../ai/ai_grading_service.dart';
 
 class WritingLessonService {
   final _supabase = Supabase.instance.client;

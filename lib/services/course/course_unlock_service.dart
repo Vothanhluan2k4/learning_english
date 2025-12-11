@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../models/course.dart';
+import '../../models/course.dart';
 
 class CourseUnlockService {
   final _supabase = Supabase.instance.client;

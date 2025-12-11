@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:learning_english/screens/profile/edit_user_infor_screen.dart';
-import 'package:learning_english/services/auth_service.dart';
-import 'package:learning_english/services/user_service.dart';
+import 'package:learning_english/services/auth/auth_service.dart';
+import 'package:learning_english/services/auth/user_service.dart';
 import 'package:learning_english/services/user_prefs.dart';
 import 'package:url_launcher/url_launcher.dart';
 

@@ -5,7 +5,6 @@ class AiConfig {
   // Production app nên dùng server-side proxy để bảo vệ API key
   static const String groqApiKey = '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';  
   
-  // ✅ ADD: Gemini API key (Get from https://makersuite.google.com/app/apikey)
   static const String geminiApiKey = 'AIzaSyB6Pu9kqSZJhPDHBjYhPL3dN93DRzd8OFQ'; 
   
   // ==================== GROQ ====================

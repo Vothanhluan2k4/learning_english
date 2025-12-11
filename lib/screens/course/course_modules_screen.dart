@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../models/course.dart';
 import '../../models/course_module.dart';
-import '../../services/course_service.dart';
-import '../../services/course_module_service.dart';
+import '../../services/course/course_service.dart';
+import '../../services/course/course_module_service.dart';
 
 class CourseModulesScreen extends StatefulWidget {
   final String courseId;

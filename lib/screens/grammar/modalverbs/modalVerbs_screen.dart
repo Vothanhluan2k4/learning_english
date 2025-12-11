@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:learning_english/models/lesson.dart';
-import 'package:learning_english/services/grammar_service.dart';
+import 'package:learning_english/services/grammar/grammar_service.dart';
 import '../modalverbs/modalverbs_detail_screen.dart';
 
 class ModalverbsScreen extends StatefulWidget {

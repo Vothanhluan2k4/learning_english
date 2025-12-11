@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../models/test_question.dart';
-import '../../services/audio_recorder_service.dart';
+import '../course/audio_recorder_service.dart';
 import '../../services/ai/groq_speech_service.dart';
 import '../../services/ai/ai_grading_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
