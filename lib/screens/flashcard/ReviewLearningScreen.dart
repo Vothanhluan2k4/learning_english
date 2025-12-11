@@ -39,6 +39,9 @@ class _ReviewLearningScreenState extends State<ReviewLearningScreen> with Single
   late AnimationController _progressAnimationController;
   final ScrollController _scrollController = ScrollController();
 
+  // Biến cờ theo dõi có bất kỳ từ nào được thay đổi status trong session không
+  bool _hasStatusChanged = false;
+
   @override
   void initState() {
     super.initState();
@@ -78,6 +81,8 @@ class _ReviewLearningScreenState extends State<ReviewLearningScreen> with Single
           .delete()
           .eq('user_id', userId)
           .eq('list_word_id', widget.list.id!);
+      // Đặt lại cờ thay đổi
+      _hasStatusChanged = true;
     } catch (e) {
       _showSnackBar('Lỗi reset: $e', Colors.red);
     }
@@ -108,7 +113,16 @@ class _ReviewLearningScreenState extends State<ReviewLearningScreen> with Single
         setState(() {
           _allWords = words;
           _wordStatuses = wordStatuses;
-          _reviewWords = List.from(words);
+          // Lọc ra các từ cần ôn tập (mặc định)
+          _reviewWords = words.where((word) => wordStatuses[word.id] != 'remembered').toList();
+          if (_reviewWords.isEmpty && words.isNotEmpty) {
+            // Nếu không có từ nào cần ôn tập, nhưng list không rỗng, hiển thị toàn bộ.
+            _reviewWords = List.from(words);
+            _showAllWordsInReview = true;
+          } else if (_reviewWords.isEmpty) {
+            // Nếu list rỗng hoàn toàn
+            _reviewWords = [];
+          }
           _isLoading = false;
         });
       }
@@ -137,15 +151,21 @@ class _ReviewLearningScreenState extends State<ReviewLearningScreen> with Single
   void _skipCurrentWord() {
     if (_reviewWords.isEmpty) return;
     final word = _reviewWords[_currentIndex];
+
+    // Cập nhật trạng thái
     _wordStatuses[word.id!] = 'remembered';
     _updateWordStatus(word.id!, 'remembered');
+    _hasStatusChanged = true; // Đánh dấu có thay đổi
+
     setState(() {
       _skippedWords.add(word);
       _reviewWords.removeAt(_currentIndex);
+
       if (_currentIndex >= _reviewWords.length && _reviewWords.isNotEmpty) {
         _currentIndex = _reviewWords.length - 1;
       }
       if (_reviewWords.isEmpty) _isSessionDone = true;
+
       _resetReviewState();
     });
   }
@@ -164,9 +184,13 @@ class _ReviewLearningScreenState extends State<ReviewLearningScreen> with Single
     _currentReviewLevel = Difficulty.none;
   }
 
+  // ✨ ĐÃ SỬA: Hàm thoát màn hình học (Gửi tín hiệu refresh)
   void _handleStopLearning() {
     flutterTts.stop();
-    _completeSession();
+    // Trả về _hasStatusChanged (bool) cho màn hình cha
+    if (mounted) {
+      Navigator.of(context).pop(_hasStatusChanged);
+    }
   }
 
   void _startReviewLevel(Difficulty level) {
@@ -179,6 +203,10 @@ class _ReviewLearningScreenState extends State<ReviewLearningScreen> with Single
     };
     _wordStatuses[word.id!] = status;
     _updateWordStatus(word.id!, status);
+
+    // Đánh dấu có thay đổi khi bắt đầu level review
+    _hasStatusChanged = true;
+
     setState(() {
       _currentReviewLevel = level;
       _isFlipped = false;
@@ -191,13 +219,19 @@ class _ReviewLearningScreenState extends State<ReviewLearningScreen> with Single
   Future<void> _updateWordStatus(String wordId, String status) async {
     try {
       await FlashcardService().updateWordStatus(wordId, status, widget.list.id!);
+      // Cờ _hasStatusChanged đã được bật trước đó
     } catch (e) {
       _showSnackBar('Lỗi cập nhật: $e', Colors.red);
     }
   }
 
+  // Logic hoàn thành session (Chỉ lưu và chuyển sang màn hình chúc mừng)
   Future<void> _completeSession() async {
+    if (_isSessionDone) return; // Tránh gọi lại nhiều lần
+
     setState(() => _isSessionDone = true);
+
+    // Logic lưu lịch sử
     try {
       final wordsReviewed = _wordStatuses.length;
       final wordsRemembered = _wordStatuses.values.where((s) => s == 'remembered').length;
@@ -205,7 +239,7 @@ class _ReviewLearningScreenState extends State<ReviewLearningScreen> with Single
     } catch (e) {
       _showSnackBar('Lỗi lưu: $e', Colors.red);
     }
-    if (mounted) Navigator.of(context).pop();
+    // KHÔNG pop ở đây. Pop được thực hiện trong _buildCompletionView khi nhấn nút.
   }
 
   void _advanceDifficultyLevel() {
@@ -223,6 +257,7 @@ class _ReviewLearningScreenState extends State<ReviewLearningScreen> with Single
       _updateWordStatus(word.id!, 'to_review');
       _moveToNextWord();
     }
+    _hasStatusChanged = true; // Đảm bảo cờ thay đổi luôn được bật
   }
 
   void _showCorrectAnswer() {
@@ -230,6 +265,7 @@ class _ReviewLearningScreenState extends State<ReviewLearningScreen> with Single
     final word = _reviewWords[_currentIndex];
     setState(() {
       _showAnswer = true;
+      // ... (logic hiển thị đáp án giữ nguyên) ...
       if (_currentReviewLevel == Difficulty.medium) {
         _answerController.text = word.word;
       } else if (_currentReviewLevel == Difficulty.hard) {
@@ -256,13 +292,31 @@ class _ReviewLearningScreenState extends State<ReviewLearningScreen> with Single
     }
 
     if (isCorrect) {
+      // 1. Đúng: Chuyển sang cấp độ khó hơn (hoặc từ tiếp theo)
       _showSnackBar('Chính xác! 🎉', Colors.green);
       _advanceDifficultyLevel();
     } else {
-      _showSnackBar('Chưa đúng, hãy thử lại! 💪', Colors.orange);
+      // 2. Sai: Giữ nguyên từ, reset trạng thái nhập liệu và khuyến khích làm lại
+      _showSnackBar('Chưa đúng, hãy thử lại! 💪', Colors.red); // Đổi màu SnackBar thành đỏ để nhấn mạnh lỗi
+
+      // Đặt lại status của từ hiện tại về 'to_review' (hoặc giữ nguyên nếu đã là 'to_review')
       _wordStatuses[word.id!] = 'to_review';
       _updateWordStatus(word.id!, 'to_review');
-      _moveToNextWord();
+      _hasStatusChanged = true; // Đánh dấu có thay đổi
+
+      // ✨ QUAN TRỌNG: CHỈ reset UI, KHÔNG chuyển từ
+      setState(() {
+        // Reset các controller và cờ show answer
+        _answerController.clear();
+        _meaningController.clear();
+        _showAnswer = false;
+
+        // Nếu ở cấp độ gõ (Medium/Hard) mà sai, nên chuyển về cấp độ dễ hơn (Ví dụ: Easy)
+        // để giúp người dùng ôn lại định nghĩa.
+        if (_currentReviewLevel != Difficulty.easy) {
+          _currentReviewLevel = Difficulty.easy;
+        }
+      });
     }
   }
 
@@ -467,6 +521,7 @@ class _ReviewLearningScreenState extends State<ReviewLearningScreen> with Single
           ),
           child: const Icon(Icons.arrow_back_ios_new, size: 18, color: Colors.black87),
         ),
+        // ✨ ĐÃ SỬA: Gọi _handleStopLearning để trả về kết quả refresh
         onPressed: _handleStopLearning,
       ),
       title: Column(
@@ -1217,11 +1272,10 @@ class _ReviewLearningScreenState extends State<ReviewLearningScreen> with Single
               const SizedBox(height: 32),
               ElevatedButton.icon(
                 onPressed: () {
-                  Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(
-                      builder: (_) => ReviewSessionScreen(list: widget.list),
-                    ),
-                  );
+                  // ✨ ĐÃ SỬA: Pop màn hình học và trả về TRUE để màn hình Session refresh.
+                  if (mounted) {
+                    Navigator.of(context).pop(true);
+                  }
                 },
                 icon: const Icon(Icons.analytics_outlined, size: 22),
                 label: const Text('Xem tiến độ học tập', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
@@ -1267,6 +1321,7 @@ class _ReviewLearningScreenState extends State<ReviewLearningScreen> with Single
                 _buildHeaderButton(
                   icon: Icons.list_alt,
                   label: 'Tất cả',
+                  // Nút này cũng nên gọi _handleStopLearning
                   onPressed: _handleStopLearning,
                 ),
                 _buildHeaderButton(
@@ -1285,6 +1340,7 @@ class _ReviewLearningScreenState extends State<ReviewLearningScreen> with Single
           _buildHeaderButton(
             icon: Icons.stop_circle_outlined,
             label: 'Dừng',
+            // ✨ ĐÃ SỬA: Gọi _handleStopLearning để trả về kết quả refresh
             onPressed: _handleStopLearning,
             color: Colors.red.shade600,
           ),
@@ -1352,6 +1408,7 @@ class _ReviewLearningScreenState extends State<ReviewLearningScreen> with Single
             ElevatedButton(
               onPressed: () {
                 setState(() {
+                  // Logic lọc từ giữ nguyên
                   _reviewWords = _showAllWordsInReview
                       ? List.from(_allWords)
                       : _allWords.where((w) => _wordStatuses[w.id!] == 'to_review').toList();
@@ -1434,6 +1491,7 @@ class _ReviewLearningScreenState extends State<ReviewLearningScreen> with Single
                         setDialogState(() {
                           _skippedWords.remove(word);
                           _reviewWords.add(word);
+                          _hasStatusChanged = true; // Đánh dấu có thay đổi
                         });
                         setState(() {});
                       },

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:learning_english/models/list_word.dart';
 import 'package:learning_english/services/flashcard_service.dart';
+import 'package:flutter/services.dart'; // Import cần thiết cho Haptic Feedback
 
 class CreateDeckScreen extends StatefulWidget {
   const CreateDeckScreen({super.key});
@@ -16,6 +17,7 @@ class _CreateDeckScreenState extends State<CreateDeckScreen> {
   final _descriptionController = TextEditingController();
   String? _userId;
   bool _isLoading = true;
+  bool _isSaving = false; // Biến trạng thái riêng cho nút Lưu
 
   // --- ✨ Modern Color Scheme ---
   static const Color primaryColor = Color(0xFF6C5CE7);
@@ -24,18 +26,30 @@ class _CreateDeckScreenState extends State<CreateDeckScreen> {
   static const Color cardColor = Colors.white;
   static const Color textPrimary = Color(0xFF2D3436);
   static const Color textSecondary = Color(0xFF636E72);
+  static const Color accentError = Color(0xFFFF6B6B);
 
   @override
   void initState() {
     super.initState();
     _initializeUser();
+    // Thêm listener để cập nhật widget mô phỏng khi nhập liệu
+    _titleController.addListener(_updateFormState);
+    _descriptionController.addListener(_updateFormState);
   }
 
   @override
   void dispose() {
+    _titleController.removeListener(_updateFormState);
+    _descriptionController.removeListener(_updateFormState);
     _titleController.dispose();
     _descriptionController.dispose();
     super.dispose();
+  }
+
+  // Cập nhật trạng thái Widget (dùng cho mô phỏng)
+  void _updateFormState() {
+    // Chỉ cần gọi setState để rebuild phần mô phỏng nhỏ
+    setState(() {});
   }
 
   // --- LOGIC FUNCTIONS (Unchanged) ---
@@ -76,8 +90,11 @@ class _CreateDeckScreenState extends State<CreateDeckScreen> {
   }
 
   Future<void> _submitForm() async {
+    // Thêm Haptic Feedback nhẹ khi nhấn nút
+    HapticFeedback.lightImpact();
+
     if (_formKey.currentState!.validate() && _userId != null) {
-      setState(() => _isLoading = true);
+      setState(() => _isSaving = true); // Bật trạng thái lưu
       try {
         final newList = ListWord(
           id: null,
@@ -87,6 +104,7 @@ class _CreateDeckScreenState extends State<CreateDeckScreen> {
         );
         await FlashcardService().createListWord(newList);
         if (context.mounted) {
+          // Trả về true để màn hình cha refresh
           Navigator.pop(context, true);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -100,16 +118,22 @@ class _CreateDeckScreenState extends State<CreateDeckScreen> {
       } catch (e) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Lỗi: $e')),
+            SnackBar(
+              content: Text('Lỗi: $e'),
+              backgroundColor: accentError,
+            ),
           );
         }
       } finally {
-        if (mounted) setState(() => _isLoading = false);
+        if (mounted) setState(() => _isSaving = false);
       }
     } else if (_userId == null) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Lỗi: Không thể xác định người dùng')),
+          const SnackBar(
+            content: Text('Lỗi: Không thể xác định người dùng'),
+            backgroundColor: accentError,
+          ),
         );
       }
     }
@@ -128,14 +152,14 @@ class _CreateDeckScreenState extends State<CreateDeckScreen> {
 
     return Scaffold(
       backgroundColor: backgroundColor,
+      // AppBar đơn giản, chỉ có nút Đóng
       appBar: AppBar(
-        title: const Text('Tạo Bộ Thẻ Mới', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary)),
         elevation: 0,
         backgroundColor: backgroundColor,
         foregroundColor: textPrimary,
         leading: IconButton(
-          icon: const Icon(Icons.close_rounded),
-          onPressed: () => Navigator.of(context).pop(),
+          icon: const Icon(Icons.close_rounded, size: 28),
+          onPressed: () => Navigator.of(context).pop(), // Pop không trả về giá trị
         ),
       ),
       body: _isLoading
@@ -147,16 +171,11 @@ class _CreateDeckScreenState extends State<CreateDeckScreen> {
   Widget _buildForm(BuildContext context) {
     return SafeArea(
       child: Center(
-        // ✨ NEW: Added Scrollbar for better web/desktop experience
         child: Scrollbar(
           child: SingleChildScrollView(
-            // ✨ NEW: Use LayoutBuilder for adaptive padding
             child: LayoutBuilder(
               builder: (context, constraints) {
-                // Check if the screen is wide (like a tablet or web)
                 final bool isWideScreen = constraints.maxWidth > 600;
-
-                // Adjust padding based on screen width
                 final a_padding = isWideScreen
                     ? const EdgeInsets.symmetric(horizontal: 40.0, vertical: 32.0)
                     : const EdgeInsets.all(24.0);
@@ -164,14 +183,13 @@ class _CreateDeckScreenState extends State<CreateDeckScreen> {
                 return Center(
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-                    // Constrain the width on large screens
                     constraints: const BoxConstraints(maxWidth: 600),
-                    // ✨ NEW: Wrap the form in a Card for better visual structure on web
                     child: Card(
-                      elevation: 0,
+                      elevation: 4, // Tăng elevation nhẹ
+                      shadowColor: Colors.black.withOpacity(0.1),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
-                        side: BorderSide(color: Colors.grey.shade300),
+                        side: BorderSide(color: Colors.grey.shade200, width: 0.5),
                       ),
                       child: Padding(
                         padding: a_padding,
@@ -180,18 +198,23 @@ class _CreateDeckScreenState extends State<CreateDeckScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // ✨ NEW: Added a header inside the card
+                              // --- Header ---
                               const Text(
-                                'Chi tiết bộ thẻ',
-                                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: textPrimary),
+                                'Tạo Bộ Thẻ Mới',
+                                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: textPrimary),
                               ),
                               const SizedBox(height: 8),
                               const Text(
-                                'Điền thông tin dưới đây để tạo một bộ flashcard mới.',
+                                'Tổ chức kiến thức của bạn thành các bộ flashcard.',
                                 style: TextStyle(fontSize: 14, color: textSecondary),
                               ),
                               const SizedBox(height: 32.0),
 
+                              // --- Live Preview ---
+                              _buildDeckPreview(),
+                              const SizedBox(height: 32.0),
+
+                              // --- Input Fields ---
                               _buildTextField(
                                 controller: _titleController,
                                 label: 'Tiêu đề *',
@@ -202,10 +225,12 @@ class _CreateDeckScreenState extends State<CreateDeckScreen> {
                               _buildTextField(
                                 controller: _descriptionController,
                                 label: 'Mô tả',
-                                hintText: 'Nhập mô tả (tùy chọn)',
-                                maxLines: 4,
+                                hintText: 'Nhập mô tả (tùy chọn, tối đa 3 dòng)',
+                                maxLines: 3,
                               ),
                               const SizedBox(height: 32.0),
+
+                              // --- Submit Button ---
                               SizedBox(
                                 width: double.infinity,
                                 child: ElevatedButton(
@@ -216,10 +241,12 @@ class _CreateDeckScreenState extends State<CreateDeckScreen> {
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(12.0),
                                     ),
-                                    textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                    elevation: 4,
+                                    shadowColor: primaryColor.withOpacity(0.4),
+                                    textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                                   ),
-                                  onPressed: _isLoading ? null : _submitForm,
-                                  child: _isLoading
+                                  onPressed: _isSaving ? null : _submitForm, // Sử dụng _isSaving
+                                  child: _isSaving
                                       ? const SizedBox(
                                       width: 24,
                                       height: 24,
@@ -239,6 +266,65 @@ class _CreateDeckScreenState extends State<CreateDeckScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  // ✨ NEW: Widget mô phỏng thẻ (Live Preview)
+  Widget _buildDeckPreview() {
+    final title = _titleController.text.trim().isEmpty
+        ? 'Bộ Thẻ Mới Của Bạn'
+        : _titleController.text;
+    final description = _descriptionController.text.trim().isEmpty
+        ? 'Đây là nơi bạn có thể thêm mô tả.'
+        : _descriptionController.text;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      height: 150,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: primaryColor.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: primaryColor.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: primaryColor.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.style_rounded, color: primaryColor, size: 24),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textPrimary),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            description,
+            style: const TextStyle(fontSize: 13, color: textSecondary),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const Spacer(),
+          const Text(
+            'Chưa có từ',
+            style: TextStyle(fontSize: 12, color: textSecondary, fontWeight: FontWeight.w500),
+          ),
+        ],
       ),
     );
   }
@@ -276,6 +362,14 @@ class _CreateDeckScreenState extends State<CreateDeckScreen> {
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12.0),
               borderSide: const BorderSide(color: primaryColor, width: 2),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12.0),
+              borderSide: const BorderSide(color: accentError, width: 2),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12.0),
+              borderSide: const BorderSide(color: accentError, width: 2),
             ),
           ),
           maxLines: maxLines,
