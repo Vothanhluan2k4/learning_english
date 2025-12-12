@@ -116,6 +116,7 @@ class _LearningExploreScreenState extends State<LearningExploreScreen> {
     return separated;
   }
 
+  // --- PHẦN ĐÃ ĐƯỢC CHỈNH SỬA ---
   void _startSession(List<ExploreWord> wordsToInclude) {
     if (wordsToInclude.isEmpty) {
       _showSnackBar('Không có từ nào để ôn tập trong lựa chọn này.', Colors.orange);
@@ -123,11 +124,11 @@ class _LearningExploreScreenState extends State<LearningExploreScreen> {
       return;
     }
 
+    // Loại bỏ giới hạn .take(10) để cho phép học tất cả các từ trong danh sách.
     if (widget.mode == 'random') {
       wordsToInclude.shuffle();
-    } else {
-      wordsToInclude = wordsToInclude.take(10).toList();
     }
+    // wordsToInclude = wordsToInclude.take(10).toList(); <--- ĐÃ XÓA
 
     setState(() {
       _exploreWords = wordsToInclude;
@@ -136,6 +137,7 @@ class _LearningExploreScreenState extends State<LearningExploreScreen> {
       _isLoading = false;
     });
   }
+  // -----------------------------
 
   void _showLearningOptionDialog(List<ExploreWord> allWords) {
     if (!mounted) return;
@@ -919,7 +921,7 @@ class _LearningExploreScreenState extends State<LearningExploreScreen> {
                     ),
                   ],
                 ),
-                child: Icon(Icons.edit_note_rounded, color: Colors.white, size: 22),
+                child: const Icon(Icons.edit_note_rounded, color: Colors.white, size: 22),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -1105,93 +1107,89 @@ class _LearningExploreScreenState extends State<LearningExploreScreen> {
     );
   }
 
- Widget _buildInitialAssessmentControls() {
-  return Center(
-    child: Container(
-      constraints: const BoxConstraints(maxWidth: 600),
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        children: [
-          const Text(
-            'Bạn nhớ từ này ở mức độ nào?',
-            style: TextStyle(
-              fontSize: 19,
-              fontWeight: FontWeight.bold,
-              color: _PRIMARY,
-              letterSpacing: -0.4,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 32),
-
-          // 3 nút căn giữa đẹp tuyệt đối
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final double buttonSize = constraints.maxWidth < 500 ? 80 : 96;
-              final double spacing = constraints.maxWidth < 500 ? 16 : 32;
-
-              return Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _buildLevelButton(
-                    'Dễ',
-                    _EASY_COLOR,
-                    Icons.sentiment_satisfied_alt_rounded,
-                    () => _startReviewLevel(Difficulty.easy),
-                    size: buttonSize,
-                  ),
-                  SizedBox(width: spacing),
-                  _buildLevelButton(
-                    'Trung bình',
-                    _MEDIUM_COLOR,
-                    Icons.sentiment_neutral_rounded,
-                    () => _startReviewLevel(Difficulty.medium),
-                    size: buttonSize,
-                  ),
-                  SizedBox(width: spacing),
-                  _buildLevelButton(
-                    'Khó',
-                    _HARD_COLOR,
-                    Icons.sentiment_dissatisfied_rounded,
-                    () => _startReviewLevel(Difficulty.hard),
-                    size: buttonSize,
-                  ),
-                ],
-              );
-            },
-          ),
-
-          const SizedBox(height: 36),
-
-          // Nút bỏ qua
-          TextButton.icon(
-            onPressed: _moveToNextWord,
-            icon: Icon(Icons.skip_next_rounded, color: Colors.blue[700], size: 26),
-            label: Text(
-              'Bỏ qua từ này',
+  Widget _buildInitialAssessmentControls() {
+    return Center(
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 600),
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Column(
+          children: [
+            const Text(
+              'Bạn nhớ từ này ở mức độ nào?',
               style: TextStyle(
-                color: Colors.blue[700],
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
+                fontSize: 19,
+                fontWeight: FontWeight.bold,
+                color: _PRIMARY,
+                letterSpacing: -0.4,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+
+            // 3 nút căn giữa đẹp tuyệt đối
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final double spacing = constraints.maxWidth < 500 ? 16 : 32;
+
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _buildLevelButton(
+                      'Dễ',
+                      _EASY_COLOR,
+                      Icons.sentiment_satisfied_alt_rounded,
+                          () => _startReviewLevel(Difficulty.easy),
+                    ),
+                    SizedBox(width: spacing),
+                    _buildLevelButton(
+                      'Trung bình',
+                      _MEDIUM_COLOR,
+                      Icons.sentiment_neutral_rounded,
+                          () => _startReviewLevel(Difficulty.medium),
+                    ),
+                    SizedBox(width: spacing),
+                    _buildLevelButton(
+                      'Khó',
+                      _HARD_COLOR,
+                      Icons.sentiment_dissatisfied_rounded,
+                          () => _startReviewLevel(Difficulty.hard),
+                    ),
+                  ],
+                );
+              },
+            ),
+
+            const SizedBox(height: 36),
+
+            // Nút bỏ qua
+            TextButton.icon(
+              onPressed: _moveToNextWord,
+              icon: Icon(Icons.skip_next_rounded, color: Colors.blue[700], size: 26),
+              label: Text(
+                'Bỏ qua từ này',
+                style: TextStyle(
+                  color: Colors.blue[700],
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
               ),
             ),
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _buildLevelButton(String text,
-    Color color,
-    IconData icon,
-    VoidCallback onPressed, {
-    double size = 96, // mặc định
-  }) {
+      Color color,
+      IconData icon,
+      VoidCallback onPressed, {
+        double size = 96, // mặc định
+      }) {
     return Column(
       children: [
         Container(
