@@ -20,7 +20,7 @@ class _CreateDeckScreenState extends State<CreateDeckScreen> {
   bool _isSaving = false; // Biến trạng thái riêng cho nút Lưu
 
   // --- ✨ Modern Color Scheme ---
-  static const Color primaryColor = Color(0xFF6C5CE7);
+  static const Color primaryColor = Color(0xFF1E88E5);
   static const Color secondaryColor = Color(0xFF00B894);
   static const Color backgroundColor = Color(0xFFF5F6FA);
   static const Color cardColor = Colors.white;

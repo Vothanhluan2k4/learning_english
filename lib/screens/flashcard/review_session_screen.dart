@@ -706,7 +706,7 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> with SingleTi
               style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textPrimary),
             ),
             Text(
-              '${(percentage * 100).toStringAsFixed(1)}%',
+              '${(percentage * 100).toStringAsFixed(0)}%',
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: secondaryColor),
             ),
           ],

@@ -50,6 +50,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
             floating: false,
             pinned: true,
             elevation: 0,
+            automaticallyImplyLeading: false,
             backgroundColor: Colors.white,
             flexibleSpace: FlexibleSpaceBar(
               titlePadding: const EdgeInsets.only(left: 24, bottom: 16),
@@ -133,7 +134,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
         ],
       ),
     );
-  }
+  } 
 
   Widget _buildLoadingState() {
     return Center(

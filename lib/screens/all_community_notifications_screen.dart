@@ -268,10 +268,10 @@ class _AllCommunityNotificationsScreenState
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.stars, size: 14, color: Colors.white),
+                    Icon(Icons.stars, size: 12, color: Colors.white),
                     SizedBox(width: 4),
                     Text(
-                      '${score.toStringAsFixed(1)}%',
+                      '${score.toStringAsFixed(0)}%',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,

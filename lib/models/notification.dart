@@ -87,6 +87,9 @@ class NotificationMetadata {
     required this.targetCorrectAnswers,
   });
 
+  // ✅ Thêm getter để lấy score dưới dạng int
+  int get scoreAsInt => score.round();
+
   factory NotificationMetadata.fromJson(Map<String, dynamic> json) {
     // ✅ FIX: Parse score from string/int/double
     final scoreRaw = json['score'];

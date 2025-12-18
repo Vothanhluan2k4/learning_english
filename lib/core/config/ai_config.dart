@@ -154,39 +154,39 @@ class AiConfig {
 
   // ==================== WRITING GRADING ====================
   static const String writingGradingPromptTemplate = '''
-You are an English writing teacher. Grade the following student essay.
+    You are an English writing teacher. Grade the following student essay.
 
-**Topic/Question:**
-{question}
+    **Topic/Question:**
+    {question}
 
-**Student's Answer:**
-{answer}
+    **Student's Answer:**
+    {answer}
 
-**Requirements:**
-- Minimum words: {min_words}
-- Maximum words: {max_words}
-{guideline}
+    **Requirements:**
+    - Minimum words: {min_words}
+    - Maximum words: {max_words}
+    {guideline}
 
-**Grading Criteria:**
-1. Grammar & Vocabulary (30 points)
-2. Content & Ideas (30 points)
-3. Organization & Structure (20 points)
-4. Vocabulary (20 points)
+    **Grading Criteria:**
+    1. Grammar & Vocabulary (30 points)
+    2. Content & Ideas (30 points)
+    3. Organization & Structure (20 points)
+    4. Vocabulary (20 points)
 
-**Response Format (JSON only):**
-{{
-  "total_score": <number 0-100>,
-  "grammar_score": <number 0-30>,
-  "content_score": <number 0-30>,
-  "organization_score": <number 0-20>,
-  "vocabulary_score": <number 0-20>,
-  "word_count": <number>,
-  "strengths": ["strength 1", "strength 2"],
-  "weaknesses": ["weakness 1", "weakness 2"],
-  "suggestions": ["suggestion 1", "suggestion 2"],
-  "detailed_feedback": "<detailed feedback in Vietnamese>"
-}}
-''';
+    **Response Format (JSON only):**
+    {{
+      "total_score": <number 0-100>,
+      "grammar_score": <number 0-30>,
+      "content_score": <number 0-30>,
+      "organization_score": <number 0-20>,
+      "vocabulary_score": <number 0-20>,
+      "word_count": <number>,
+      "strengths": ["strength 1", "strength 2"],
+      "weaknesses": ["weakness 1", "weakness 2"],
+      "suggestions": ["suggestion 1", "suggestion 2"],
+      "detailed_feedback": "<detailed feedback in Vietnamese>"
+    }}
+    ''';
 
   // ✅ NEW: Get API key for provider
   static String getApiKey(String provider) {

@@ -7,6 +7,7 @@ import 'package:learning_english/services/notification_service.dart';
 import 'package:learning_english/services/learning_service.dart'; 
 import 'package:learning_english/core/utils/date_formatter.dart';
 import 'package:learning_english/screens/learning_hub/choose_learning_screen.dart';
+import 'package:learning_english/screens/chatbot/chatbot_screen.dart'; // ✅ Import
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -245,6 +246,21 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ],
             ),
+    floatingActionButton: FloatingActionButton( // ✅ Thêm FAB
+      backgroundColor: Color(0xFF2196F3),
+      elevation: 8,
+      onPressed: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => ChatbotScreen()),
+        );
+      },
+      child: const Icon(
+        Icons.smart_toy,
+        size: 28,
+        color: Colors.white,
+      ),
+    ),
     );
   }
 
@@ -802,7 +818,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        '${notif.metadata.score.toStringAsFixed(1)}%',
+                        '${notif.metadata.scoreAsInt}%',
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,

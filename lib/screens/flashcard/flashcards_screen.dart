@@ -59,7 +59,7 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> with SingleTickerPr
   late TabController _tabController;
 
   // Sử dụng GETTER không static hoặc STATIC FINAL cho màu sắc
-  Color get primaryColor => AppColors.primary;
+  Color get primaryColor => Colors.blue[600]!;
   Color get secondaryColor => AppColors.info; // Dùng AppColors.info cho general secondary
   Color get accentColor => AppColors.error;
   Color get backgroundColor => AppColors.background;
@@ -470,7 +470,7 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> with SingleTickerPr
                         icon: Icon(Icons.arrow_forward_ios_rounded, size: 14, color: primaryColor),
                         label: const Text(
                           "Xem tất cả bộ thẻ",
-                          style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold),
+                          style: TextStyle(color: Color(0xFF1E88E5), fontWeight: FontWeight.bold),
                         ),
                         onPressed: () {
                           _tabController.animateTo(1);

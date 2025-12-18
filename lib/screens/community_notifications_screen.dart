@@ -102,7 +102,7 @@ class CommunityNotificationsScreen extends StatelessWidget {
                         border: Border.all(color: Colors.green.shade200),
                       ),
                       child: Text(
-                        '${notif.metadata.score.toStringAsFixed(1)}%',
+                        '${notif.metadata.scoreAsInt}%',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,

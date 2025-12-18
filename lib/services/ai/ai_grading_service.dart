@@ -18,6 +18,26 @@ class AiGradingService {
     try {
       debugPrint('🤖 Sending to $provider AI for grading...');
 
+      // ✅ Check if user wrote in Vietnamese
+      if (_containsVietnamese(userAnswer)) {
+        debugPrint('⚠️ Detected Vietnamese text in answer');
+        return {
+          'total_score': 0,
+          'grammar_score': 0,
+          'content_score': 0,
+          'organization_score': 0,
+          'vocabulary_score': 0,
+          'word_count': countWords(userAnswer),
+          'strengths': [],
+          'weaknesses': ['Bài viết được viết bằng tiếng Việt'],
+          'suggestions': ['Vui lòng viết bài bằng tiếng Anh'],
+          'detailed_feedback': '⚠️ Yêu cầu viết bằng tiếng Anh. Bài làm của bạn có chứa tiếng Việt nên không được chấm điểm. Hãy thử lại bằng tiếng Anh nhé!',
+          'provider': provider,
+          'model': AiConfig.getDefaultModel(provider),
+          'grading_time_ms': DateTime.now().difference(startTime).inMilliseconds,
+        };
+      }
+
       // Build prompt
       final prompt = AiConfig.writingGradingPromptTemplate
           .replaceAll('{question}', questionText)
@@ -444,5 +464,38 @@ $userAnswer
 
 **IMPORTANT:** Return ONLY valid JSON. Do NOT wrap in markdown code blocks.
 ''';
+  }
+
+  /// ✅ Check if text contains Vietnamese characters
+  bool _containsVietnamese(String text) {
+    // Vietnamese specific characters (with diacritics)
+    final vietnamesePattern = RegExp(
+      r'[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ'
+      r'ÀÁẠẢÃÂẦẤẬẨẪĂẰẮẶẲẴÈÉẸẺẼÊỀẾỆỂỄÌÍỊỈĨÒÓỌỎÕÔỒỐỘỔỖƠỜỚỢỞỠÙÚỤỦŨƯỪỨỰỬỮỲÝỴỶỸĐ]'
+    );
+    
+    // Check if text has Vietnamese characters
+    final hasVietnameseChars = vietnamesePattern.hasMatch(text);
+    
+    // Common Vietnamese words (lowercase)
+    final vietnameseWords = {
+      'và', 'của', 'cho', 'với', 'trong', 'được', 'có', 'là', 'một', 'không',
+      'để', 'các', 'khi', 'như', 'đã', 'từ', 'bởi', 'này', 'đó', 'những',
+      'tôi', 'bạn', 'chúng', 'họ', 'mình', 'việc', 'người', 'thì', 'hay', 'sẽ',
+      'cũng', 'rất', 'đang', 'làm', 'nếu', 'nhưng', 'hoặc', 'vì', 'đến', 'về',
+      'cần', 'phải', 'theo', 'nên', 'còn', 'hơn', 'giữa', 'sau', 'trước', 'theo',
+    };
+    
+    // Split text into words and check
+    final words = text.toLowerCase().split(RegExp(r'\s+'));
+    int vietnameseWordCount = 0;
+    
+    for (final word in words) {
+      if (vietnameseWords.contains(word.trim())) {
+        vietnameseWordCount++;
+      }
+    }
+    
+    return hasVietnameseChars || vietnameseWordCount >= 3;
   }
 }
