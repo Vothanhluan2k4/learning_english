@@ -156,7 +156,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
 
-                      SizedBox(height: 24),
+                      SizedBox(height: 20),
 
                       // CHALLENGE CARD
                       Padding(
@@ -177,6 +177,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           ],
                         ),
                       ),
+
+                      SizedBox(height: 10),
 
                       // NOTIFICATIONS
                       if (personalNotification != null || communityNotifications.isNotEmpty)
