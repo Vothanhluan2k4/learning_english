@@ -11,7 +11,8 @@ class AiGradingService {
     int? minWords,
     int? maxWords,
     String? guideline,
-    String provider = 'groq', // 'groq' or 'gemini'
+    String? exampleAnswer, // ✅ NEW: Thêm example answer
+    String provider = 'groq',
   }) async {
     final startTime = DateTime.now();
 
@@ -38,13 +39,28 @@ class AiGradingService {
         };
       }
 
-      // Build prompt
-      final prompt = AiConfig.writingGradingPromptTemplate
-          .replaceAll('{question}', questionText)
-          .replaceAll('{answer}', userAnswer)
-          .replaceAll('{min_words}', minWords?.toString() ?? 'Không giới hạn')
-          .replaceAll('{max_words}', maxWords?.toString() ?? 'Không giới hạn')
-          .replaceAll('{guideline}', guideline != null ? '- Guideline: $guideline' : '');
+      // ✅ NEW: Detect if this is a sentence building exercise
+      final isSentenceBuilding = _isSentenceBuildingExercise(
+        questionText, 
+        minWords, 
+        maxWords, 
+        guideline,
+      );
+
+      // Build appropriate prompt
+      final prompt = isSentenceBuilding
+          ? _buildSentenceBuildingPrompt(
+              questionText, 
+              userAnswer, 
+              exampleAnswer, 
+              guideline,
+            )
+          : AiConfig.writingGradingPromptTemplate
+              .replaceAll('{question}', questionText)
+              .replaceAll('{answer}', userAnswer)
+              .replaceAll('{min_words}', minWords?.toString() ?? 'Không giới hạn')
+              .replaceAll('{max_words}', maxWords?.toString() ?? 'Không giới hạn')
+              .replaceAll('{guideline}', guideline != null ? '- Guideline: $guideline' : '');
 
       Map<String, dynamic> result;
 
@@ -59,6 +75,12 @@ class AiGradingService {
       // ✅ Validate and fix result
       result = _validateAndFixGradingResult(result);
 
+      // ✅ CRITICAL: Override AI's word_count with our own accurate count
+      // AI often miscounts words, so we use our reliable countWords() method
+      final actualWordCount = countWords(userAnswer);
+      result['word_count'] = actualWordCount;
+      debugPrint('📊 Overriding AI word_count (${result['word_count']}) with actual count: $actualWordCount');
+
       final responseTime = DateTime.now().difference(startTime).inMilliseconds;
       debugPrint('✅ AI grading completed in ${responseTime}ms');
 
@@ -72,6 +94,115 @@ class AiGradingService {
       debugPrint('❌ AI grading error: $e');
       rethrow;
     }
+  }
+
+  /// ✅ NEW: Check if this is a sentence building exercise
+  bool _isSentenceBuildingExercise(
+    String questionText,
+    int? minWords,
+    int? maxWords,
+    String? guideline,
+  ) {
+    final lowerQuestion = questionText.toLowerCase();
+    final lowerGuideline = guideline?.toLowerCase() ?? '';
+
+    // Keywords indicating sentence building
+    final sentenceBuildingKeywords = [
+      'viết câu',
+      'sắp xếp',
+      'từ gợi ý',
+      'hoàn chỉnh',
+      'rearrange',
+      'arrange',
+      'words given',
+      'write a sentence',
+      'complete the sentence',
+      'use the words',
+    ];
+
+    // Check if question/guideline contains keywords
+    for (final keyword in sentenceBuildingKeywords) {
+      if (lowerQuestion.contains(keyword) || lowerGuideline.contains(keyword)) {
+        return true;
+      }
+    }
+
+    // Check word count (sentence building usually has low word limit)
+    if (maxWords != null && maxWords <= 20) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /// ✅ NEW: Build prompt for sentence building exercises
+  String _buildSentenceBuildingPrompt(
+    String questionText,
+    String userAnswer,
+    String? exampleAnswer,
+    String? guideline,
+  ) {
+    return '''
+You are an English grammar teacher grading a SENTENCE BUILDING exercise.
+
+**Task:** $questionText
+
+**Guidelines:** ${guideline ?? 'Build a grammatically correct sentence'}
+
+**Expected Answer (Example):**
+$exampleAnswer
+
+**Student's Answer:**
+$userAnswer
+
+**IMPORTANT Grading Rules:**
+1. This is a SENTENCE BUILDING exercise (NOT an essay)
+2. Student only needs to write 1 correct sentence
+3. DO NOT penalize for "lack of vocabulary variety" or "short length"
+4. DO NOT suggest "expanding the sentence" or "using advanced words"
+5. **MUST FOLLOW the Guidelines provided above** - grade based on what the guideline requires
+6. Focus ONLY on:
+   - Grammar correctness (verb tense, word order, articles, prepositions)
+   - Matching the required meaning AND guideline requirements
+   - Proper capitalization and punctuation
+7. **ALL FEEDBACK MUST BE IN VIETNAMESE** (detailed_feedback, strengths, weaknesses, suggestions)
+
+**Scoring:**
+- grammar_score (0-30): Grammar correctness ONLY
+- content_score (0-30): Does it express the correct meaning?
+- organization_score (0-20): Capitalization, punctuation
+- vocabulary_score (0-20): Word choice (only if words are clearly wrong)
+
+**Response Format (JSON only):**
+{
+  "total_score": <0-100>,
+  "grammar_score": <0-30>,
+  "content_score": <0-30>,
+  "organization_score": <0-20>,
+  "vocabulary_score": <0-20>,
+  "word_count": <number>,
+  "strengths": ["<what's correct>"],
+  "weaknesses": ["<only real errors, not suggestions>"],
+  "suggestions": ["<only if there are grammar mistakes>"],
+  "detailed_feedback": "<feedback in Vietnamese, focus on grammar errors ONLY>"
+}
+
+**Examples of GOOD feedback:**
+✅ "Câu đúng ngữ pháp, diễn đạt rõ ý"
+✅ "Thiếu giới từ 'to' trước 'school'"
+✅ "Sai thì động từ: phải dùng 'goes' thay vì 'go'"
+
+**Examples of BAD feedback (DO NOT do this):**
+❌ "Từ vựng đơn giản" (This is a sentence building exercise!)
+❌ "Nên mở rộng câu thêm" (Not required!)
+❌ "Thiếu liên từ, từ nối" (It's just 1 sentence!)
+
+**CRITICAL:**
+1. Return ONLY valid JSON. Do NOT wrap in markdown code blocks.
+2. ALL text in detailed_feedback, strengths, weaknesses, suggestions MUST be in VIETNAMESE
+3. Grade according to the Guidelines provided above
+4. detailed_feedback must be a PARAGRAPH (not bullet points)
+''';
   }
 
   /// Grade with Groq
@@ -124,16 +255,24 @@ class AiGradingService {
           {
             'parts': [
               {
-                'text': '$prompt\n\n**IMPORTANT:** Return ONLY valid JSON. Do NOT wrap in markdown code blocks (```json). Do NOT include any text before or after the JSON object.'
+                'text': '$prompt\n\n**CRITICAL INSTRUCTIONS:**\n1. Return ONLY valid JSON (no markdown code blocks like ```json)\n2. ALL feedback fields (detailed_feedback, strengths, weaknesses, suggestions) MUST be in VIETNAMESE\n3. Follow ALL guidelines and requirements mentioned in the prompt\n4. Ensure JSON is complete and valid'
               }
             ]
           }
         ],
+        'systemInstruction': {
+          'parts': [
+            {
+              'text': 'Bạn là giáo viên tiếng Anh. LUÔN LUÔN phản hồi bằng TIẾNG VIỆT trong các trường detailed_feedback, strengths, weaknesses, suggestions. Chấm điểm CHÍNH XÁC theo yêu cầu và guideline được cung cấp. Trả về JSON hợp lệ.'
+            }
+          ]
+        },
         'generationConfig': {
           'temperature': 0.7,
-          'maxOutputTokens': 4096, // ✅ Increase to prevent truncation
+          'maxOutputTokens': 8192, // ✅ Increase to prevent truncation
           'topP': 0.95,
           'topK': 40,
+          'responseMimeType': 'application/json', // ✅ Force JSON response
         },
         'safetySettings': [
           {
@@ -284,10 +423,25 @@ class AiGradingService {
     return result;
   }
 
-  /// Count words in text
+  /// Count words in text (improved accuracy)
   int countWords(String text) {
     if (text.trim().isEmpty) return 0;
-    return text.trim().split(RegExp(r'\s+')).length;
+    
+    // Remove extra whitespace, newlines, tabs
+    String cleaned = text
+        .trim()
+        .replaceAll(RegExp(r'\s+'), ' ') // Replace multiple spaces/newlines/tabs with single space
+        .replaceAll(RegExp(r"[^\w\s'-]"), ' '); // Remove special chars except apostrophe, hyphen
+    
+    // Split by space and filter out empty strings
+    final words = cleaned
+        .split(' ')
+        .where((word) => word.trim().isNotEmpty)
+        .toList();
+    
+    debugPrint('📊 Word count: ${words.length} words from "${text.substring(0, text.length > 100 ? 100 : text.length)}..."');
+    
+    return words.length;
   }
 
   /// Validate writing answer
@@ -306,6 +460,7 @@ class AiGradingService {
       };
     }
 
+    // ✅ Check min words
     if (minWords != null && wordCount < minWords) {
       return {
         'isValid': false,
@@ -314,18 +469,35 @@ class AiGradingService {
       };
     }
 
-    if (maxWords != null && wordCount > maxWords) {
-      return {
-        'isValid': false,
-        'wordCount': wordCount,
-        'message': 'Bài viết không được vượt quá $maxWords từ (hiện tại: $wordCount từ)',
-      };
+    // ✅ Check max words with 5% tolerance
+    if (maxWords != null) {
+      final tolerance = (maxWords * 0.05).ceil(); // 5% tolerance: 80 → 84
+      final effectiveMax = maxWords + tolerance;
+      
+      if (wordCount > effectiveMax) {
+        return {
+          'isValid': false,
+          'wordCount': wordCount,
+          'message': 'Bài viết không được vượt quá $maxWords từ (tối đa cho phép: $effectiveMax từ, hiện tại: $wordCount từ)',
+        };
+      }
+    }
+
+    // ✅ Success message
+    String statusMessage = 'Bài viết hợp lệ ($wordCount từ)';
+    
+    if (minWords != null && maxWords != null) {
+      statusMessage = 'Số từ: $wordCount/$minWords-$maxWords ✓';
+    } else if (minWords != null) {
+      statusMessage = 'Số từ: $wordCount (tối thiểu $minWords) ✓';
+    } else if (maxWords != null) {
+      statusMessage = 'Số từ: $wordCount (tối đa $maxWords) ✓';
     }
 
     return {
       'isValid': true,
       'wordCount': wordCount,
-      'message': 'Bài viết hợp lệ',
+      'message': statusMessage,
     };
   }
 

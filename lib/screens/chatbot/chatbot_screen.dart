@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ChatbotScreen extends StatefulWidget {
   const ChatbotScreen({super.key});
@@ -18,13 +17,13 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   final List<Map<String, String>> _messages = [];
   
   bool _isLoading = false;
-  final String backend = "https://bikiet.app.n8n.cloud/webhook/vocab-chat";
-  late String userEmail;
+  // TODO: Thay đổi URL này sau khi setup n8n workflow của bạn
+  // Xem hướng dẫn tại docs/N8N_SETUP.md
+  final String backend = "https://luanthanhvo.app.n8n.cloud/webhook/english-chat";
 
   @override
   void initState() {
     super.initState();
-    userEmail = Supabase.instance.client.auth.currentUser?.email ?? "guest@example.com";
   }
 
   Future<void> _sendMessage() async {
@@ -50,7 +49,12 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
       final resp = await http.post(
         Uri.parse(backend),
         headers: {"Content-Type": "application/json"},
-        body: jsonEncode({"session_id": userEmail, "message": message}),
+        body: jsonEncode({"message": message}),
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw Exception('Request timeout');
+        },
       );
 
       String reply = errorReply;
@@ -59,6 +63,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         try {
           final dynamic rawData = jsonDecode(resp.body);
 
+          // Handle n8n response format: [{json: {output: "..."}}]
           if (rawData is List && rawData.isNotEmpty) {
             for (var item in rawData) {
               if (item is Map<String, dynamic>) {
@@ -72,17 +77,40 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                 }
               }
             }
+          } 
+          // Handle direct response format: {output: "..."}
+          else if (rawData is Map<String, dynamic> && rawData["output"] != null) {
+            reply = rawData["output"].toString();
+          }
+          // Handle text response
+          else if (rawData is String) {
+            reply = rawData;
           }
         } catch (e) {
+          print('Parse error: $e');
           reply = errorReply;
         }
+      } else if (resp.statusCode == 404) {
+        reply = "❌ Không tìm thấy server. Vui lòng kiểm tra lại URL trong code.";
+      } else if (resp.statusCode == 500) {
+        reply = "⚠️ Server đang gặp sự cố. Vui lòng thử lại sau.";
       } else {
-        reply = errorReply;
+        reply = "😕 Có lỗi xảy ra (Status: ${resp.statusCode}). Vui lòng thử lại.";
       }
 
       _sendBotMessage(reply);
+    } on Exception catch (e) {
+      String errorMsg = errorReply;
+      if (e.toString().contains('timeout')) {
+        errorMsg = "⏱️ Yêu cầu bị timeout. Vui lòng thử lại.";
+      } else if (e.toString().contains('SocketException')) {
+        errorMsg = "🌐 Không có kết nối mạng. Vui lòng kiểm tra Internet.";
+      }
+      _sendBotMessage(errorMsg);
+      print('Request error: $e');
     } catch (e) {
       _sendBotMessage(errorReply);
+      print('Unknown error: $e');
     }
 
     setState(() => _isLoading = false);
@@ -126,29 +154,9 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          "Bingo AI",
+          "LQEnglish AI - English Tutor",
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
-        actions: [
-          IconButton(
-            color: Colors.white,
-            icon: const Icon(Icons.shuffle),
-            tooltip: "Ôn tập từ vựng",
-            onPressed: () => _callAgent("ôn tập từ vựng"),
-          ),
-          IconButton(
-            color: Colors.white,
-            icon: const Icon(Icons.bar_chart),
-            tooltip: "Xem thống kê",
-            onPressed: () => _callAgent("xem thống kê học tập"),
-          ),
-          IconButton(
-            color: Colors.white,
-            icon: const Icon(Icons.lightbulb),
-            tooltip: "Gợi ý ôn tập",
-            onPressed: () => _callAgent("gợi ý ôn tập"),
-          ),
-        ],
       ),
       body: Column(
         children: [
@@ -165,7 +173,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                         ),
                         SizedBox(height: 16),
                         Text(
-                          "Xin chào! Tôi là Bingo AI",
+                          "Xin chào! Tôi là LQEnglish AI",
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
@@ -174,10 +182,19 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                         ),
                         SizedBox(height: 8),
                         Text(
-                          "Hãy hỏi tôi bất cứ điều gì!",
+                          "Trợ lý học tiếng Anh thông minh của bạn!",
                           style: TextStyle(
                             fontSize: 14,
                             color: Colors.grey[600],
+                          ),
+                        ),
+                        SizedBox(height: 16),
+                        Text(
+                          "Hỏi mình về:\n• Ngữ pháp\n• Từ vựng\n• Phát âm\n• Dịch câu",
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[500],
                           ),
                         ),
                       ],

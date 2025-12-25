@@ -1,16 +1,21 @@
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 /// AI Provider Configuration
 class AiConfig {
-  // ==================== FREE API KEYS ====================
-  // ⚠️ LƯU Ý: Đây là free tier API, giới hạn 3 lần/ngày cho mỗi user
-  // Production app nên dùng server-side proxy để bảo vệ API key
-  static const String groqApiKey = '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';  
+  // ==================== API KEYS FROM ENV ====================
+  // ⚠️ LƯU Ý: API keys được load từ file .env
+  // File .env không được commit lên git để bảo mật
+  static String get groqApiKey => dotenv.env['GROQ_API_KEY'] ?? '';  
   
-  static const String geminiApiKey = 'AIzaSyB6Pu9kqSZJhPDHBjYhPL3dN93DRzd8OFQ'; 
+  static String get geminiApiKey => dotenv.env['GEMINI_API_KEY'] ?? ''; 
   
   // ==================== GROQ ====================
   static const String groqBaseUrl = 'https://api.groq.com/openai/v1/chat/completions';
   static const String groqDefaultModel = 'llama-3.3-70b-versatile';
-  
+
   static const List<String> groqAvailableModels = [
     'llama-3.3-70b-versatile',
     'llama-3.1-70b-versatile',
@@ -27,12 +32,10 @@ class AiConfig {
 
   static const List<String> geminiAvailableModels = [
     'gemini-2.5-flash',
-    'gemini-1.5-flash',    
-    'gemini-1.5-pro',      
+    'gemini-1.5-flash',
+    'gemini-1.5-pro',
     'gemini-2.0-flash-exp',
-];
-
-
+  ];
 
   static const int geminiMaxTokensPerMinute = 32000;
   static const int geminiMaxRequestsPerMinute = 15;
@@ -46,8 +49,8 @@ class AiConfig {
   static const int defaultMaxTokens = 2000;
 
   // ==================== USAGE LIMITS ====================
-  static const int freeDailyUsageLimit = 3; 
-  
+  static const int freeDailyUsageLimit = 3;
+
   // ✅ NEW: Unlimited types
   static const List<String> unlimitedRequestTypes = [
     'writing_grading',
@@ -76,7 +79,7 @@ class AiConfig {
   static const String encryptionKey = "12345678901234567890123456789012";
 
   // ==================== HELPERS ====================
-  
+
   static String getEndpoint(String provider, {String? apiKey}) {
     switch (provider.toLowerCase()) {
       case 'groq':
@@ -167,11 +170,16 @@ class AiConfig {
     - Maximum words: {max_words}
     {guideline}
 
+    **IMPORTANT GRADING INSTRUCTIONS:**
+    1. **FOLLOW THE GUIDELINE**: If a guideline is provided above, grade the answer based on whether it meets the guideline requirements
+    2. **Count words accurately**: Split by spaces only, count EXACTLY as written
+    3. **Respond in VIETNAMESE**: All feedback fields must be in Vietnamese
+
     **Grading Criteria:**
-    1. Grammar & Vocabulary (30 points)
-    2. Content & Ideas (30 points)
-    3. Organization & Structure (20 points)
-    4. Vocabulary (20 points)
+    1. Grammar (30 points) - Ngữ pháp chính xác
+    2. Content & Ideas (30 points) - Nội dung đáp ứng yêu cầu và guideline
+    3. Organization & Structure (20 points) - Bố cục, mạch lạc
+    4. Vocabulary (20 points) - Từ vựng phù hợp
 
     **Response Format (JSON only):**
     {{
@@ -180,12 +188,17 @@ class AiConfig {
       "content_score": <number 0-30>,
       "organization_score": <number 0-20>,
       "vocabulary_score": <number 0-20>,
-      "word_count": <number>,
-      "strengths": ["strength 1", "strength 2"],
-      "weaknesses": ["weakness 1", "weakness 2"],
-      "suggestions": ["suggestion 1", "suggestion 2"],
-      "detailed_feedback": "<detailed feedback in Vietnamese>"
+      "word_count": <exact number of words in answer>,
+      "strengths": ["<điểm mạnh bằng tiếng Việt>", "<điểm mạnh 2>"],
+      "weaknesses": ["<điểm yếu bằng tiếng Việt>", "<điểm yếu 2>"],
+      "suggestions": ["<gợi ý cải thiện bằng tiếng Việt>", "<gợi ý 2>"],
+      "detailed_feedback": "<Nhận xét tổng quan bằng tiếng Việt, viết thành ĐOẠN VĂN liền mạch (KHÔNG dùng bullet points hay dấu gạch đầu dòng). Bao gồm: điểm mạnh, điểm yếu, và hướng cải thiện.>"
     }}
+
+    **CRITICAL:**
+    - ALL text in strengths, weaknesses, suggestions, detailed_feedback MUST be in VIETNAMESE
+    - detailed_feedback must be a PARAGRAPH (not bullet points)
+    - Grade based on the guideline if provided
     ''';
 
   // ✅ NEW: Get API key for provider

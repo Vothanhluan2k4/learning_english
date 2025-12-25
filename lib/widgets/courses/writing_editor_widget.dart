@@ -77,8 +77,26 @@ class _WritingEditorWidgetState extends State<WritingEditorWidget> {
   }
 
   void _updateWordCount() {
-    final text = _controller.text.trim();
-    final words = text.isEmpty ? 0 : text.split(RegExp(r'\s+')).length;
+    final text = _controller.text;
+    
+    if (text.trim().isEmpty) {
+      setState(() {
+        _wordCount = 0;
+        _isValid = _checkValid(0);
+      });
+      return;
+    }
+    
+    // ✅ Same logic as AiGradingService.countWords()
+    String cleaned = text
+        .trim()
+        .replaceAll(RegExp(r'\s+'), ' ') // Replace multiple spaces/newlines/tabs with single space
+        .replaceAll(RegExp(r"[^\w\s'-]"), ' '); // Remove special chars except apostrophe, hyphen
+    
+    final words = cleaned
+        .split(' ')
+        .where((word) => word.trim().isNotEmpty)
+        .length;
     
     setState(() {
       _wordCount = words;

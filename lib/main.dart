@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:learning_english/core/config/supabase_config.dart';
 import 'package:learning_english/helpers/notification_helper.dart';
 import 'package:learning_english/screens/course/choose_course_screen.dart';
@@ -26,6 +27,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 void main() async{
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Load environment variables from .env file
+  await dotenv.load(fileName: ".env");
+  
   final prefs = await SharedPreferences.getInstance();
   final bool isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
   //initialize Supabase

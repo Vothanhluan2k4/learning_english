@@ -1114,7 +1114,7 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> with SingleTi
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Expanded(child: _buildDialogTextField('Loại từ (N, V, ADJ...)', wordTypeController)),
+                            Expanded(child: _buildDialogTextField('Loại từ (N,V,...)', wordTypeController)),
                             const SizedBox(width: 16),
                             Expanded(child: _buildDialogTextField('Phiên âm', transcriptionController)),
                           ],

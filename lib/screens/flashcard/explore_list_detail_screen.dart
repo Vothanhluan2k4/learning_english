@@ -164,93 +164,55 @@ class _ExploreListDetailScreenState extends State<ExploreListDetailScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: bgColor,
-      body: CustomScrollView(
-        physics: const BouncingScrollPhysics(),
-        slivers: [
-          // Modern App Bar
-          SliverAppBar(
-            expandedHeight: 80,
-            floating: false,
-            pinned: true,
-            elevation: 0,
-            backgroundColor: Colors.white,
-            leading: IconButton(
-              icon: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-              ),
-              onPressed: () => Navigator.pop(context),
-            ),
-            actions: [
-              IconButton(
-                onPressed: () {
-                  _showSnackBar('Tính năng lưu bộ thẻ đang phát triển...');
-                },
-                icon: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: primaryColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(Icons.bookmark_add_outlined, color: primaryColor, size: 20),
-                ),
-                tooltip: 'Lưu vào bộ thẻ của tôi',
-              ),
-              const SizedBox(width: 8),
-            ],
-            flexibleSpace: FlexibleSpaceBar(
-              titlePadding: const EdgeInsets.only(left: 60, bottom: 16, right: 60),
-              title: Text(
-                _currentList.title,
-                style: const TextStyle(
-                  color: Color(0xFF1A1A2E),
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                  letterSpacing: -0.3,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
+      appBar: AppBar(
+        elevation: 0,
+        backgroundColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Color(0xFF1A1A2E)),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          _currentList.title,
+          style: const TextStyle(
+            color: Color(0xFF1A1A2E),
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+            letterSpacing: -0.3,
           ),
-
-          // Content
-          _isLoading
-              ? SliverFillRemaining(child: _buildLoadingState())
-              : SliverToBoxAdapter(
-            child: RefreshIndicator(
+        ),
+        centerTitle: false,
+      ),
+      body: _isLoading
+          ? _buildLoadingState()
+          : RefreshIndicator(
               onRefresh: _loadWords,
               color: primaryColor,
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Header Card
-                    _buildHeaderCard(),
-                    const SizedBox(height: 20),
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Header Card
+                      _buildHeaderCard(),
+                      const SizedBox(height: 20),
 
-                    // Action Buttons
-                    _buildActionButtons(),
-                    const SizedBox(height: 32),
+                      // Action Buttons
+                      _buildActionButtons(),
+                      const SizedBox(height: 32),
 
-                    // Word List Header
-                    _buildSectionHeader(),
-                    const SizedBox(height: 16),
+                      // Word List Header
+                      _buildSectionHeader(),
+                      const SizedBox(height: 16),
 
-                    // Word Cards
-                    _buildWordList(),
-                  ],
+                      // Word Cards
+                      _buildWordList(),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
-      ),
     );
   }
 

@@ -80,7 +80,7 @@ class _AiPracticeCheckScreenState extends State<AiPracticeCheckScreen> {
     }
   }
 
-  void _startPractice() {
+  void _startPractice() async {
     final useFreeApi = _selectedMode == 'free';
     
     // ✅ ADD DEBUG
@@ -89,7 +89,7 @@ class _AiPracticeCheckScreenState extends State<AiPracticeCheckScreen> {
     debugPrint('   API Key ID: ${useFreeApi ? 'FREE' : _selectedApiKeyId}');
     debugPrint('   Question count: $_questionCount');
     
-    Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => AiPracticeLoadingScreen(
@@ -99,6 +99,11 @@ class _AiPracticeCheckScreenState extends State<AiPracticeCheckScreen> {
         ),
       ),
     );
+    
+    // 🔄 Reload data khi quay lại từ màn hình luyện tập
+    if (mounted) {
+      await _checkUsage();
+    }
   }
 
   @override

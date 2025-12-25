@@ -45,6 +45,7 @@ dependencies:
   path_provider: ^2.1.5
   dio: ^5.9.0
   google_generative_ai: ^0.4.7
+  flutter_dotenv: ^5.2.1
 
 dev_dependencies:
   flutter_test:
@@ -63,3 +64,4 @@ flutter:
     - assets/default_avatar.png
     - assets/google_logo.png
     - assets/welcome_User.png
+    - .env

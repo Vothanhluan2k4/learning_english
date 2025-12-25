@@ -44,39 +44,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
       body: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
-          // Modern App Bar
-          SliverAppBar(
-            expandedHeight: 120,
-            floating: false,
-            pinned: true,
-            elevation: 0,
-            automaticallyImplyLeading: false,
-            backgroundColor: Colors.white,
-            flexibleSpace: FlexibleSpaceBar(
-              titlePadding: const EdgeInsets.only(left: 24, bottom: 16),
-              title: const Text(
-                'Khám Phá',
-                style: TextStyle(
-                  color: Color(0xFF1A1A2E),
-                  fontWeight: FontWeight.bold,
-                  fontSize: 28,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              background: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Colors.white,
-                      Colors.blue[50]!.withOpacity(0.3),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
+          // Modern App Ba
 
           // Content
           SliverPadding(
